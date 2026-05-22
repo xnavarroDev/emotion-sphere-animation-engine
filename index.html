@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Emotion Sphere</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; font-family:'Courier New',monospace; cursor:grab; }
+body.dragging { cursor:grabbing; }
+canvas { position:fixed; top:0; left:0; z-index:1; }
+/* Subtle holographic scanlines */
+body::after {
+  content:'';
+  position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(255,255,255,0.018) 2px, rgba(255,255,255,0.028) 3px
+  );
+}
+#label { position:fixed; top:24px; left:24px; z-index:100; color:rgba(255,255,255,0.55); font-size:9px; letter-spacing:5px; pointer-events:none; }
+#dots { position:fixed; top:24px; right:24px; z-index:100; display:flex; gap:10px; }
+.dot { width:10px; height:10px; border-radius:50%; cursor:pointer; opacity:0.35; transition:all 0.3s; }
+.dot:hover,.dot.active { opacity:1; transform:scale(1.5); }
+.dot-cycle {
+  width:14px; height:14px; border-radius:50%;
+  background:conic-gradient(from 90deg,#1A50C8,#7B4ED6,#E83040,#FFE066,#1A50C8);
+  box-shadow:0 0 8px rgba(255,255,255,0.35);
+}
+#hint { position:fixed; bottom:24px; right:24px; z-index:100; color:rgba(255,255,255,0.2); font-size:9px; letter-spacing:2px; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="label">RED · DANGER · AGGRESSION · ALERT</div>
+<div id="dots">
+  <div class="dot" style="background:#1A50C8;box-shadow:0 0 6px #5599EE" onclick="switchEmotion('blue')" id="d-blue"></div>
+  <div class="dot" style="background:#FFE066;box-shadow:0 0 8px #FFE880" onclick="switchEmotion('yellow')" id="d-yellow"></div>
+  <div class="dot active" style="background:#E83040;box-shadow:0 0 8px #FF5560" onclick="switchEmotion('red')" id="d-red"></div>
+  <div class="dot" style="background:#7B4ED6;box-shadow:0 0 6px #7B4ED6" onclick="switchEmotion('purple')" id="d-purple"></div>
+  <div class="dot dot-cycle" onclick="toggleCycle()" id="d-cycle" title="Cycle: blue → purple → red → yellow (click a colour dot to stop)"></div>
+</div>
+<div id="hint">DRAG TO ROTATE · CYCLE RUNS ALL FOUR · CLICK A DOT TO STOP</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+function hexRgb(h){
+  const n=parseInt(h.slice(1),16);
+  return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];
+}
+const SILVER=hexRgb('#B8C8DC');
+
+function emotionPalette(cfg){
+  const e={...cfg};
+  e.shadow=hexRgb(cfg.shadowHex);
+  e.deep=hexRgb(cfg.deepHex);
+  e.base=hexRgb(cfg.baseHex);
+  if(cfg.hotHex) e.hot=hexRgb(cfg.hotHex);
+  if(cfg.coreHex) e.core=hexRgb(cfg.coreHex);
+  if(cfg.midHex) e.mid=hexRgb(cfg.midHex);
+  if(cfg.highlightHex) e.highlight=hexRgb(cfg.highlightHex);
+  return e;
+}
+
+const EMOTIONS={
+  blue:emotionPalette({
+    label:'BLUE · CALM · FRIENDLY · SAFE',
+    shadowHex:'#0A0F2E',deepHex:'#0D2458',baseHex:'#1A50C8',midHex:'#5599EE',highlightHex:'#C8E8FF',
+    pulse:2.75,pulseMode:'calm',pulseAmp:0.02,chaos:0.025,chaosFreq:0.3,edgeFlicker:false,
+    glowSize:0.058,glowOp:0.14,silver:0.07,silverStyle:'droplets',
+    autoSpeed:0.0015,density:0.64,size:6,radius:1.78,
+  }),
+  yellow:emotionPalette({
+    label:'YELLOW · CURIOUS · PROCESSING · TRANSITION',
+    shadowHex:'#2A1800',deepHex:'#5A4200',baseHex:'#F0C820',midHex:'#FFE878',highlightHex:'#FFFDE8',
+    pulse:0.75,pulseMode:'burst',pulseAmp:0.05,chaos:0.3,chaosFreq:0.65,edgeFlicker:true,
+    glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'sparks',
+    autoSpeed:0.014,density:0.5,size:4.75,radius:1.5,
+  }),
+  red:emotionPalette({
+    label:'RED · DANGER · AGGRESSION · ALERT',
+    shadowHex:'#280808',deepHex:'#6A1818',baseHex:'#E82838',hotHex:'#FF5A48',coreHex:'#FFD4C8',
+    pulse:0.4,pulseMode:'heartbeat',pulseAmp:0.11,chaos:0.75,chaosFreq:1.4,edgeFlicker:false,
+    glowSize:0.02,glowOp:0.78,silver:0.1,silverStyle:'shards',
+    autoSpeed:0.022,density:0.55,size:6,radius:1.45,
+  }),
+  purple:emotionPalette({
+    label:'PURPLE · EMPATHY · BOND · CONNECTION',
+    shadowHex:'#0D0820',deepHex:'#26215C',baseHex:'#7B4ED6',midHex:'#AA88FF',highlightHex:'#E8DDFF',
+    pulse:6.5,pulseMode:'wave',pulseAmp:0.095,chaos:0.035,chaosFreq:0.12,edgeFlicker:false,
+    glowSize:0.036,glowOp:0.48,silver:0.08,silverStyle:'orbs',
+    autoSpeed:0.0016,density:0.68,size:4,radius:1.85,
+  }),
+};
+
+const COLOR_KEYS=['shadow','deep','base','mid','highlight','hot','core'];
+const MOTION_KEYS=['pulse','chaos','radius','size','density','autoSpeed','pulseAmp','glowSize','glowOp','silver','chaosFreq','pulseMode','edgeFlicker','silverStyle'];
+const SLIDER_KEYS=['pulse','density','chaos','radius','size'];
+const LOCKED_PARAMS={
+  blue:{ size:6 },
+  purple:{ size:4 },
+  yellow:{ pulse:0.75, density:0.5, chaos:0.3, radius:1.5, size:4.75 },
+  red:{ pulse:0.4, size:6 },
+};
+const ANGER_PULSE_BASE=0.4;
+const CYCLE_ORDER=['blue','purple','red','yellow'];
+const CYCLE_SEC=28;
+let cycleOn=false;
+let cycleStartAt=0;
+
+function innerJitter(t,phase,ox,oy,oz,amt){
+  const a=Math.sin(t*1.6+phase*2.3+oy*3.4);
+  const b=Math.sin(t*2.1+ox*4.2+phase*1.7);
+  const c=Math.cos(t*1.9+oz*3.8+phase*0.9);
+  const d=Math.sin(t*3.4+phase*3.1+ox*oz*5);
+  const e=Math.cos(t*2.7+oy*5.1+phase*2.5);
+  return {
+    x:(a*b+d*0.5)*amt,
+    y:(c*a+e*0.45)*amt,
+    z:(b*c+d*0.55)*amt,
+  };
+}
+
+function getAngerMod(t){
+  const p=Math.PI*2;
+  const ampMul=1+0.07*Math.sin(t*p/7+0.6)+0.05*Math.sin(t*p/5+1.4);
+  return {period:ANGER_PULSE_BASE, amp:ampMul};
+}
+function lockedParamsFor(name){ return LOCKED_PARAMS[name]; }
+
+function copyEmotion(e){
+  const c={...e};
+  for(const k of COLOR_KEYS){ if(e[k]) c[k]=[...e[k]]; }
+  return c;
+}
+let params=copyEmotion(EMOTIONS.red);
+let target=copyEmotion(EMOTIONS.red);
+let activeEmotion='red';
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+function emotionPreset(name){
+  const e=copyEmotion(EMOTIONS[name]);
+  const lp=LOCKED_PARAMS[name];
+  if(lp) for(const [k,v] of Object.entries(lp)) e[k]=v;
+  return e;
+}
+
+const smoothstep=t=>t*t*(3-2*t);
+const smootherstep=t=>t*t*t*(t*(t*6-15)+10);
+const HARD_CYCLE_SEGMENTS={'purple-red':true,'yellow-blue':true};
+const logLerp=(a,b,t)=>Math.exp(Math.log(Math.max(a,1e-6))*(1-t)+Math.log(Math.max(b,1e-6))*t);
+
+let cycleSegment={a:'blue',b:'purple',t:0};
+
+function cycleSegmentKey(a,b){ return a+'-'+b; }
+
+function cycleBlendSt(seg){
+  let t=smootherstep(seg.t);
+  if(HARD_CYCLE_SEGMENTS[cycleSegmentKey(seg.a,seg.b)]) t=smootherstep(t);
+  return t;
+}
+
+function cycleColorBlendSt(seg){
+  if(!HARD_CYCLE_SEGMENTS[cycleSegmentKey(seg.a,seg.b)]) return cycleBlendSt(seg);
+  return smootherstep(smootherstep(smootherstep(seg.t)));
+}
+
+function getSphereBreathForEmotion(t,emotion){
+  const prev=activeEmotion;
+  activeEmotion=emotion;
+  const e=emotionPreset(emotion);
+  const mode=e.pulseMode;
+  const period=mode==='calm'?Math.max(e.pulse,2.75):mode==='wave'?Math.max(e.pulse,5.5):emotion==='red'?ANGER_PULSE_BASE:Math.max(e.pulse,0.4);
+  let amp=e.pulseAmp||0.06;
+  if(emotion==='red'&&mode==='heartbeat') amp*=getAngerMod(t).amp;
+  const r=getSphereBreath(t,period,mode,amp);
+  activeEmotion=prev;
+  return r;
+}
+
+function cycleStyleWeights(){
+  if(!cycleOn) return null;
+  const st=cycleBlendSt(cycleSegment);
+  const wa=1-st, wb=st;
+  const a=cycleSegment.a, b=cycleSegment.b;
+  const colorSt=cycleColorBlendSt(cycleSegment);
+  const w={calm:0,purple:0,red:0,yellow:0,wa,wb,a,b,st,colorSt};
+  const add=(name,wt)=>{
+    const m=EMOTIONS[name].pulseMode, s=EMOTIONS[name].silverStyle;
+    if(m==='calm') w.calm+=wt;
+    if(m==='wave') w.purple+=wt;
+    if(m==='heartbeat') w.red+=wt;
+    if(m==='burst'||s==='sparks') w.yellow+=wt;
+  };
+  add(a,wa);
+  add(b,wb);
+  return w;
+}
+
+function cyclePaintWeights(){
+  const cw=cycleStyleWeights();
+  if(!cw) return null;
+  const {a,b,wa,wb}=cw;
+  const from=(test)=> (test(EMOTIONS[a])?wa:0)+(test(EMOTIONS[b])?wb:0);
+  return {
+    wYellow:from(e=>e.silverStyle==='sparks'),
+    wShards:from(e=>e.silverStyle==='shards'),
+    wOrbs:from(e=>e.silverStyle==='orbs'),
+    wCalmBlue:(a==='blue'?wa:0)+(b==='blue'?wb:0),
+  };
+}
+
+function silverShellAmt(style,silver){
+  if(style==='shards') return silver*0.18;
+  if(style==='sparks') return silver*0.12;
+  if(style==='orbs') return silver*0.1;
+  return silver*0.08;
+}
+function silverInnerAmt(style,silver){
+  if(style==='sparks') return silver*0.45;
+  if(style==='shards') return silver*0.35;
+  if(style==='orbs') return silver*0.3;
+  return silver*0.25;
+}
+
+function getCycleSegment(phase){
+  const n=CYCLE_ORDER.length;
+  let p=phase%1;
+  if(p<0) p+=1;
+  const x=p*n;
+  const i=Math.min(Math.floor(x),n-1);
+  const j=(i+1)%n;
+  const t=x-i;
+  return {a:CYCLE_ORDER[i],b:CYCLE_ORDER[j],t};
+}
+
+function buildCycleTarget(phase){
+  const seg=getCycleSegment(phase);
+  cycleSegment=seg;
+  const st=cycleBlendSt(seg);
+  const hard=!!HARD_CYCLE_SEGMENTS[cycleSegmentKey(seg.a,seg.b)];
+  activeEmotion=st>=0.5?seg.b:seg.a;
+  const presetA=emotionPreset(seg.a);
+  const presetB=emotionPreset(seg.b);
+  target=copyEmotion(presetA);
+  const scalarKeys=['pulse','density','chaos','radius','size','autoSpeed','pulseAmp','glowSize','glowOp','silver','chaosFreq'];
+  const logKeys=new Set(['chaos','glowOp','pulseAmp','chaosFreq']);
+  for(const k of scalarKeys){
+    if(hard&&logKeys.has(k)) target[k]=logLerp(presetA[k],presetB[k],st);
+    else target[k]=(1-st)*presetA[k]+st*presetB[k];
+  }
+  target.pulseMode=st>=0.5?presetB.pulseMode:presetA.pulseMode;
+  target.silverStyle=st>=0.5?presetB.silverStyle:presetA.silverStyle;
+  target.edgeFlicker=!!(EMOTIONS[seg.a].edgeFlicker||EMOTIONS[seg.b].edgeFlicker);
+  target.edgeFlickerAmt=(EMOTIONS[seg.a].edgeFlicker?(1-st):0)+(EMOTIONS[seg.b].edgeFlicker?st:0);
+  for(const k of COLOR_KEYS){
+    const colA=EMOTIONS[seg.a][k];
+    const colB=EMOTIONS[seg.b][k];
+    if(colA&&colB) target[k]=[(1-st)*colA[0]+st*colB[0],(1-st)*colA[1]+st*colB[1],(1-st)*colA[2]+st*colB[2]];
+    else if(colA) target[k]=[...colA];
+    else if(colB) target[k]=[...colB];
+    else delete target[k];
+  }
+  for(const k of COLOR_KEYS){
+    if(!EMOTIONS[seg.a][k]&&!EMOTIONS[seg.b][k]) delete target[k];
+  }
+  target.label=`${seg.a.toUpperCase()} ${((1-st)*100).toFixed(0)}% · ${seg.b.toUpperCase()} ${(st*100).toFixed(0)}%`;
+}
+
+function setDotActive(id){
+  document.querySelectorAll('.dot').forEach(d=>d.classList.remove('active'));
+  const el=document.getElementById(id);
+  if(el) el.classList.add('active');
+}
+
+function switchEmotion(name){
+  cycleOn=false;
+  activeEmotion=name;
+  target=emotionPreset(name);
+  target.edgeFlickerAmt=target.edgeFlicker?1:0;
+  params=copyEmotion(target);
+  document.getElementById('label').textContent=target.label||'';
+  setDotActive('d-'+name);
+}
+
+function toggleCycle(){
+  cycleOn=true;
+  cycleStartAt=performance.now();
+  setDotActive('d-cycle');
+  buildCycleTarget(0);
+  document.getElementById('label').textContent=target.label||'';
+}
+
+function tickCycle(){
+  if(!cycleOn) return;
+  const elapsed=(performance.now()-cycleStartAt)/1000;
+  const phase=(elapsed%CYCLE_SEC)/CYCLE_SEC;
+  buildCycleTarget(phase);
+  document.getElementById('label').textContent=target.label||'';
+}
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
+camera.position.z = 5;
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+const group = new THREE.Group();
+scene.add(group);
+
+const SHELL_N = 6000;
+const INNER_N = 900;
+const SHELL_PT_MUL = 0.0095;
+const INNER_PT_MUL = 0.017;
+const GLOW_PT_MUL = 4.0;
+
+function makeGlowTexture(){
+  const c=document.createElement('canvas');
+  c.width=c.height=64;
+  const ctx=c.getContext('2d');
+  const g=ctx.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(0.25,'rgba(255,255,255,0.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,64,64);
+  const tex=new THREE.CanvasTexture(c);
+  tex.needsUpdate=true;
+  return tex;
+}
+const glowTex=makeGlowTexture();
+
+// Shell (dense border)
+const shellPos=new Float32Array(SHELL_N*3);
+const shellOrig=new Float32Array(SHELL_N*3);
+const shellPhase=new Float32Array(SHELL_N);
+const shellColors=new Float32Array(SHELL_N*3);
+const golden=Math.PI*(3-Math.sqrt(5));
+for(let i=0;i<SHELL_N;i++){
+  const y=1-(i/(SHELL_N-1))*2;
+  const r=Math.sqrt(1-y*y);
+  const theta=golden*i;
+  const shellR=0.95+Math.random()*0.12;
+  shellPos[i*3]=shellOrig[i*3]=r*Math.cos(theta)*shellR;
+  shellPos[i*3+1]=shellOrig[i*3+1]=y*shellR;
+  shellPos[i*3+2]=shellOrig[i*3+2]=r*Math.sin(theta)*shellR;
+  shellPhase[i]=Math.random()*Math.PI*2;
+}
+const shellGeo=new THREE.BufferGeometry();
+shellGeo.setAttribute('position',new THREE.BufferAttribute(shellPos,3));
+shellGeo.setAttribute('color',new THREE.BufferAttribute(shellColors,3));
+const shellMat=new THREE.PointsMaterial({
+  size:0.018, vertexColors:true, transparent:true, opacity:0.65,
+  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+});
+group.add(new THREE.Points(shellGeo,shellMat));
+
+// Inner core + glow halo
+const innerPos=new Float32Array(INNER_N*3);
+const innerOrig=new Float32Array(INNER_N*3);
+const innerPhase=new Float32Array(INNER_N);
+const innerColors=new Float32Array(INNER_N*3);
+for(let i=0;i<INNER_N;i++){
+  const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+  const rad=Math.pow(Math.random(),0.45)*0.75;
+  innerPos[i*3]=innerOrig[i*3]=rad*Math.sin(ph)*Math.cos(th);
+  innerPos[i*3+1]=innerOrig[i*3+1]=rad*Math.sin(ph)*Math.sin(th);
+  innerPos[i*3+2]=innerOrig[i*3+2]=rad*Math.cos(ph);
+  innerPhase[i]=Math.random()*Math.PI*2;
+}
+const innerGeo=new THREE.BufferGeometry();
+innerGeo.setAttribute('position',new THREE.BufferAttribute(innerPos,3));
+innerGeo.setAttribute('color',new THREE.BufferAttribute(innerColors,3));
+const innerGlowMat=new THREE.PointsMaterial({
+  size:0.065, map:glowTex, vertexColors:true, transparent:true, opacity:0.35,
+  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+});
+const innerMat=new THREE.PointsMaterial({
+  size:0.032, map:glowTex, vertexColors:true, transparent:true, opacity:0.92,
+  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+});
+group.add(new THREE.Points(innerGeo,innerGlowMat));
+group.add(new THREE.Points(innerGeo,innerMat));
+
+function lerpRgb(a,b,t,out){
+  if(!a||!b){ out[0]=out[1]=out[2]=0.5; return; }
+  out[0]=a[0]+(b[0]-a[0])*t;
+  out[1]=a[1]+(b[1]-a[1])*t;
+  out[2]=a[2]+(b[2]-a[2])*t;
+}
+function colorCopy(c){ return [c[0],c[1],c[2]]; }
+function colorOr(p,tgt,key){
+  const c=(tgt&&tgt[key])||(p&&p[key]);
+  return c||[0.5,0.5,0.5];
+}
+function mixSilver(rgb,amount,out){
+  const m=1-amount;
+  out[0]=rgb[0]*m+SILVER[0]*amount;
+  out[1]=rgb[1]*m+SILVER[1]*amount;
+  out[2]=rgb[2]*m+SILVER[2]*amount;
+}
+const _rgb=[0,0,0],_rgb2=[0,0,0];
+
+function buildStops(p,tgt){
+  if(tgt.core&&tgt.hot){
+    return [
+      {at:0,c:colorCopy(colorOr(p,tgt,'core'))},{at:0.22,c:colorCopy(colorOr(p,tgt,'hot'))},
+      {at:0.48,c:colorCopy(colorOr(p,tgt,'base'))},{at:0.72,c:colorCopy(colorOr(p,tgt,'deep'))},
+      {at:1,c:colorCopy(colorOr(p,tgt,'shadow'))},
+    ];
+  }
+  return [
+    {at:0,c:colorCopy(colorOr(p,tgt,'highlight'))},{at:0.28,c:colorCopy(colorOr(p,tgt,'mid'))},
+    {at:0.52,c:colorCopy(colorOr(p,tgt,'base'))},{at:0.74,c:colorCopy(colorOr(p,tgt,'deep'))},
+    {at:1,c:colorCopy(colorOr(p,tgt,'shadow'))},
+  ];
+}
+function presetForStops(name){
+  return emotionPreset(name);
+}
+function sampleStops(t,stops,out){
+  const u=Math.max(0,Math.min(1,t));
+  for(let i=0;i<stops.length-1;i++){
+    if(u<=stops[i+1].at){
+      lerpRgb(stops[i].c,stops[i+1].c,(u-stops[i].at)/(stops[i+1].at-stops[i].at),out);
+      return;
+    }
+  }
+  out[0]=stops[stops.length-1].c[0];
+  out[1]=stops[stops.length-1].c[1];
+  out[2]=stops[stops.length-1].c[2];
+}
+
+function getPulseWave(t,period,mode){
+  const f=(1/Math.max(period,0.05))*Math.PI*2;
+  const s=Math.sin(t*f);
+  if(mode==='calm'){
+    const eased=(1-Math.cos(t*f))*0.5;
+    return 0.5+(eased-0.5)*0.22;
+  }
+  if(mode==='breath') return s*0.5+0.5;
+  if(mode==='heartbeat'){
+    if(activeEmotion==='red'){
+      const eased=(1-Math.cos(t*f))*0.5;
+      const slow=(1-Math.cos(t*f*0.48+0.5))*0.5;
+      return eased*0.8+slow*0.2;
+    }
+    const bump=Math.max(0,s);
+    return bump*bump*(0.65+0.35*Math.max(0,Math.sin(t*f*2+0.4)));
+  }
+  if(mode==='burst'){
+    if(activeEmotion==='yellow'){
+      const eased=(1-Math.cos(t*f))*0.5;
+      return 0.38+0.62*eased;
+    }
+    return Math.pow(Math.max(0,s),2.4);
+  }
+  if(mode==='wave'){
+    if(activeEmotion==='purple'){
+      const w1=(1-Math.cos(t*f))*0.5;
+      const w2=(1-Math.cos(t*f*0.52+0.85))*0.5;
+      const w3=(1-Math.cos(t*f*0.34+2.05))*0.5;
+      return w1*0.58+w2*0.28+w3*0.14;
+    }
+    const a=s*0.5+0.5,b=Math.sin(t*f*0.62+1.1)*0.5+0.5;
+    return a*0.72+b*0.28;
+  }
+  return s*0.5+0.5;
+}
+
+const YELLOW_FLASH=hexRgb('#FFFFD0');
+
+function yellowSparkFlicker(t,phase,ox,oy,oz){
+  const a=Math.sin(t*12.7+phase*2.31);
+  const b=Math.sin(t*19.3+phase*4.17+ox*3.7);
+  const c=Math.cos(t*8.4+phase*1.83+oy*4.9+oz*2.6);
+  const d=Math.sin(t*23.1+phase*0.97+ox*oy*6);
+  const chaos=Math.pow(Math.abs(a*b*c*d),0.38);
+  const spike=Math.pow(Math.max(0,Math.sin(t*17.4+phase*3.6+ox*2.2)*Math.sin(t*24.1+phase*1.9+oy*4.1)),2.05);
+  const flash=spike*(0.35+0.65*chaos);
+  const mul=0.92+chaos*0.18+spike*0.82;
+  return {mul,flash};
+}
+
+function tintBrightYellow(r,g,b,flash,out){
+  const f=Math.min(flash,1);
+  out[0]=Math.min(r*(1+f*0.82)+YELLOW_FLASH[0]*f*0.62,1);
+  out[1]=Math.min(g*(1+f*0.72)+YELLOW_FLASH[1]*f*0.58,1);
+  out[2]=Math.min(b*(1+f*0.35)+YELLOW_FLASH[2]*f*0.22,1);
+}
+
+function getSphereBreath(t,period,mode,pulseAmp){
+  const f=(1/Math.max(period,0.05))*Math.PI*2;
+  if(mode==='calm'){
+    const breath=(1-Math.cos(t*f))*0.5;
+    const swell=(breath-0.5)*2;
+    return {breath,swell,scale:1+swell*0.045,disperse:Math.max(0,swell)*0.055,innerScale:1+swell*0.042};
+  }
+  if(mode==='wave'&&activeEmotion==='purple'){
+    const w1=(1-Math.cos(t*f))*0.5;
+    const w2=(1-Math.cos(t*f*0.48+0.6))*0.5;
+    const breath=w1*0.65+w2*0.35;
+    const swell=(breath-0.5)*2;
+    const amp=pulseAmp||0.095;
+    return {breath,swell,scale:1+swell*amp*1.15,disperse:Math.max(0,swell)*amp*1.05,innerScale:1+swell*amp*1.05};
+  }
+  const breath=getPulseWave(t,period,mode);
+  const swell=(breath-0.5)*2;
+  let amp=pulseAmp||0.06;
+  let scaleMul=0.85, disperseMul=0.55, innerMul=0.7;
+  if(mode==='heartbeat'&&activeEmotion==='red'){
+    scaleMul=0.72;
+    disperseMul=0.48;
+    innerMul=0.58;
+  }
+  return {breath,swell,scale:1+swell*amp*scaleMul,disperse:Math.max(0,swell)*amp*disperseMul,innerScale:1+swell*amp*innerMul};
+}
+
+function updateColors(shimmerT=0){
+  try{
+    const cw=cycleStyleWeights();
+    const stops=buildStops(params,target);
+    const stopsA=cw?buildStops(params,presetForStops(cw.a)):null;
+    const stopsB=cw?buildStops(params,presetForStops(cw.b)):null;
+    const blendSt=cw?cw.colorSt:0;
+    const silver=params.silver||0.08;
+    const pw=cyclePaintWeights();
+    const style=target.silverStyle||params.silverStyle||'droplets';
+    let shellSilver=silver*(style==='shards'?0.14:0.08);
+    let innerSilver=silver*0.25;
+    if(pw){
+      shellSilver=0;
+      innerSilver=0;
+      const add=(name,wt)=>{
+        const e=EMOTIONS[name], s=e.silver||silver;
+        shellSilver+=wt*silverShellAmt(e.silverStyle,s);
+        innerSilver+=wt*silverInnerAmt(e.silverStyle,s);
+      };
+      add(cw.a,cw.wa);
+      add(cw.b,cw.wb);
+    }else{
+      if(style==='sparks'){ shellSilver=silver*0.12; innerSilver=silver*0.45; }
+      if(style==='shards'){ shellSilver=silver*0.18; innerSilver=silver*0.35; }
+      if(style==='orbs'){ shellSilver=silver*0.1; innerSilver=silver*0.3; }
+    }
+
+    const mode=target.pulseMode||params.pulseMode||'breath';
+    const wYellow=pw?pw.wYellow:(activeEmotion==='yellow'&&style==='sparks'?1:0);
+    const wCalmBlue=pw?pw.wCalmBlue:(activeEmotion==='blue'&&mode==='calm'?1:0);
+    const wPurpleOrb=pw?pw.wOrbs:(activeEmotion==='purple'&&style==='orbs'?1:0);
+    const wBlueInner=pw?pw.wCalmBlue:(activeEmotion==='blue'?1:0);
+    const wShards=pw?pw.wShards:(style==='shards'?1:0);
+    for(let i=0;i<SHELL_N;i++){
+      const i3=i*3;
+      const ox=shellOrig[i3],oy=shellOrig[i3+1],oz=shellOrig[i3+2];
+      const d=Math.sqrt(ox*ox+oy*oy+oz*oz)/1.05;
+      let sampleD=d, silverAmt=shellSilver*(0.1+0.35*d), edgeFade=1;
+      if(wCalmBlue>0.001){
+        const edge=Math.max(0,Math.min(1,(d-0.84)/0.22));
+        const calmD=d*(1-edge*0.45)+0.06;
+        const calmSilver=shellSilver*(0.03+0.08*d)*(1-edge*0.75);
+        const calmFade=1-edge*0.55;
+        sampleD=d*(1-wCalmBlue)+calmD*wCalmBlue;
+        silverAmt=shellSilver*(0.1+0.35*d)*(1-wCalmBlue)+calmSilver*wCalmBlue;
+        edgeFade=1*(1-wCalmBlue)+calmFade*wCalmBlue;
+      }
+      if(cw){
+        sampleStops(sampleD,stopsA,_rgb);
+        sampleStops(sampleD,stopsB,_rgb2);
+        lerpRgb(_rgb,_rgb2,blendSt,_rgb);
+      }else sampleStops(sampleD,stops,_rgb);
+      mixSilver(_rgb,silverAmt,_rgb2);
+      let r=_rgb2[0],g=_rgb2[1],b=_rgb2[2];
+      if(wYellow>0.001){
+        const yw=smoothstep(Math.min(1,wYellow));
+        const yf=yellowSparkFlicker(shimmerT,shellPhase[i],ox,oy,oz);
+        tintBrightYellow(r*yf.mul,g*yf.mul,b*yf.mul,yf.flash,_rgb);
+        const yr=_rgb[0],yg=_rgb[1],yb=_rgb[2];
+        r=r*(1-yw)+yr*yw;
+        g=g*(1-yw)+yg*yw;
+        b=b*(1-yw)+yb*yw;
+      }
+      shellColors[i3]=Math.min(r*edgeFade,1);
+      shellColors[i3+1]=Math.min(g*edgeFade,1);
+      shellColors[i3+2]=Math.min(b*edgeFade,1);
+    }
+    shellGeo.attributes.color.needsUpdate=true;
+
+    for(let i=0;i<INNER_N;i++){
+      const i3=i*3;
+      const d=Math.sqrt(innerOrig[i3]**2+innerOrig[i3+1]**2+innerOrig[i3+2]**2)/0.75;
+      if(cw){
+        sampleStops(d*0.42,stopsA,_rgb);
+        sampleStops(d*0.42,stopsB,_rgb2);
+        lerpRgb(_rgb,_rgb2,blendSt,_rgb);
+      }else sampleStops(d*0.42,stops,_rgb);
+      mixSilver(_rgb,innerSilver,_rgb2);
+      const ox=innerOrig[i3],oy=innerOrig[i3+1],oz=innerOrig[i3+2];
+      let boost=1.42+(wShards>0.001?0.16*wShards:0);
+      let r=_rgb2[0],g=_rgb2[1],b=_rgb2[2];
+      if(wYellow>0.001){
+        const yw=smoothstep(Math.min(1,wYellow));
+        const yf=yellowSparkFlicker(shimmerT,innerPhase[i],ox,oy,oz);
+        tintBrightYellow(r*yf.mul*1.22,g*yf.mul*1.22,b*yf.mul*1.18,yf.flash*1.12,_rgb);
+        const yr=_rgb[0],yg=_rgb[1],yb=_rgb[2];
+        r=r*(1-yw)+yr*yw;
+        g=g*(1-yw)+yg*yw;
+        b=b*(1-yw)+yb*yw;
+        boost=1+(1-yw)*(boost-1);
+      }
+      if(wBlueInner>0.001){
+        const bb=1.35+0.008*Math.sin(shimmerT*0.5+ox*3);
+        boost=boost*(1-wBlueInner)+bb*wBlueInner;
+      }
+      if(wPurpleOrb>0.001){
+        const pb=1.34+0.007*Math.sin(shimmerT*0.35+innerPhase[i]+ox*1.8);
+        boost=boost*(1-wPurpleOrb)+pb*wPurpleOrb;
+      }
+      innerColors[i3]=Math.min(r*boost,1);
+      innerColors[i3+1]=Math.min(g*boost,1);
+      innerColors[i3+2]=Math.min(b*boost,1);
+    }
+    innerGeo.attributes.color.needsUpdate=true;
+  }catch(err){ console.error('updateColors',err); }
+}
+updateColors();
+
+let isDragging=false, prevX=0, prevY=0, rotX=0, rotY=0, velX=0, velY=0;
+
+renderer.domElement.addEventListener('mousedown', e=>{
+  isDragging=true; prevX=e.clientX; prevY=e.clientY; velX=0; velY=0;
+  document.body.classList.add('dragging');
+});
+window.addEventListener('mouseup', ()=>{ isDragging=false; document.body.classList.remove('dragging'); });
+window.addEventListener('mousemove', e=>{
+  if(!isDragging) return;
+  const dx=e.clientX-prevX, dy=e.clientY-prevY;
+  velX=dy*0.006; velY=dx*0.006; rotX+=velX; rotY+=velY;
+  prevX=e.clientX; prevY=e.clientY;
+});
+renderer.domElement.addEventListener('touchstart', e=>{
+  isDragging=true; prevX=e.touches[0].clientX; prevY=e.touches[0].clientY; velX=0; velY=0;
+},{passive:true});
+window.addEventListener('touchend', ()=>{ isDragging=false; });
+renderer.domElement.addEventListener('touchmove', e=>{
+  if(!isDragging) return;
+  const dx=e.touches[0].clientX-prevX, dy=e.touches[0].clientY-prevY;
+  velX=dy*0.006; velY=dx*0.006; rotX+=velX; rotY+=velY;
+  prevX=e.touches[0].clientX; prevY=e.touches[0].clientY;
+},{passive:true});
+
+switchEmotion('red');
+
+const clock = new THREE.Clock();
+const shellPosAttr=shellGeo.getAttribute('position');
+const innerPosAttr=innerGeo.getAttribute('position');
+
+function animate(){
+  requestAnimationFrame(animate);
+  tickCycle();
+  const t=clock.getElapsedTime();
+
+  const cw=cycleStyleWeights();
+  const motionT=cycleOn?0.2:0.02;
+  for(const k of SLIDER_KEYS) params[k]=lerp(params[k],target[k],motionT);
+  for(const k of MOTION_KEYS){
+    if(SLIDER_KEYS.includes(k)) continue;
+    params[k]=lerp(params[k],target[k],motionT);
+  }
+  if(!cycleOn){
+    params.edgeFlicker=!!target.edgeFlicker;
+    if(target.pulseMode) params.pulseMode=target.pulseMode;
+    if(target.silverStyle) params.silverStyle=target.silverStyle;
+  }else{
+    params.edgeFlicker=!!target.edgeFlicker;
+    params.pulseMode=target.pulseMode;
+    params.silverStyle=target.silverStyle;
+    const hardColor=HARD_CYCLE_SEGMENTS[cycleSegmentKey(cycleSegment.a,cycleSegment.b)];
+    const colorT=hardColor?0.045:0.1;
+    for(const k of COLOR_KEYS){
+      if(target[k]){
+        if(!params[k]) params[k]=[...target[k]];
+        else for(let i=0;i<3;i++) params[k][i]=lerp(params[k][i],target[k][i],colorT);
+      }else delete params[k];
+    }
+  }
+
+  const mode=target.pulseMode||'breath';
+  const style=target.silverStyle||'droplets';
+  const pw=cyclePaintWeights();
+  const wShards=pw?pw.wShards:(style==='shards'?1:0);
+  const wCalm=cw?cw.calm:(mode==='calm'?1:0);
+  const wPurple=cw?cw.purple:(mode==='wave'?1:0);
+  const wRed=cw?cw.red:(mode==='heartbeat'?1:0);
+  const wYellow=cw?cw.yellow:(style==='sparks'||mode==='burst'?1:0);
+  const wChaosMotion=wRed+wYellow;
+  const wGlowChaos=Math.max(0,1-Math.min(1,wCalm+wPurple+wRed+wYellow));
+  const wGlowSum=wCalm+wPurple+wRed+wYellow+wGlowChaos;
+  const wMotionSum=wCalm+wPurple+wChaosMotion;
+  const mNorm=wMotionSum>0.001?1/wMotionSum:1;
+  const wEdge=cycleOn?(target.edgeFlickerAmt!=null?target.edgeFlickerAmt:(target.edgeFlicker?1:0)):(target.edgeFlicker?1:0);
+  const angerMod=wRed>0.1?getAngerMod(t):null;
+  let sphere,breath;
+  if(cw){
+    const sa=getSphereBreathForEmotion(t,cw.a);
+    const sb=getSphereBreathForEmotion(t,cw.b);
+    sphere={
+      breath:cw.wa*sa.breath+cw.wb*sb.breath,
+      swell:cw.wa*sa.swell+cw.wb*sb.swell,
+      scale:cw.wa*sa.scale+cw.wb*sb.scale,
+      disperse:cw.wa*sa.disperse+cw.wb*sb.disperse,
+      innerScale:cw.wa*sa.innerScale+cw.wb*sb.innerScale,
+    };
+    breath=sphere.breath;
+  }else{
+    const calmPeriod=Math.max(target.pulse||2.75,2.75);
+    const purplePeriod=Math.max(target.pulse||6.5,5.5);
+    const breathPeriod=wCalm>0.5?calmPeriod:wPurple>0.5?purplePeriod:wRed>0.5?ANGER_PULSE_BASE:Math.max(target.pulse||0.4,0.05);
+    const angerAmp=wRed>0.5?(target.pulseAmp||0.11)*(angerMod?angerMod.amp:1):target.pulseAmp||0.06;
+    sphere=getSphereBreath(t,breathPeriod,mode,angerAmp);
+    breath=sphere.breath;
+  }
+  const breathPeriodFor=(emotion)=>{
+    const e=emotionPreset(emotion);
+    const m=e.pulseMode;
+    return m==='calm'?Math.max(e.pulse,2.75):m==='wave'?Math.max(e.pulse,5.5):emotion==='red'?ANGER_PULSE_BASE:Math.max(e.pulse,0.4);
+  };
+  const breathPeriod=cw
+    ?cw.wa*breathPeriodFor(cw.a)+cw.wb*breathPeriodFor(cw.b)
+    :(wCalm>0.5?Math.max(target.pulse||2.75,2.75):wPurple>0.5?Math.max(target.pulse||6.5,5.5):wRed>0.5?ANGER_PULSE_BASE:Math.max(target.pulse||0.4,0.05));
+  const pulseFreq=(1/Math.max(breathPeriod,0.05))*Math.PI*2;
+  const cf=params.chaosFreq||0.5;
+  const radius=Number.isFinite(params.radius)?Math.max(params.radius,0.1):1.5;
+  const density=Math.max(params.density||0.5,0.05);
+  const pSize=Number.isFinite(params.size)?Math.max(params.size,0.1):2;
+
+  const yellowPulse=wYellow>0.35;
+  shellMat.size=pSize*SHELL_PT_MUL*(yellowPulse
+    ?0.97+0.03*Math.sin(t*pulseFreq*0.35)
+    :wChaosMotion>0.5?0.92+Math.sin(t*18)*0.08:1);
+  let shellOp=wCalm*density*(0.44+sphere.breath*0.07)+wPurple*density*(0.52+(breath-0.5)*0.16)+wChaosMotion*density*(0.58+breath*0.14);
+  if(wEdge>0.001){
+    const flick=wYellow>0.2?0.92+0.08*Math.sin(t*pulseFreq*0.45):0.82+0.18*Math.sin(t*13.5);
+    shellOp*=1-wEdge+flick*wEdge;
+  }
+  if(yellowPulse) shellOp*=0.94+0.06*Math.sin(t*pulseFreq*0.4);
+  shellMat.opacity=Math.min(Math.max(shellOp,0.12),1);
+
+  const gNorm=wGlowSum>0.001?1/wGlowSum:1;
+  const gbCalm=0.96+(breath-0.5)*0.04;
+  const gbPurple=0.9+(breath-0.5)*0.14;
+  const gbRed=0.92+(breath-0.5)*0.1;
+  const gbBurst=0.8+breath*0.2;
+  const glowBreath=(
+    wCalm*gbCalm+wPurple*gbPurple+wRed*gbRed+wYellow*gbBurst+wGlowChaos*gbBurst
+  )*gNorm;
+  innerMat.size=pSize*INNER_PT_MUL*glowBreath;
+  innerMat.opacity=Math.min(density*(wRed*(0.9+(breath-0.5)*0.08)+(1-wRed)*(0.88+breath*0.12)),1);
+  const gmCalm=1.08, gmPurple=0.92+(breath-0.5)*0.16, gmRed=0.9+(breath-0.5)*0.1, gmBurst=1, gmChaos=0.85;
+  const glowSizeMul=(wCalm*gmCalm+wPurple*gmPurple+wRed*gmRed+wYellow*gmBurst+wGlowChaos*gmChaos)*gNorm;
+  innerGlowMat.size=(params.glowSize||0.03)*GLOW_PT_MUL*glowBreath*glowSizeMul;
+  const opCalm=0.88+(breath-0.5)*0.06, opPurple=0.76+(breath-0.5)*0.14, opPulse=0.75+breath*0.25;
+  innerGlowMat.opacity=Math.min(density*(params.glowOp||0.35)*(
+    wCalm*opCalm+wPurple*opPurple+(wRed+wYellow+wGlowChaos)*opPulse
+  )*gNorm,0.9);
+
+  const chaosMul=wCalm*target.chaos*0.018+wPurple*target.chaos*0.01+wChaosMotion*target.chaos*0.06;
+  const shimmer=wCalm*0.028+wPurple*0.02+wYellow*0.012;
+  const shellArr=shellPosAttr.array;
+  for(let i=0;i<SHELL_N;i++){
+    const i3=i*3;
+    const ox=shellOrig[i3],oy=shellOrig[i3+1],oz=shellOrig[i3+2];
+    const len=Math.sqrt(ox*ox+oy*oy+oz*oz)||1;
+    const rippleWave=Math.sin(t*pulseFreq+shellPhase[i])*0.5+0.5;
+    const ripple=wRed*breath+(1-wRed)*rippleWave;
+    const rippleAmt=wCalm*0.018+wPurple*0.022+wYellow*0.016+wRed*0.02+wChaosMotion*0.025;
+    let dx=0,dy=0,dz=0,expand=1+sphere.disperse;
+    if(wCalm>0.001){
+      const ph=shellPhase[i];
+      const edge=Math.max(0,Math.min(1,(len-0.88)/0.24));
+      const shim=shimmer*(1+edge*2.4);
+      const cdx=Math.sin(t*0.38+oy*1.6+ph)*shim+Math.sin(t*0.28+oz*2+ph*0.7)*shim*0.6;
+      const cdy=Math.sin(t*0.33+oz*1.8+ph*1.1)*shim+Math.cos(t*0.44+ox*1.4+ph)*shim*0.5;
+      const cdz=Math.sin(t*0.41+ox*2+ph*0.9)*shim;
+      dx+=wCalm*mNorm*(cdx+edge*Math.sin(t*0.47+ph*2.3+oy*1.2)*0.038);
+      dy+=wCalm*mNorm*(cdy+edge*Math.cos(t*0.39+ph*1.7+oz*1.4)*0.038);
+      dz+=wCalm*mNorm*(cdz+edge*Math.sin(t*0.52+ph*2.9+ox*1.1)*0.034);
+      expand+=wCalm*mNorm*edge*(Math.sin(t*0.44+ph*1.8)*0.09+Math.sin(t*0.33+ph*3.1+oy)*0.06);
+    }
+    if(wPurple>0.001){
+      const ph=shellPhase[i];
+      const wave=Math.sin(t*pulseFreq*0.28+ph+oy*0.6+oz*0.4)*0.5+0.5;
+      const shim=shimmer*(0.75+wave*0.5);
+      dx+=wPurple*mNorm*(Math.sin(t*0.2+oy*1.1+ph)*shim+Math.sin(t*0.16+oz*1.3+ph*0.65)*shim*0.55);
+      dy+=wPurple*mNorm*(Math.sin(t*0.18+oz*1.5+ph*0.9)*shim+Math.cos(t*0.22+ox*1.2+ph)*shim*0.5);
+      dz+=wPurple*mNorm*(Math.sin(t*0.21+ox*1.4+ph*0.75)*shim);
+      expand+=wPurple*mNorm*(sphere.swell*0.045+wave*0.04*Math.sin(t*pulseFreq*0.22+ph*1.4));
+    }
+    if(wChaosMotion>0.001){
+      const c=chaosMul;
+      dx+=wChaosMotion*mNorm*Math.sin(t*cf*0.9+oy*4+shellPhase[i])*c;
+      dy+=wChaosMotion*mNorm*Math.sin(t*cf*0.7+oz*3+shellPhase[i]*1.3)*c;
+      dz+=wChaosMotion*mNorm*Math.sin(t*cf*1.1+ox*5+shellPhase[i]*0.7)*c;
+    }
+    const r=radius*sphere.scale*(1+(ripple-0.5)*rippleAmt);
+    const nx=ox/len,ny=oy/len,nz=oz/len;
+    const pr=len*r*expand;
+    shellArr[i3]=nx*pr+dx;
+    shellArr[i3+1]=ny*pr+dy;
+    shellArr[i3+2]=nz*pr+dz;
+  }
+  shellPosAttr.needsUpdate=true;
+
+  const innerArr=innerPosAttr.array;
+  for(let i=0;i<INNER_N;i++){
+    const i3=i*3;
+    const ox=innerOrig[i3],oy=innerOrig[i3+1],oz=innerOrig[i3+2];
+    const rippleWave=Math.sin(t*pulseFreq+innerPhase[i])*0.5+0.5;
+    const ripple=wRed*breath+(1-wRed)*rippleWave;
+    const rippleAmt=wCalm*0.01+wPurple*0.016+wYellow*0.012+wRed*0.012+wChaosMotion*0.02;
+    let dx=0,dy=0,dz=0;
+    if(wCalm>0.001){
+      const ph=innerPhase[i];
+      dx+=wCalm*mNorm*Math.sin(t*0.35+oy*1.5+ph)*shimmer*0.8;
+      dy+=wCalm*mNorm*Math.sin(t*0.3+oz*1.7+ph*1.2)*shimmer*0.8;
+      dz+=wCalm*mNorm*Math.cos(t*0.39+ox*1.6+ph*0.8)*shimmer*0.7;
+    }
+    if(wPurple>0.001){
+      const ph=innerPhase[i];
+      const wave=Math.sin(t*pulseFreq*0.25+ph+oy*0.5)*0.5+0.5;
+      const shim=shimmer*(0.7+wave*0.45);
+      dx+=wPurple*mNorm*Math.sin(t*0.19+oy*1.2+ph)*shim;
+      dy+=wPurple*mNorm*Math.sin(t*0.17+oz*1.4+ph*1.1)*shim;
+      dz+=wPurple*mNorm*Math.cos(t*0.2+ox*1.3+ph*0.85)*shim;
+    }
+    if(wChaosMotion>0.001){
+      const c=chaosMul*1.35;
+      dx+=wChaosMotion*mNorm*Math.sin(t*cf*0.9+oy*4+innerPhase[i])*c;
+      dy+=wChaosMotion*mNorm*Math.sin(t*cf*0.7+oz*3+innerPhase[i]*1.3)*c;
+      dz+=wChaosMotion*mNorm*Math.sin(t*cf*1.1+ox*5+innerPhase[i]*0.7)*c;
+      dx+=wChaosMotion*mNorm*Math.sin(t*cf*1.6+ox*6+innerPhase[i]*2.1)*c*0.55;
+      dy+=wChaosMotion*mNorm*Math.cos(t*cf*1.4+oy*5+innerPhase[i]*1.8)*c*0.55;
+      dz+=wChaosMotion*mNorm*Math.sin(t*cf*1.8+oz*4+innerPhase[i]*2.4)*c*0.5;
+    }
+    const jitAmt=target.chaos*(wCalm*0.028+wPurple*0.038+wChaosMotion*(wShards*0.095+(1-wShards)*(yellowPulse?0.075:0.065)))+0.018;
+    const j=innerJitter(t,innerPhase[i],ox,oy,oz,jitAmt);
+    dx+=j.x; dy+=j.y; dz+=j.z;
+    const len=Math.sqrt(ox*ox+oy*oy+oz*oz)||1;
+    const innerExpand=1+sphere.disperse*(wPurple*0.92+wChaosMotion*0.5);
+    const r=radius*sphere.innerScale*(1+(ripple-0.5)*rippleAmt);
+    const innerC=target.chaos*(wPurple*0.016+wYellow*0.034+wChaosMotion*(wShards*0.052+0.048*(1-wShards)));
+    const streakMul=wRed*1.15+wPurple*0.32+wYellow*1.05+wChaosMotion*2.2;
+    const streakWave=Math.sin(t*streakMul+innerPhase[i])*innerC;
+    const streak=wRed*sphere.swell*innerC+(1-wRed)*streakWave;
+    const drift=0.82;
+    innerArr[i3]=ox*r*innerExpand+dx*drift+j.x*0.35+(ox/len)*streak;
+    innerArr[i3+1]=oy*r*innerExpand+dy*drift+j.y*0.35+(oy/len)*streak;
+    innerArr[i3+2]=oz*r*innerExpand+dz*drift+j.z*0.35+(oz/len)*streak;
+  }
+  innerPosAttr.needsUpdate=true;
+  updateColors(t);
+
+  if(!isDragging){
+    velX*=0.92; velY*=0.92;
+    rotX+=velX; rotY+=velY+params.autoSpeed;
+  }
+  group.rotation.x=rotX;
+  group.rotation.y=rotY;
+
+  renderer.render(scene,camera);
+}
+animate();
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
