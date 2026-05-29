@@ -24,7 +24,7 @@ body::after {
 .dot:hover,.dot.active { opacity:1; transform:scale(1.5); }
 .dot-cycle {
   width:14px; height:14px; border-radius:50%;
-  background:conic-gradient(from 90deg,#1A50C8,#7B4ED6,#E83040,#FFE066,#1A50C8);
+  background:conic-gradient(from 90deg,#22b8e8,#c890b0,#E83040,#FFE066,#22b8e8);
   box-shadow:0 0 8px rgba(255,255,255,0.35);
 }
 #hint { position:fixed; bottom:24px; right:24px; z-index:100; color:rgba(255,255,255,0.2); font-size:9px; letter-spacing:2px; pointer-events:none; }
@@ -33,16 +33,31 @@ body::after {
 <body>
 <div id="label">RED · DANGER · AGGRESSION · ALERT</div>
 <div id="dots">
-  <div class="dot" style="background:#1A50C8;box-shadow:0 0 6px #5599EE" onclick="switchEmotion('blue')" id="d-blue"></div>
+  <div class="dot" style="background:#22b8e8;box-shadow:0 0 8px #5ce4ff" onclick="switchEmotion('blue')" id="d-blue"></div>
   <div class="dot" style="background:#FFE066;box-shadow:0 0 8px #FFE880" onclick="switchEmotion('yellow')" id="d-yellow"></div>
   <div class="dot active" style="background:#E83040;box-shadow:0 0 8px #FF5560" onclick="switchEmotion('red')" id="d-red"></div>
-  <div class="dot" style="background:#7B4ED6;box-shadow:0 0 6px #7B4ED6" onclick="switchEmotion('purple')" id="d-purple"></div>
+  <div class="dot" style="background:#c890b0;box-shadow:0 0 8px #e8b0c8" onclick="switchEmotion('purple')" id="d-purple"></div>
   <div class="dot dot-cycle" onclick="toggleCycle()" id="d-cycle" title="Cycle: blue → purple → red → yellow (click a colour dot to stop)"></div>
 </div>
 <div id="hint">DRAG TO ROTATE · CYCLE RUNS ALL FOUR · CLICK A DOT TO STOP</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="cloud-background.js"></script>
 <script>
+// Show runtime errors on-screen (helps when the canvas is blank)
+(function(){
+  const box=document.createElement('div');
+  box.id='err';
+  box.style.cssText='position:fixed;left:12px;bottom:12px;max-width:46vw;z-index:9999;padding:10px 12px;border:1px solid rgba(255,80,80,0.35);background:rgba(10,0,0,0.65);color:rgba(255,170,170,0.95);font:11px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;white-space:pre-wrap;pointer-events:none;display:none;';
+  document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(box));
+  function show(msg){
+    box.textContent=msg;
+    box.style.display='block';
+  }
+  window.addEventListener('error',(e)=>show(String(e.message||e.error||e)));
+  window.addEventListener('unhandledrejection',(e)=>show('Unhandled promise rejection:\n'+String(e.reason||e)));
+})();
+
 function hexRgb(h){
   const n=parseInt(h.slice(1),16);
   return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];
@@ -58,13 +73,15 @@ function emotionPalette(cfg){
   if(cfg.coreHex) e.core=hexRgb(cfg.coreHex);
   if(cfg.midHex) e.mid=hexRgb(cfg.midHex);
   if(cfg.highlightHex) e.highlight=hexRgb(cfg.highlightHex);
+  if(cfg.accentHex) e.accent=hexRgb(cfg.accentHex);
   return e;
 }
 
 const EMOTIONS={
   blue:emotionPalette({
     label:'BLUE · CALM · FRIENDLY · SAFE',
-    shadowHex:'#0A0F2E',deepHex:'#0D2458',baseHex:'#1A50C8',midHex:'#5599EE',highlightHex:'#C8E8FF',
+    shadowHex:'#040a18',deepHex:'#0a2848',baseHex:'#22b8e8',midHex:'#5ce4ff',highlightHex:'#e8fcff',
+    coreHex:'#f6feff',hotHex:'#88f0ff',accentHex:'#ffcf66',
     pulse:2.75,pulseMode:'calm',pulseAmp:0.02,chaos:0.025,chaosFreq:0.3,edgeFlicker:false,
     glowSize:0.058,glowOp:0.14,silver:0.07,silverStyle:'droplets',
     autoSpeed:0.0015,density:0.64,size:6,radius:1.78,
@@ -72,22 +89,25 @@ const EMOTIONS={
   yellow:emotionPalette({
     label:'YELLOW · CURIOUS · PROCESSING · TRANSITION',
     shadowHex:'#2A1800',deepHex:'#5A4200',baseHex:'#F0C820',midHex:'#FFE878',highlightHex:'#FFFDE8',
+    accentHex:'#6fb0ff',
     pulse:0.75,pulseMode:'burst',pulseAmp:0.05,chaos:0.3,chaosFreq:0.65,edgeFlicker:true,
     glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'sparks',
     autoSpeed:0.014,density:0.5,size:4.75,radius:1.5,
   }),
   red:emotionPalette({
     label:'RED · DANGER · AGGRESSION · ALERT',
-    shadowHex:'#280808',deepHex:'#6A1818',baseHex:'#E82838',hotHex:'#FF5A48',coreHex:'#FFD4C8',
-    pulse:0.4,pulseMode:'heartbeat',pulseAmp:0.11,chaos:0.75,chaosFreq:1.4,edgeFlicker:false,
+    shadowHex:'#280808',deepHex:'#7A2828',baseHex:'#F04048',hotHex:'#FF7060',coreHex:'#FF8878',
+    accentHex:'#74e8ff',
+    pulse:0.4,pulseMode:'heartbeat',pulseAmp:0.075,chaos:0.75,chaosFreq:1.4,edgeFlicker:false,
     glowSize:0.02,glowOp:0.78,silver:0.1,silverStyle:'shards',
     autoSpeed:0.022,density:0.55,size:6,radius:1.45,
   }),
   purple:emotionPalette({
     label:'PURPLE · EMPATHY · BOND · CONNECTION',
-    shadowHex:'#0D0820',deepHex:'#26215C',baseHex:'#7B4ED6',midHex:'#AA88FF',highlightHex:'#E8DDFF',
+    shadowHex:'#140a12',deepHex:'#321828',baseHex:'#8e5888',midHex:'#c890b0',highlightHex:'#f0d0e0',
+    accentHex:'#58e1c0',
     pulse:6.5,pulseMode:'wave',pulseAmp:0.095,chaos:0.035,chaosFreq:0.12,edgeFlicker:false,
-    glowSize:0.036,glowOp:0.48,silver:0.08,silverStyle:'orbs',
+    glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'orbs',
     autoSpeed:0.0016,density:0.68,size:4,radius:1.85,
   }),
 };
@@ -122,7 +142,7 @@ function innerJitter(t,phase,ox,oy,oz,amt){
 
 function getAngerMod(t){
   const p=Math.PI*2;
-  const ampMul=1+0.07*Math.sin(t*p/7+0.6)+0.05*Math.sin(t*p/5+1.4);
+  const ampMul=1+0.04*Math.sin(t*p/7+0.6)+0.028*Math.sin(t*p/5+1.4);
   return {period:ANGER_PULSE_BASE, amp:ampMul};
 }
 function lockedParamsFor(name){ return LOCKED_PARAMS[name]; }
@@ -210,15 +230,15 @@ function cyclePaintWeights(){
 }
 
 function silverShellAmt(style,silver){
-  if(style==='shards') return silver*0.18;
-  if(style==='sparks') return silver*0.12;
-  if(style==='orbs') return silver*0.1;
-  return silver*0.08;
+  if(style==='shards') return silver*0.12;
+  if(style==='sparks') return silver*0.08;
+  if(style==='orbs') return silver*0.08;
+  return silver*0.05;
 }
 function silverInnerAmt(style,silver){
   if(style==='sparks') return silver*0.45;
   if(style==='shards') return silver*0.35;
-  if(style==='orbs') return silver*0.3;
+  if(style==='orbs') return silver*0.38;
   return silver*0.25;
 }
 
@@ -278,6 +298,9 @@ function switchEmotion(name){
   target=emotionPreset(name);
   target.edgeFlickerAmt=target.edgeFlicker?1:0;
   params=copyEmotion(target);
+  spawnEnabled=true;
+  innerSpawnAcc=0;
+  innerSpawnCursor=0;
   document.getElementById('label').textContent=target.label||'';
   setDotActive('d-'+name);
 }
@@ -285,6 +308,8 @@ function switchEmotion(name){
 function toggleCycle(){
   cycleOn=true;
   cycleStartAt=performance.now();
+  // keep spawner on so the "blend" view still shows independent particles
+  spawnEnabled=true;
   setDotActive('d-cycle');
   buildCycleTarget(0);
   document.getElementById('label').textContent=target.label||'';
@@ -299,21 +324,62 @@ function tickCycle(){
 }
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 120);
 camera.position.z = 5;
 const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setClearColor(0x000000);
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 const group = new THREE.Group();
 scene.add(group);
+const cloudBg = createCloudBackground(scene, camera, group);
 
-const SHELL_N = 6000;
-const INNER_N = 900;
-const SHELL_PT_MUL = 0.0095;
-const INNER_PT_MUL = 0.017;
-const GLOW_PT_MUL = 4.0;
+const SHELL_N = 1500;
+const INNER_N = 200;
+const SHELL_PT_MUL = 0.0145;
+const INNER_PT_MUL = 0.055;
+const GLOW_PT_MUL = 20.0;
+const SWIRL_SPIN = 1.35;
+const SWIRL_TANG_SHELL = 0.14;
+const SWIRL_TANG_INNER = 0.1;
+const SWIRL_IN_SHELL = 0.32;
+const SWIRL_IN_INNER = 0.4;
+
+// Slow, one-by-one continuous emitter (inner only; shell stays always-on)
+const SPAWN_INNER_LIFE = 4.1;
+const SPAWN_INNER_FADE = 1.0;
+const SPAWN_INNER_INTERVAL = 0.28; // slower
+const SPAWN_INNER_AMP = 0.38;
+let spawnEnabled=true;
+let innerSpawnCursor=0;
+let innerSpawnAcc=0;
+let lastAnimT=0;
+
+function swirlInward(t, phase, ox, oy, oz, len, tangAmt, inAmt){
+  const inv=1/(len||1);
+  const nx=ox*inv, ny=oy*inv, nz=oz*inv;
+  let tx=ny*0.55-nz*0.35, ty=nz*0.5-nx*0.4, tz=nx*0.45-ny*0.5;
+  let tl=Math.sqrt(tx*tx+ty*ty+tz*tz)||1;
+  tx/=tl; ty/=tl; tz/=tl;
+  let bx=ny*tz-nz*ty, by=nz*tx-nx*tz, bz=nx*ty-ny*tx;
+  let bl=Math.sqrt(bx*bx+by*by+bz*bz)||1;
+  bx/=bl; by/=bl; bz/=bl;
+  const edge=Math.min(1,Math.max(0.42,len*0.95));
+  const ang=t*SWIRL_SPIN+phase*2.4+(1.05-len)*t*0.55;
+  const coil=Math.sin(ang*1.35-len*2.4)*0.5+0.5;
+  const pull=inAmt*(0.55+0.45*coil);
+  const spin=tangAmt*len*edge*(1.1+0.25*Math.sin(t*0.42+phase));
+  const c=Math.cos(ang), s=Math.sin(ang);
+  const rx=nx*c-nz*s*0.35, ry=ny*c+nx*s*0.2, rz=nz*c+nx*s*0.35;
+  return {
+    dx:(tx*c+bx*s)*spin+(rx-nx)*len*pull*0.35,
+    dy:(ty*c+by*s)*spin+(ry-ny)*len*pull*0.35,
+    dz:(tz*c+bz*s)*spin+(rz-nz)*len*pull*0.35,
+    radScale:Math.max(0.42,1-pull),
+  };
+}
 
 function makeGlowTexture(){
   const c=document.createElement('canvas');
@@ -331,6 +397,46 @@ function makeGlowTexture(){
 }
 const glowTex=makeGlowTexture();
 
+function makeFacetGlowTexture(){
+  const c=document.createElement('canvas');
+  c.width=c.height=64;
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,64,64);
+  ctx.save();
+  ctx.translate(32,32);
+  ctx.rotate(Math.PI/4);
+  ctx.scale(1.15,0.58);
+  const g=ctx.createRadialGradient(0,0,0,0,0,30);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(0.32,'rgba(255,255,255,0.52)');
+  g.addColorStop(0.72,'rgba(255,255,255,0.12)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;
+  ctx.fillRect(-30,-30,60,60);
+  ctx.restore();
+  const streak=ctx.createLinearGradient(6,32,58,32);
+  streak.addColorStop(0,'rgba(255,255,255,0)');
+  streak.addColorStop(0.45,'rgba(255,255,255,0.42)');
+  streak.addColorStop(0.55,'rgba(255,255,255,0.42)');
+  streak.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=streak;
+  ctx.fillRect(6,28,52,8);
+  const tex=new THREE.CanvasTexture(c);
+  tex.needsUpdate=true;
+  return tex;
+}
+const facetGlowTex=makeFacetGlowTexture();
+
+function patchPerVertexSize(pointsMaterial, attrName){
+  pointsMaterial.customProgramCacheKey=()=>`pvSize:${attrName}:${pointsMaterial.size}`;
+  pointsMaterial.onBeforeCompile=(shader)=>{
+    shader.vertexShader=shader.vertexShader
+      .replace('#include <common>', `#include <common>\nattribute float ${attrName};`)
+      .replace('#include <pointsize>', `#include <pointsize>\n gl_PointSize *= ${attrName};`);
+  };
+  pointsMaterial.needsUpdate=true;
+}
+
 // Shell (dense border)
 const shellPos=new Float32Array(SHELL_N*3);
 const shellOrig=new Float32Array(SHELL_N*3);
@@ -341,7 +447,7 @@ for(let i=0;i<SHELL_N;i++){
   const y=1-(i/(SHELL_N-1))*2;
   const r=Math.sqrt(1-y*y);
   const theta=golden*i;
-  const shellR=0.95+Math.random()*0.12;
+  const shellR=0.97+Math.random()*0.05;
   shellPos[i*3]=shellOrig[i*3]=r*Math.cos(theta)*shellR;
   shellPos[i*3+1]=shellOrig[i*3+1]=y*shellR;
   shellPos[i*3+2]=shellOrig[i*3+2]=r*Math.sin(theta)*shellR;
@@ -351,8 +457,8 @@ const shellGeo=new THREE.BufferGeometry();
 shellGeo.setAttribute('position',new THREE.BufferAttribute(shellPos,3));
 shellGeo.setAttribute('color',new THREE.BufferAttribute(shellColors,3));
 const shellMat=new THREE.PointsMaterial({
-  size:0.018, vertexColors:true, transparent:true, opacity:0.65,
-  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+  size:0.018, map:glowTex, vertexColors:true, transparent:true, opacity:0.65,
+  alphaTest:0.01, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true, fog:false
 });
 group.add(new THREE.Points(shellGeo,shellMat));
 
@@ -361,6 +467,14 @@ const innerPos=new Float32Array(INNER_N*3);
 const innerOrig=new Float32Array(INNER_N*3);
 const innerPhase=new Float32Array(INNER_N);
 const innerColors=new Float32Array(INNER_N*3);
+const innerAxis=new Float32Array(INNER_N*3);
+const innerBirth=new Float32Array(INNER_N);
+const innerVis=new Float32Array(INNER_N);
+const innerSeqTint=new Uint8Array(INNER_N);
+for(let i=0;i<INNER_N;i++){
+  const h=Math.abs(Math.sin(i*12.9898)*43758.5453)%1;
+  innerSeqTint[i]=h<0.2?2:(h<0.5?1:0);
+}
 for(let i=0;i<INNER_N;i++){
   const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
   const rad=Math.pow(Math.random(),0.45)*0.75;
@@ -368,20 +482,78 @@ for(let i=0;i<INNER_N;i++){
   innerPos[i*3+1]=innerOrig[i*3+1]=rad*Math.sin(ph)*Math.sin(th);
   innerPos[i*3+2]=innerOrig[i*3+2]=rad*Math.cos(ph);
   innerPhase[i]=Math.random()*Math.PI*2;
+  innerBirth[i]=-1;
+  innerVis[i]=1;
+  const nx=innerOrig[i*3], ny=innerOrig[i*3+1], nz=innerOrig[i*3+2];
+  const inv=1/(Math.sqrt(nx*nx+ny*ny+nz*nz)||1);
+  const ux=nx*inv, uy=ny*inv, uz=nz*inv;
+  const rx=Math.random()*2-1, ry=Math.random()*2-1, rz=Math.random()*2-1;
+  let ax=uy*rz-uz*ry, ay=uz*rx-ux*rz, az=ux*ry-uy*rx;
+  const al=Math.sqrt(ax*ax+ay*ay+az*az)||1;
+  ax/=al; ay/=al; az/=al;
+  innerAxis[i*3]=ax; innerAxis[i*3+1]=ay; innerAxis[i*3+2]=az;
 }
 const innerGeo=new THREE.BufferGeometry();
 innerGeo.setAttribute('position',new THREE.BufferAttribute(innerPos,3));
 innerGeo.setAttribute('color',new THREE.BufferAttribute(innerColors,3));
+const innerSize=new Float32Array(INNER_N);
+for(let i=0;i<INNER_N;i++) innerSize[i]=1;
+innerGeo.setAttribute('aSize',new THREE.BufferAttribute(innerSize,1));
 const innerGlowMat=new THREE.PointsMaterial({
-  size:0.065, map:glowTex, vertexColors:true, transparent:true, opacity:0.35,
-  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+  size:0.065, map:facetGlowTex, vertexColors:true, transparent:true, opacity:0.35,
+  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true, fog:false
+});
+const innerHalo2Mat=new THREE.PointsMaterial({
+  size:0.065, map:glowTex, vertexColors:true, transparent:true, opacity:0.18,
+  blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, sizeAttenuation:true, fog:false
+});
+const innerHalo3Mat=new THREE.PointsMaterial({
+  size:0.065, map:glowTex, vertexColors:true, transparent:true, opacity:0.1,
+  blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, sizeAttenuation:true, fog:false
 });
 const innerMat=new THREE.PointsMaterial({
-  size:0.032, map:glowTex, vertexColors:true, transparent:true, opacity:0.92,
-  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+  size:0.052, map:glowTex, vertexColors:true, transparent:true, opacity:0.92,
+  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true, fog:false
 });
+patchPerVertexSize(innerGlowMat,'aSize');
+patchPerVertexSize(innerHalo2Mat,'aSize');
+patchPerVertexSize(innerHalo3Mat,'aSize');
+patchPerVertexSize(innerMat,'aSize');
+const innerHalo3Pts=new THREE.Points(innerGeo,innerHalo3Mat);
+const innerHalo2Pts=new THREE.Points(innerGeo,innerHalo2Mat);
+innerHalo3Pts.renderOrder=2;
+innerHalo2Pts.renderOrder=3;
+group.add(innerHalo3Pts);
+group.add(innerHalo2Pts);
 group.add(new THREE.Points(innerGeo,innerGlowMat));
 group.add(new THREE.Points(innerGeo,innerMat));
+
+// Emitted trail particles (each inner dot leaves glowing dots that drift + fade)
+const TRAIL_POOL=12000;
+const TRAIL_LIFE=1.25;
+const TRAIL_EMIT_STEP=0.016;
+const trailPos=new Float32Array(TRAIL_POOL*3);
+const trailCol=new Float32Array(TRAIL_POOL*3);
+const trailBaseCol=new Float32Array(TRAIL_POOL*3);
+const trailVel=new Float32Array(TRAIL_POOL*3);
+const trailAge=new Float32Array(TRAIL_POOL);
+const trailAlive=new Uint8Array(TRAIL_POOL);
+const trailActive=new Uint32Array(TRAIL_POOL);
+let trailActiveN=0;
+let trailHead=0;
+const innerPrev=new Float32Array(INNER_N*3);
+for(let i=0;i<INNER_N*3;i++) innerPrev[i]=innerPos[i];
+const trailGeo=new THREE.BufferGeometry();
+trailGeo.setAttribute('position',new THREE.BufferAttribute(trailPos,3));
+trailGeo.setAttribute('color',new THREE.BufferAttribute(trailCol,3));
+const trailMat=new THREE.PointsMaterial({
+  size:0.1, map:glowTex, vertexColors:true, transparent:true, opacity:0.88,
+  blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, sizeAttenuation:true, fog:false
+});
+const trailPoints=new THREE.Points(trailGeo,trailMat);
+trailPoints.renderOrder=6;
+trailPoints.frustumCulled=false;
+group.add(trailPoints);
 
 function lerpRgb(a,b,t,out){
   if(!a||!b){ out[0]=out[1]=out[2]=0.5; return; }
@@ -394,11 +566,37 @@ function colorOr(p,tgt,key){
   const c=(tgt&&tgt[key])||(p&&p[key]);
   return c||[0.5,0.5,0.5];
 }
-function mixSilver(rgb,amount,out){
-  const m=1-amount;
-  out[0]=rgb[0]*m+SILVER[0]*amount;
-  out[1]=rgb[1]*m+SILVER[1]*amount;
-  out[2]=rgb[2]*m+SILVER[2]*amount;
+function mixSilver(rgb,amount,out,colorBias=0){
+  const b=Math.min(1,Math.max(0,colorBias));
+  const amt=amount*(1-b*0.8);
+  const m=1-amt;
+  const sr=rgb[0]*(0.72+0.26*b)+SILVER[0]*(0.28-0.26*b);
+  const sg=rgb[1]*(0.72+0.26*b)+SILVER[1]*(0.28-0.26*b);
+  const sb=rgb[2]*(0.72+0.26*b)+SILVER[2]*(0.28-0.26*b);
+  out[0]=rgb[0]*m+sr*amt;
+  out[1]=rgb[1]*m+sg*amt;
+  out[2]=rgb[2]*m+sb*amt;
+}
+function tintedLift(r,g,bl,amt,colorBias=0){
+  const bias=Math.min(1,Math.max(0,colorBias));
+  const floor=0.2*(1-bias)+0.03*bias;
+  const slope=0.8*(1-bias)+0.97*bias;
+  return [
+    Math.min(1,r+amt*(floor+r*slope)),
+    Math.min(1,g+amt*(floor+g*slope)),
+    Math.min(1,bl+amt*(floor+bl*slope)),
+  ];
+}
+function emotionColorBias(){
+  const cw=cycleStyleWeights();
+  if(!cw){
+    if(activeEmotion==='red') return 0.9;
+    if(activeEmotion==='yellow') return 0.5;
+    if(activeEmotion==='blue'||activeEmotion==='purple') return 0.22;
+    return 0.35;
+  }
+  const pick=(e)=>(cw.a===e?cw.wa:0)+(cw.b===e?cw.wb:0);
+  return pick('red')*0.9+pick('yellow')*0.5+pick('blue')*0.22+pick('purple')*0.22;
 }
 const _rgb=[0,0,0],_rgb2=[0,0,0];
 
@@ -470,24 +668,126 @@ function getPulseWave(t,period,mode){
 }
 
 const YELLOW_FLASH=hexRgb('#FFFFD0');
+const WARM_PURPLE_GLOW=hexRgb('#F0C0D8');
+const CYAN_CORE=hexRgb('#E8FCFF');
+
+function cyanDropletGlow(t,phase,ox,oy,oz){
+  const ripple=Math.sin(t*2.4+oy*2.6+phase*1.1)*Math.sin(t*1.7+oz*2.1+phase*0.75);
+  const spark=Math.pow(Math.abs(Math.sin(t*9.5+phase*3.2+ox*4.2+oz*1.8)),0.5);
+  const drift=Math.sin(t*1.2+ox*1.4+oz*1.4+phase)*0.5+0.5;
+  const glow=0.035+ripple*0.14+spark*0.2+drift*0.06;
+  const mul=0.92+ripple*0.12+spark*0.28+drift*0.05;
+  return {mul,glow,spark};
+}
+
+function tintCyanGlow(r,gn,b,glowAmt,sparkAmt,out){
+  const gl=Math.min(glowAmt,0.52);
+  const sp=Math.min(sparkAmt,0.42);
+  out[0]=Math.min(r*(1+gl*0.45+sp*0.35)+CYAN_CORE[0]*(gl*0.38+sp*0.32),1);
+  out[1]=Math.min(gn*(1+gl*0.5+sp*0.42)+CYAN_CORE[1]*(gl*0.42+sp*0.38),1);
+  out[2]=Math.min(b*(1+gl*0.62+sp*0.55)+CYAN_CORE[2]*(gl*0.52+sp*0.48),1);
+}
+
+function purpleEmpathyGlow(t,phase,ox,oy,oz){
+  const wave=(Math.sin(t*3.6+phase*1.5)+Math.sin(t*2.2+ox*2.4+oy*2.1))*0.5+0.5;
+  const shimmer=Math.sin(t*5.2+phase*0.9+oz*3.2)*0.5+0.5;
+  const glow=0.02+wave*0.07+shimmer*0.04;
+  const mul=0.96+wave*0.07+shimmer*0.04;
+  return {mul,glow};
+}
+
+const RED_SHELL=hexRgb('#FF7868');
+const RED_SPARK=hexRgb('#FF6458');
+function redShellGlow(t,phase,ox,oy,oz){
+  const a=Math.sin(t*6.4+phase*2.1+ox*3.2);
+  const b=Math.cos(t*4.1+oy*2.6+phase*1.4);
+  const c=Math.sin(t*8.6+oz*2.2+phase*0.9);
+  const chaos=Math.pow(Math.abs(a*b*c),0.52);
+  const wave=Math.sin(t*2.6+phase+oy*1.1+ox*0.7)*0.5+0.5;
+  const spark=Math.pow(Math.max(0,Math.sin(t*9.4+phase*3.1+ox*2.6)*Math.sin(t*7.8+phase*2.2+oy*2.4)),1.85);
+  return {mul:0.95+chaos*0.05+wave*0.03, glow:0.024+chaos*0.08+wave*0.05+spark*0.07, spark, jitter:(chaos*0.02+wave*0.015)};
+}
+
+function tintRedShell(r,g,b,glowAmt,out){
+  const gl=Math.min(glowAmt,0.62);
+  out[0]=Math.min(r*(1+gl*0.38)+RED_SHELL[0]*gl*0.52,1);
+  out[1]=Math.min(g*(1+gl*0.1)+RED_SHELL[1]*gl*0.06,1);
+  out[2]=Math.min(b*(1+gl*0.08)+RED_SHELL[2]*gl*0.05,1);
+}
+
+function redShardSparkle(t,phase,ox,oy,oz){
+  const a=Math.sin(t*7.6+phase*2.5+ox*3.1);
+  const b=Math.cos(t*5.8+oy*2.3+phase*1.5);
+  const c=Math.sin(t*10.2+oz*2.1+phase*0.85);
+  const spike=Math.pow(Math.abs(a*b*c),0.46);
+  return {mul:0.94+spike*0.05, flash:spike};
+}
+
+function tintRedSpark(r,g,b,flash,out){
+  const f=Math.min(flash*0.62,0.48);
+  out[0]=Math.min(r*(1+f*0.34)+RED_SPARK[0]*f*0.48,1);
+  out[1]=Math.min(g*(1+f*0.06),1);
+  out[2]=Math.min(b*(1+f*0.05),1);
+}
+
+function pushRedSaturation(r,g,b,amt,out){
+  const t=Math.min(1,Math.max(0,amt));
+  const rn=Math.min(r*(1+t*0.18)+RED_SHELL[0]*t*0.12,1);
+  out[0]=rn;
+  out[1]=Math.min(g,rn*(1-t*0.38));
+  out[2]=Math.min(b,rn*(1-t*0.42));
+}
+
+const AMBER_SHELL=hexRgb('#FFE878');
+function yellowShellGlow(t,phase,ox,oy,oz){
+  const wave=Math.sin(t*3.1+phase*1.1+ox*1.7)*Math.cos(t*2.3+oy*2.0+phase*0.8);
+  const drift=Math.sin(t*1.4+oz*1.9+phase*0.6)*0.5+0.5;
+  const shimmer=Math.sin(t*6.8+phase*2.8+ox*oy*2.2)*0.5+0.5;
+  return {mul:0.94+Math.abs(wave)*0.09+drift*0.05, glow:0.015+drift*0.055+shimmer*0.04, jitter:Math.abs(wave)*0.03+drift*0.025};
+}
+
+function tintYellowShell(r,g,b,glowAmt,out){
+  const gl=Math.min(glowAmt,0.38);
+  out[0]=Math.min(r*(1+gl*0.38)+AMBER_SHELL[0]*gl*0.3,1);
+  out[1]=Math.min(g*(1+gl*0.34)+AMBER_SHELL[1]*gl*0.28,1);
+  out[2]=Math.min(b*(1+gl*0.18)+AMBER_SHELL[2]*gl*0.12,1);
+}
+
+function cycleEmotionOffset(from,steps){
+  const i=CYCLE_ORDER.indexOf(from);
+  if(i<0) return from;
+  return CYCLE_ORDER[(i+steps+CYCLE_ORDER.length)%CYCLE_ORDER.length];
+}
+
+function sampleEmotionInnerRgb(emotion,d,out){
+  const e=emotionPreset(emotion);
+  const stops=buildStops(e,e);
+  sampleStops(Math.max(0,Math.min(1,d*0.42)),stops,out);
+}
+
+function tintPurpleGlow(r,gn,b,glowAmt,out){
+  const gl=Math.min(glowAmt*0.55,0.35);
+  out[0]=Math.min(r*(1+gl*0.48)+WARM_PURPLE_GLOW[0]*gl*0.38,1);
+  out[1]=Math.min(gn*(1+gl*0.36)+WARM_PURPLE_GLOW[1]*gl*0.28,1);
+  out[2]=Math.min(b*(1+gl*0.22)+WARM_PURPLE_GLOW[2]*gl*0.18,1);
+}
 
 function yellowSparkFlicker(t,phase,ox,oy,oz){
-  const a=Math.sin(t*12.7+phase*2.31);
-  const b=Math.sin(t*19.3+phase*4.17+ox*3.7);
-  const c=Math.cos(t*8.4+phase*1.83+oy*4.9+oz*2.6);
-  const d=Math.sin(t*23.1+phase*0.97+ox*oy*6);
-  const chaos=Math.pow(Math.abs(a*b*c*d),0.38);
-  const spike=Math.pow(Math.max(0,Math.sin(t*17.4+phase*3.6+ox*2.2)*Math.sin(t*24.1+phase*1.9+oy*4.1)),2.05);
-  const flash=spike*(0.35+0.65*chaos);
-  const mul=0.92+chaos*0.18+spike*0.82;
+  const a=Math.sin(t*4.2+phase*1.6);
+  const b=Math.sin(t*5.8+phase*2.1+ox*1.4);
+  const c=Math.cos(t*3.4+phase*1.2+oy*1.8+oz*1.1);
+  const chaos=Math.pow(Math.abs(a*b*c),0.55);
+  const spike=Math.pow(Math.max(0,Math.sin(t*5.2+phase*2.1+ox*1.1)*Math.sin(t*6.4+phase*1.4+oy*1.6)),2.1);
+  const flash=spike*(0.12+0.28*chaos);
+  const mul=0.97+chaos*0.05+spike*0.22;
   return {mul,flash};
 }
 
 function tintBrightYellow(r,g,b,flash,out){
-  const f=Math.min(flash,1);
-  out[0]=Math.min(r*(1+f*0.82)+YELLOW_FLASH[0]*f*0.62,1);
-  out[1]=Math.min(g*(1+f*0.72)+YELLOW_FLASH[1]*f*0.58,1);
-  out[2]=Math.min(b*(1+f*0.35)+YELLOW_FLASH[2]*f*0.22,1);
+  const f=Math.min(flash*0.6,0.5);
+  out[0]=Math.min(r*(1+f*0.5)+YELLOW_FLASH[0]*f*0.34,1);
+  out[1]=Math.min(g*(1+f*0.45)+YELLOW_FLASH[1]*f*0.32,1);
+  out[2]=Math.min(b*(1+f*0.22)+YELLOW_FLASH[2]*f*0.14,1);
 }
 
 function getSphereBreath(t,period,mode,pulseAmp){
@@ -517,8 +817,37 @@ function getSphereBreath(t,period,mode,pulseAmp){
   return {breath,swell,scale:1+swell*amp*scaleMul,disperse:Math.max(0,swell)*amp*disperseMul,innerScale:1+swell*amp*innerMul};
 }
 
+// Glossy glints from a slow virtual light (no drag/rotate needed).
+function specularShine(ox,oy,oz, lux,luy,luz, exp, amt){
+  const inv=1/(Math.sqrt(ox*ox+oy*oy+oz*oz)||1);
+  const nx=ox*inv, ny=oy*inv, nz=oz*inv;
+  const nd=Math.max(0,nx*lux+ny*luy+nz*luz);
+  return Math.pow(nd,exp)*amt;
+}
+
+function emotionSparkleMul(){
+  const cw=cycleStyleWeights();
+  if(!cw){
+    if(activeEmotion==='red') return 0.22;
+    if(activeEmotion==='yellow') return 0.42;
+    return 1;
+  }
+  const pick=(e)=>(cw.a===e?cw.wa:0)+(cw.b===e?cw.wb:0);
+  return pick('blue')+pick('purple')+pick('red')*0.22+pick('yellow')*0.42;
+}
+
+function particleSparkle(t, phase, ox, oy, oz, idx, shell){
+  const tw=0.5+0.5*Math.sin(t*14.5+phase*3.7+ox*5.2+oy*4.1);
+  const tw2=0.5+0.5*Math.sin(t*22.3+phase*5.1+oz*6.8);
+  const twinkle=Math.pow(tw*tw2,1.35)*(shell?0.3:0.38);
+  const popGate=Math.sin(t*3.1+phase*11.3+idx*0.17);
+  const pop=popGate>0.92?(popGate-0.92)/0.08*(shell?0.38:0.5):0;
+  return twinkle+pop;
+}
+
 function updateColors(shimmerT=0){
   try{
+    const t=shimmerT||0;
     const cw=cycleStyleWeights();
     const stops=buildStops(params,target);
     const stopsA=cw?buildStops(params,presetForStops(cw.a)):null;
@@ -527,7 +856,7 @@ function updateColors(shimmerT=0){
     const silver=params.silver||0.08;
     const pw=cyclePaintWeights();
     const style=target.silverStyle||params.silverStyle||'droplets';
-    let shellSilver=silver*(style==='shards'?0.14:0.08);
+    let shellSilver=silver*(style==='shards'?0.1:0.05);
     let innerSilver=silver*0.25;
     if(pw){
       shellSilver=0;
@@ -540,9 +869,9 @@ function updateColors(shimmerT=0){
       add(cw.a,cw.wa);
       add(cw.b,cw.wb);
     }else{
-      if(style==='sparks'){ shellSilver=silver*0.12; innerSilver=silver*0.45; }
-      if(style==='shards'){ shellSilver=silver*0.18; innerSilver=silver*0.35; }
-      if(style==='orbs'){ shellSilver=silver*0.1; innerSilver=silver*0.3; }
+      if(style==='sparks'){ shellSilver=silver*0.08; innerSilver=silver*0.45; }
+      if(style==='shards'){ shellSilver=silver*0.12; innerSilver=silver*0.35; }
+      if(style==='orbs'){ shellSilver=silver*0.08; innerSilver=silver*0.38; }
     }
 
     const mode=target.pulseMode||params.pulseMode||'breath';
@@ -551,11 +880,29 @@ function updateColors(shimmerT=0){
     const wPurpleOrb=pw?pw.wOrbs:(activeEmotion==='purple'&&style==='orbs'?1:0);
     const wBlueInner=pw?pw.wCalmBlue:(activeEmotion==='blue'?1:0);
     const wShards=pw?pw.wShards:(style==='shards'?1:0);
+    const wRedEmotion=cw?cw.red:(activeEmotion==='red'?1:0);
+    const wRedInner=wRedEmotion;
+    const wRedShell=wRedEmotion;
+    const wYellowShell=cw?cw.yellow:(activeEmotion==='yellow'?1:0);
+    const seqBase=cycleOn?activeEmotion:activeEmotion;
+    let ar=0.5, ag=0.5, ab=0.5;
+    if(cw){
+      const ea=EMOTIONS[cw.a].accent, eb=EMOTIONS[cw.b].accent;
+      if(ea&&eb){
+        ar=ea[0]*cw.wa+eb[0]*cw.wb;
+        ag=ea[1]*cw.wa+eb[1]*cw.wb;
+        ab=ea[2]*cw.wa+eb[2]*cw.wb;
+      }
+    }else if(params.accent){
+      ar=params.accent[0]; ag=params.accent[1]; ab=params.accent[2];
+    }else if(target.accent){
+      ar=target.accent[0]; ag=target.accent[1]; ab=target.accent[2];
+    }
     for(let i=0;i<SHELL_N;i++){
       const i3=i*3;
       const ox=shellOrig[i3],oy=shellOrig[i3+1],oz=shellOrig[i3+2];
       const d=Math.sqrt(ox*ox+oy*oy+oz*oz)/1.05;
-      let sampleD=d, silverAmt=shellSilver*(0.1+0.35*d), edgeFade=1;
+      let sampleD=d, silverAmt=0, edgeFade=1;
       if(wCalmBlue>0.001){
         const edge=Math.max(0,Math.min(1,(d-0.84)/0.22));
         const calmD=d*(1-edge*0.45)+0.06;
@@ -565,22 +912,85 @@ function updateColors(shimmerT=0){
         silverAmt=shellSilver*(0.1+0.35*d)*(1-wCalmBlue)+calmSilver*wCalmBlue;
         edgeFade=1*(1-wCalmBlue)+calmFade*wCalmBlue;
       }
+      if(wRedShell>0.001){
+        const rg=redShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        const rw=smoothstep(Math.min(1,wRedShell));
+        sampleD=d+rg.jitter*rw;
+      }
+      if(wYellowShell>0.001){
+        const yg=yellowShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        const ysw=smoothstep(Math.min(1,wYellowShell));
+        sampleD=d*(1-ysw*0.5)+(d+yg.jitter)*ysw*0.5;
+      }
       if(cw){
         sampleStops(sampleD,stopsA,_rgb);
         sampleStops(sampleD,stopsB,_rgb2);
         lerpRgb(_rgb,_rgb2,blendSt,_rgb);
       }else sampleStops(sampleD,stops,_rgb);
-      mixSilver(_rgb,silverAmt,_rgb2);
+      _rgb2[0]=_rgb[0]; _rgb2[1]=_rgb[1]; _rgb2[2]=_rgb[2];
       let r=_rgb2[0],g=_rgb2[1],b=_rgb2[2];
+      if(wRedShell>0.001){
+        const rg=redShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        const rs=redShardSparkle(shimmerT,shellPhase[i],ox,oy,oz);
+        const rw=smoothstep(Math.min(1,wRedShell))*0.78;
+        tintRedShell(r*rg.mul,g*rg.mul*0.9,b*rg.mul*0.86,(rg.glow+rg.spark*0.14)*rw,_rgb);
+        tintRedSpark(_rgb[0],_rgb[1],_rgb[2],rs.flash*rw*0.55,_rgb2);
+        pushRedSaturation(_rgb2[0],_rgb2[1],_rgb2[2],rw*0.55,_rgb);
+        const rr=_rgb[0],rgG=_rgb[1],rb=_rgb[2];
+        r=r*(1-rw)+rr*rw;
+        g=g*(1-rw)+rgG*rw;
+        b=b*(1-rw)+rb*rw;
+      }
+      if(wYellowShell>0.001){
+        const yg=yellowShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        const ysw=smoothstep(Math.min(1,wYellowShell));
+        tintYellowShell(r*yg.mul,g*yg.mul,b*yg.mul,yg.glow*ysw,_rgb);
+        const yr=_rgb[0],ygG=_rgb[1],yb=_rgb[2];
+        r=r*(1-ysw)+yr*ysw;
+        g=g*(1-ysw)+ygG*ysw;
+        b=b*(1-ysw)+yb*ysw;
+      }
       if(wYellow>0.001){
-        const yw=smoothstep(Math.min(1,wYellow));
+        const yw=smoothstep(Math.min(1,wYellow))*0.48;
         const yf=yellowSparkFlicker(shimmerT,shellPhase[i],ox,oy,oz);
-        tintBrightYellow(r*yf.mul,g*yf.mul,b*yf.mul,yf.flash,_rgb);
+        tintBrightYellow(r*yf.mul,g*yf.mul,b*yf.mul,yf.flash*0.2,_rgb);
         const yr=_rgb[0],yg=_rgb[1],yb=_rgb[2];
         r=r*(1-yw)+yr*yw;
         g=g*(1-yw)+yg*yw;
         b=b*(1-yw)+yb*yw;
       }
+      if(wCalmBlue>0.001){
+        const cw=smoothstep(Math.min(1,wCalmBlue));
+        const cg=cyanDropletGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        tintCyanGlow(r*cg.mul,g*cg.mul,b*cg.mul,cg.glow*cw,0,_rgb);
+        const cr=_rgb[0],cgG=_rgb[1],cb=_rgb[2];
+        r=r*(1-cw)+cr*cw;
+        g=g*(1-cw)+cgG*cw;
+        b=b*(1-cw)+cb*cw;
+      }
+      if(wPurpleOrb>0.001){
+        const pw=smoothstep(Math.min(1,wPurpleOrb));
+        const pg=purpleEmpathyGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        tintPurpleGlow(r*pg.mul,g*pg.mul,b*pg.mul,pg.glow*pw*0.5,_rgb);
+        const sr=_rgb[0],sg=_rgb[1],sb=_rgb[2];
+        r=r*(1-pw)+sr*pw;
+        g=g*(1-pw)+sg*pw;
+        b=b*(1-pw)+sb*pw;
+      }
+      const edgeAccent=Math.max(0,Math.min(1,(d-0.62)/0.38));
+      const accTw=0.38+0.62*Math.sin(t*11.2+shellPhase[i]*4.1+ox*3.2+oy*2.6);
+      let accAmt=edgeAccent*(0.14+accTw*accTw*0.62);
+      if(wRedShell>0.2) accAmt*=1-wRedShell*0.82;
+      let bar=ar, bag=ag, bab=ab;
+      if(wRedShell>0.001){
+        const rwA=smoothstep(Math.min(1,wRedShell));
+        bar=RED_SHELL[0]*rwA+ar*(1-rwA);
+        bag=RED_SHELL[1]*rwA+ag*(1-rwA);
+        bab=RED_SHELL[2]*rwA+ab*(1-rwA);
+      }
+      r=r*(1-accAmt)+bar*accAmt;
+      g=g*(1-accAmt)+bag*accAmt;
+      b=b*(1-accAmt)+bab*accAmt;
       shellColors[i3]=Math.min(r*edgeFade,1);
       shellColors[i3+1]=Math.min(g*edgeFade,1);
       shellColors[i3+2]=Math.min(b*edgeFade,1);
@@ -595,31 +1005,72 @@ function updateColors(shimmerT=0){
         sampleStops(d*0.42,stopsB,_rgb2);
         lerpRgb(_rgb,_rgb2,blendSt,_rgb);
       }else sampleStops(d*0.42,stops,_rgb);
-      mixSilver(_rgb,innerSilver,_rgb2);
+      _rgb2[0]=_rgb[0]; _rgb2[1]=_rgb[1]; _rgb2[2]=_rgb[2];
       const ox=innerOrig[i3],oy=innerOrig[i3+1],oz=innerOrig[i3+2];
-      let boost=1.42+(wShards>0.001?0.16*wShards:0);
+      let boost=1.42+(wShards>0.001?0.08*wShards:0);
+      if(wRedInner>0.001) boost=1.28+(boost-1.28)*(1-smoothstep(Math.min(1,wRedInner))*0.55);
       let r=_rgb2[0],g=_rgb2[1],b=_rgb2[2];
+      const tintStep=innerSeqTint[i];
+      if(tintStep>0){
+        sampleEmotionInnerRgb(cycleEmotionOffset(seqBase,tintStep),d,_rgb);
+        const ta=tintStep===1?0.32:0.2;
+        r=r*(1-ta)+_rgb[0]*ta;
+        g=g*(1-ta)+_rgb[1]*ta;
+        b=b*(1-ta)+_rgb[2]*ta;
+      }
       if(wYellow>0.001){
-        const yw=smoothstep(Math.min(1,wYellow));
+        const yw=smoothstep(Math.min(1,wYellow))*0.48;
         const yf=yellowSparkFlicker(shimmerT,innerPhase[i],ox,oy,oz);
-        tintBrightYellow(r*yf.mul*1.22,g*yf.mul*1.22,b*yf.mul*1.18,yf.flash*1.12,_rgb);
+        tintBrightYellow(r*yf.mul*1.08,g*yf.mul*1.08,b*yf.mul*1.06,yf.flash*0.2,_rgb);
         const yr=_rgb[0],yg=_rgb[1],yb=_rgb[2];
         r=r*(1-yw)+yr*yw;
         g=g*(1-yw)+yg*yw;
         b=b*(1-yw)+yb*yw;
         boost=1+(1-yw)*(boost-1);
       }
+      if(wRedInner>0.001){
+        const rg=redShellGlow(shimmerT,innerPhase[i],ox,oy,oz);
+        const rs=redShardSparkle(shimmerT,innerPhase[i],ox,oy,oz);
+        const shardWt=Math.max(wShards,wRedInner*0.9);
+        const rw=smoothstep(Math.min(1,wRedInner))*smoothstep(shardWt);
+        tintRedShell(r*rg.mul,g*rg.mul*0.88,b*rg.mul*0.84,(rg.glow+rg.spark*0.22+rs.flash*0.1)*rw*1.25,_rgb);
+        tintRedSpark(_rgb[0],_rgb[1],_rgb[2],rs.flash*rw*0.75,_rgb2);
+        pushRedSaturation(_rgb2[0],_rgb2[1],_rgb2[2],rw*0.85,_rgb);
+        const rr=_rgb[0],rgG=_rgb[1],rb=_rgb[2];
+        r=r*(1-rw)+rr*rw;
+        g=g*(1-rw)+rgG*rw;
+        b=b*(1-rw)+rb*rw;
+      }
       if(wBlueInner>0.001){
+        const cw=smoothstep(Math.min(1,wBlueInner));
+        const cg=cyanDropletGlow(shimmerT,innerPhase[i],ox,oy,oz);
+        tintCyanGlow(r*cg.mul*1.08,g*cg.mul*1.08,b*cg.mul*1.12,cg.glow*cw,0,_rgb);
+        const cr=_rgb[0],cgG=_rgb[1],cb=_rgb[2];
+        r=r*(1-cw)+cr*cw;
+        g=g*(1-cw)+cgG*cw;
+        b=b*(1-cw)+cb*cw;
         const bb=1.35+0.008*Math.sin(shimmerT*0.5+ox*3);
-        boost=boost*(1-wBlueInner)+bb*wBlueInner;
+        boost=boost*(1-cw)+bb*cw;
       }
       if(wPurpleOrb>0.001){
-        const pb=1.34+0.007*Math.sin(shimmerT*0.35+innerPhase[i]+ox*1.8);
-        boost=boost*(1-wPurpleOrb)+pb*wPurpleOrb;
+        const pw=smoothstep(Math.min(1,wPurpleOrb));
+        const pg=purpleEmpathyGlow(shimmerT,innerPhase[i],ox,oy,oz);
+        tintPurpleGlow(r*pg.mul*1.05,g*pg.mul*1.05,b*pg.mul*1.04,pg.glow*pw*0.45,_rgb);
+        const pr=_rgb[0],pu=_rgb[1],pb2=_rgb[2];
+        r=r*(1-pw)+pr*pw;
+        g=g*(1-pw)+pu*pw;
+        b=b*(1-pw)+pb2*pw;
+        boost=1+(1-pw)*(boost-1);
       }
-      innerColors[i3]=Math.min(r*boost,1);
-      innerColors[i3+1]=Math.min(g*boost,1);
-      innerColors[i3+2]=Math.min(b*boost,1);
+      let ir=r*boost, ig=g*boost, ib=b*boost;
+      if(wRedInner>0.001){
+        const cap=smoothstep(Math.min(1,wRedInner));
+        pushRedSaturation(ir,ig,ib,cap*0.65,_rgb);
+        ir=_rgb[0]; ig=_rgb[1]; ib=_rgb[2];
+      }
+      innerColors[i3]=Math.min(ir,1);
+      innerColors[i3+1]=Math.min(ig,1);
+      innerColors[i3+2]=Math.min(ib,1);
     }
     innerGeo.attributes.color.needsUpdate=true;
   }catch(err){ console.error('updateColors',err); }
@@ -660,6 +1111,21 @@ function animate(){
   requestAnimationFrame(animate);
   tickCycle();
   const t=clock.getElapsedTime();
+  const dt=Math.min(Math.max(t-lastAnimT,0),0.05);
+  lastAnimT=t;
+  const tNow=t;
+
+  if(spawnEnabled){
+    innerSpawnAcc+=dt;
+    while(innerSpawnAcc>=SPAWN_INNER_INTERVAL){
+      innerSpawnAcc-=SPAWN_INNER_INTERVAL;
+      const idx=innerSpawnCursor++%INNER_N;
+      innerBirth[idx]=tNow;
+      innerSize[idx]=1.05+Math.random()*0.9;
+      const p3=idx*3;
+      innerPrev[p3]=innerPrev[p3+1]=innerPrev[p3+2]=0;
+    }
+  }
 
   const cw=cycleStyleWeights();
   const motionT=cycleOn?0.2:0.02;
@@ -695,6 +1161,9 @@ function animate(){
   const wRed=cw?cw.red:(mode==='heartbeat'?1:0);
   const wYellow=cw?cw.yellow:(style==='sparks'||mode==='burst'?1:0);
   const wChaosMotion=wRed+wYellow;
+  // Avoid stacking fast chaos on top of red/yellow shell motion (causes runaway jitter).
+  const wChaosShell=wChaosMotion*Math.max(0,1-wRed*0.95-wYellow*0.95);
+  const wChaosInner=wChaosMotion*Math.max(0,1-wRed*0.9-wYellow*0.9);
   const wGlowChaos=Math.max(0,1-Math.min(1,wCalm+wPurple+wRed+wYellow));
   const wGlowSum=wCalm+wPurple+wRed+wYellow+wGlowChaos;
   const wMotionSum=wCalm+wPurple+wChaosMotion;
@@ -717,7 +1186,7 @@ function animate(){
     const calmPeriod=Math.max(target.pulse||2.75,2.75);
     const purplePeriod=Math.max(target.pulse||6.5,5.5);
     const breathPeriod=wCalm>0.5?calmPeriod:wPurple>0.5?purplePeriod:wRed>0.5?ANGER_PULSE_BASE:Math.max(target.pulse||0.4,0.05);
-    const angerAmp=wRed>0.5?(target.pulseAmp||0.11)*(angerMod?angerMod.amp:1):target.pulseAmp||0.06;
+    const angerAmp=wRed>0.5?(target.pulseAmp||0.075)*(angerMod?angerMod.amp:1):target.pulseAmp||0.06;
     sphere=getSphereBreath(t,breathPeriod,mode,angerAmp);
     breath=sphere.breath;
   }
@@ -736,45 +1205,50 @@ function animate(){
   const pSize=Number.isFinite(params.size)?Math.max(params.size,0.1):2;
 
   const yellowPulse=wYellow>0.35;
-  shellMat.size=pSize*SHELL_PT_MUL*(yellowPulse
+  const purpleGlow=wPurple>0.35;
+  shellMat.size=pSize*SHELL_PT_MUL*((yellowPulse||purpleGlow)
     ?0.97+0.03*Math.sin(t*pulseFreq*0.35)
-    :wChaosMotion>0.5?0.92+Math.sin(t*18)*0.08:1);
-  let shellOp=wCalm*density*(0.44+sphere.breath*0.07)+wPurple*density*(0.52+(breath-0.5)*0.16)+wChaosMotion*density*(0.58+breath*0.14);
+    :wChaosShell>0.35?0.97+Math.sin(t*6)*0.025:1);
+  let shellOp=wCalm*density*(0.52+sphere.breath*0.08)+wPurple*density*(0.6+(breath-0.5)*0.18)+wChaosMotion*density*(0.66+breath*0.16);
   if(wEdge>0.001){
-    const flick=wYellow>0.2?0.92+0.08*Math.sin(t*pulseFreq*0.45):0.82+0.18*Math.sin(t*13.5);
+    const flick=wYellow>0.2?0.97+0.02*Math.sin(t*pulseFreq*0.35):0.94+0.06*Math.sin(t*4.2);
     shellOp*=1-wEdge+flick*wEdge;
   }
-  if(yellowPulse) shellOp*=0.94+0.06*Math.sin(t*pulseFreq*0.4);
-  shellMat.opacity=Math.min(Math.max(shellOp,0.12),1);
+  if(yellowPulse||purpleGlow) shellOp*=0.97+0.028*Math.sin(t*pulseFreq*0.32);
+  shellMat.opacity=Math.min(Math.max(shellOp,0.28),1);
 
   const gNorm=wGlowSum>0.001?1/wGlowSum:1;
   const gbCalm=0.96+(breath-0.5)*0.04;
-  const gbPurple=0.9+(breath-0.5)*0.14;
-  const gbRed=0.92+(breath-0.5)*0.1;
   const gbBurst=0.8+breath*0.2;
+  const gbRed=0.92+(breath-0.5)*0.1;
   const glowBreath=(
-    wCalm*gbCalm+wPurple*gbPurple+wRed*gbRed+wYellow*gbBurst+wGlowChaos*gbBurst
+    wCalm*gbCalm+wPurple*gbBurst+wRed*gbRed+wYellow*gbBurst+wGlowChaos*gbBurst
   )*gNorm;
   innerMat.size=pSize*INNER_PT_MUL*glowBreath;
   innerMat.opacity=Math.min(density*(wRed*(0.9+(breath-0.5)*0.08)+(1-wRed)*(0.88+breath*0.12)),1);
-  const gmCalm=1.08, gmPurple=0.92+(breath-0.5)*0.16, gmRed=0.9+(breath-0.5)*0.1, gmBurst=1, gmChaos=0.85;
-  const glowSizeMul=(wCalm*gmCalm+wPurple*gmPurple+wRed*gmRed+wYellow*gmBurst+wGlowChaos*gmChaos)*gNorm;
+  const gmCalm=1.08, gmBurst=1, gmRed=0.9+(breath-0.5)*0.1, gmChaos=0.85;
+  const glowSizeMul=(wCalm*gmCalm+wPurple*gmBurst+wRed*gmRed+wYellow*gmBurst+wGlowChaos*gmChaos)*gNorm;
   innerGlowMat.size=(params.glowSize||0.03)*GLOW_PT_MUL*glowBreath*glowSizeMul;
-  const opCalm=0.88+(breath-0.5)*0.06, opPurple=0.76+(breath-0.5)*0.14, opPulse=0.75+breath*0.25;
+  const opCalm=0.88+(breath-0.5)*0.06, opPulse=0.75+breath*0.25;
   innerGlowMat.opacity=Math.min(density*(params.glowOp||0.35)*(
-    wCalm*opCalm+wPurple*opPurple+(wRed+wYellow+wGlowChaos)*opPulse
+    wCalm*opCalm+(wPurple+wRed+wYellow+wGlowChaos)*opPulse
   )*gNorm,0.9);
+  innerHalo2Mat.size=innerGlowMat.size*1.55;
+  innerHalo3Mat.size=innerGlowMat.size*2.25;
+  innerHalo2Mat.opacity=Math.min(innerGlowMat.opacity*0.58,0.85);
+  innerHalo3Mat.opacity=Math.min(innerGlowMat.opacity*0.28,0.6);
 
-  const chaosMul=wCalm*target.chaos*0.018+wPurple*target.chaos*0.01+wChaosMotion*target.chaos*0.06;
+  const chaosMul=wCalm*target.chaos*0.018+wPurple*target.chaos*0.01+wChaosInner*target.chaos*0.032;
   const shimmer=wCalm*0.028+wPurple*0.02+wYellow*0.012;
   const shellArr=shellPosAttr.array;
+  const innerArr=innerPosAttr.array;
   for(let i=0;i<SHELL_N;i++){
     const i3=i*3;
     const ox=shellOrig[i3],oy=shellOrig[i3+1],oz=shellOrig[i3+2];
     const len=Math.sqrt(ox*ox+oy*oy+oz*oz)||1;
     const rippleWave=Math.sin(t*pulseFreq+shellPhase[i])*0.5+0.5;
     const ripple=wRed*breath+(1-wRed)*rippleWave;
-    const rippleAmt=wCalm*0.018+wPurple*0.022+wYellow*0.016+wRed*0.02+wChaosMotion*0.025;
+    const rippleAmt=wCalm*0.018+wPurple*0.022+wYellow*0.014+wRed*0.016+wChaosShell*0.012;
     let dx=0,dy=0,dz=0,expand=1+sphere.disperse;
     if(wCalm>0.001){
       const ph=shellPhase[i];
@@ -797,28 +1271,53 @@ function animate(){
       dz+=wPurple*mNorm*(Math.sin(t*0.21+ox*1.4+ph*0.75)*shim);
       expand+=wPurple*mNorm*(sphere.swell*0.045+wave*0.04*Math.sin(t*pulseFreq*0.22+ph*1.4));
     }
-    if(wChaosMotion>0.001){
-      const c=chaosMul;
-      dx+=wChaosMotion*mNorm*Math.sin(t*cf*0.9+oy*4+shellPhase[i])*c;
-      dy+=wChaosMotion*mNorm*Math.sin(t*cf*0.7+oz*3+shellPhase[i]*1.3)*c;
-      dz+=wChaosMotion*mNorm*Math.sin(t*cf*1.1+ox*5+shellPhase[i]*0.7)*c;
+    if(wRed>0.001){
+      const ph=shellPhase[i];
+      const edge=Math.max(0,Math.min(1,(len-0.86)/0.22));
+      const wave=Math.sin(t*pulseFreq*0.3+ph+ox*0.55)*0.5+0.5;
+      const shim=shimmer*(0.65+wave*0.4)*(1+edge*1.6);
+      dx+=wRed*mNorm*(Math.sin(t*0.23+oy*1.25+ph)*shim+Math.sin(t*0.19+oz*1.35+ph*0.7)*shim*0.5);
+      dy+=wRed*mNorm*(Math.sin(t*0.21+oz*1.45+ph*0.95)*shim+Math.cos(t*0.25+ox*1.15+ph)*shim*0.48);
+      dz+=wRed*mNorm*(Math.sin(t*0.24+ox*1.35+ph*0.8)*shim+edge*Math.sin(t*0.48+ph*2.1+oy)*0.018);
+      expand+=wRed*mNorm*edge*(Math.sin(t*0.41+ph*1.6)*0.04+wave*0.03);
     }
+    if(wYellow>0.001){
+      const ph=shellPhase[i];
+      const edge=Math.max(0,Math.min(1,(len-0.84)/0.24));
+      const wave=Math.sin(t*pulseFreq*0.26+ph+oy*0.5)*0.5+0.5;
+      const shim=shimmer*(0.7+wave*0.45)*(1+edge*1.4);
+      dx+=wYellow*mNorm*(Math.sin(t*0.36+oy*1.4+ph)*shim+Math.sin(t*0.31+oz*1.6+ph*0.75)*shim*0.55);
+      dy+=wYellow*mNorm*(Math.sin(t*0.34+oz*1.5+ph*1.05)*shim+Math.cos(t*0.4+ox*1.3+ph)*shim*0.5);
+      dz+=wYellow*mNorm*(Math.sin(t*0.37+ox*1.5+ph*0.85)*shim+edge*Math.cos(t*0.44+ph*1.9+oz)*0.018);
+      expand+=wYellow*mNorm*edge*(Math.sin(t*0.42+ph*1.7)*0.04+wave*0.03);
+    }
+    if(wChaosShell>0.001){
+      const c=chaosMul;
+      const cfS=cf*0.55;
+      dx+=wChaosShell*mNorm*Math.sin(t*cfS*0.9+oy*2.2+shellPhase[i])*c;
+      dy+=wChaosShell*mNorm*Math.sin(t*cfS*0.7+oz*1.8+shellPhase[i]*1.1)*c;
+      dz+=wChaosShell*mNorm*Math.sin(t*cfS*1.1+ox*2.5+shellPhase[i]*0.7)*c;
+    }
+    const sw=swirlInward(t,shellPhase[i],ox,oy,oz,len,SWIRL_TANG_SHELL,SWIRL_IN_SHELL*(0.7+sphere.breath*0.35));
+    dx+=sw.dx; dy+=sw.dy; dz+=sw.dz;
     const r=radius*sphere.scale*(1+(ripple-0.5)*rippleAmt);
     const nx=ox/len,ny=oy/len,nz=oz/len;
-    const pr=len*r*expand;
-    shellArr[i3]=nx*pr+dx;
-    shellArr[i3+1]=ny*pr+dy;
-    shellArr[i3+2]=nz*pr+dz;
+    const pr=len*r*expand*sw.radScale;
+    const tx=nx*pr+dx, ty=ny*pr+dy, tz=nz*pr+dz;
+    // Shell always-on: stable spherical outline while inner particles spawn/fade.
+    shellArr[i3]=tx;
+    shellArr[i3+1]=ty;
+    shellArr[i3+2]=tz;
   }
   shellPosAttr.needsUpdate=true;
 
-  const innerArr=innerPosAttr.array;
   for(let i=0;i<INNER_N;i++){
     const i3=i*3;
     const ox=innerOrig[i3],oy=innerOrig[i3+1],oz=innerOrig[i3+2];
+    const len=Math.sqrt(ox*ox+oy*oy+oz*oz)||1;
     const rippleWave=Math.sin(t*pulseFreq+innerPhase[i])*0.5+0.5;
     const ripple=wRed*breath+(1-wRed)*rippleWave;
-    const rippleAmt=wCalm*0.01+wPurple*0.016+wYellow*0.012+wRed*0.012+wChaosMotion*0.02;
+    const rippleAmt=wCalm*0.01+wPurple*0.016+wYellow*0.01+wRed*0.01+wChaosInner*0.01;
     let dx=0,dy=0,dz=0;
     if(wCalm>0.001){
       const ph=innerPhase[i];
@@ -834,32 +1333,150 @@ function animate(){
       dy+=wPurple*mNorm*Math.sin(t*0.17+oz*1.4+ph*1.1)*shim;
       dz+=wPurple*mNorm*Math.cos(t*0.2+ox*1.3+ph*0.85)*shim;
     }
-    if(wChaosMotion>0.001){
-      const c=chaosMul*1.35;
-      dx+=wChaosMotion*mNorm*Math.sin(t*cf*0.9+oy*4+innerPhase[i])*c;
-      dy+=wChaosMotion*mNorm*Math.sin(t*cf*0.7+oz*3+innerPhase[i]*1.3)*c;
-      dz+=wChaosMotion*mNorm*Math.sin(t*cf*1.1+ox*5+innerPhase[i]*0.7)*c;
-      dx+=wChaosMotion*mNorm*Math.sin(t*cf*1.6+ox*6+innerPhase[i]*2.1)*c*0.55;
-      dy+=wChaosMotion*mNorm*Math.cos(t*cf*1.4+oy*5+innerPhase[i]*1.8)*c*0.55;
-      dz+=wChaosMotion*mNorm*Math.sin(t*cf*1.8+oz*4+innerPhase[i]*2.4)*c*0.5;
+    if(wChaosInner>0.001){
+      const c=chaosMul;
+      const cfI=cf*0.5;
+      dx+=wChaosInner*mNorm*Math.sin(t*cfI*0.9+oy*2.5+innerPhase[i])*c;
+      dy+=wChaosInner*mNorm*Math.sin(t*cfI*0.7+oz*2+innerPhase[i]*1.1)*c;
+      dz+=wChaosInner*mNorm*Math.sin(t*cfI*1.1+ox*2.8+innerPhase[i]*0.7)*c;
     }
-    const jitAmt=target.chaos*(wCalm*0.028+wPurple*0.038+wChaosMotion*(wShards*0.095+(1-wShards)*(yellowPulse?0.075:0.065)))+0.018;
+    const jitAmt=target.chaos*(wCalm*0.028+wPurple*0.038+wRed*0.012+wYellow*0.011+wChaosInner*(wShards*0.028+(1-wShards)*0.022))+0.01;
     const j=innerJitter(t,innerPhase[i],ox,oy,oz,jitAmt);
     dx+=j.x; dy+=j.y; dz+=j.z;
-    const len=Math.sqrt(ox*ox+oy*oy+oz*oz)||1;
-    const innerExpand=1+sphere.disperse*(wPurple*0.92+wChaosMotion*0.5);
-    const r=radius*sphere.innerScale*(1+(ripple-0.5)*rippleAmt);
-    const innerC=target.chaos*(wPurple*0.016+wYellow*0.034+wChaosMotion*(wShards*0.052+0.048*(1-wShards)));
-    const streakMul=wRed*1.15+wPurple*0.32+wYellow*1.05+wChaosMotion*2.2;
+    const sw=swirlInward(t,innerPhase[i],ox,oy,oz,len,SWIRL_TANG_INNER,SWIRL_IN_INNER*(0.75+breath*0.3));
+    dx+=sw.dx; dy+=sw.dy; dz+=sw.dz;
+    const innerExpand=1+sphere.disperse*(wPurple*0.92+wChaosInner*0.12);
+    const r=radius*sphere.innerScale*(1+(ripple-0.5)*rippleAmt)*sw.radScale;
+    const innerC=target.chaos*(wPurple*0.016+wYellow*0.022+wRed*0.012+wChaosInner*(wShards*0.028+0.022*(1-wShards)));
+    const streakMul=wRed*0.85+wPurple*0.32+wYellow*0.55+wChaosInner*0.45;
     const streakWave=Math.sin(t*streakMul+innerPhase[i])*innerC;
     const streak=wRed*sphere.swell*innerC+(1-wRed)*streakWave;
     const drift=0.82;
-    innerArr[i3]=ox*r*innerExpand+dx*drift+j.x*0.35+(ox/len)*streak;
-    innerArr[i3+1]=oy*r*innerExpand+dy*drift+j.y*0.35+(oy/len)*streak;
-    innerArr[i3+2]=oz*r*innerExpand+dz*drift+j.z*0.35+(oz/len)*streak;
+    const tx=ox*r*innerExpand+dx*drift+j.x*0.35+(ox/len)*streak;
+    const ty=oy*r*innerExpand+dy*drift+j.y*0.35+(oy/len)*streak;
+    const tz=oz*r*innerExpand+dz*drift+j.z*0.35+(oz/len)*streak;
+    let vis=1;
+    const born=innerBirth[i];
+    if(spawnEnabled){
+      if(born<0){
+        vis=0;
+        innerArr[i3]=innerArr[i3+1]=innerArr[i3+2]=0;
+        innerPrev[i3]=innerPrev[i3+1]=innerPrev[i3+2]=0;
+      }else{
+        const age=tNow-born;
+        if(age>=SPAWN_INNER_LIFE){
+          innerBirth[i]=-1;
+          vis=0;
+          innerArr[i3]=innerArr[i3+1]=innerArr[i3+2]=0;
+          innerPrev[i3]=innerPrev[i3+1]=innerPrev[i3+2]=0;
+        }else{
+          const p=Math.max(0,Math.min(1,age/(SPAWN_INNER_LIFE-SPAWN_INNER_FADE)));
+          const pe=smootherstep(p);
+          const blend=smoothstep(pe);
+          const aI=1-pe;
+          if(age>SPAWN_INNER_LIFE-SPAWN_INNER_FADE){
+            const f=Math.max(0,(SPAWN_INNER_LIFE-age)/SPAWN_INNER_FADE);
+            vis=smootherstep(f);
+          }
+          const nx=ox/len, ny=oy/len, nz=oz/len;
+          const pr=len*r*innerExpand*sw.radScale;
+          const ax=innerAxis[i3], ay=innerAxis[i3+1], az=innerAxis[i3+2];
+          let ux=ay*nz-az*ny, uy=az*nx-ax*nz, uz=ax*ny-ay*nx;
+          const ul=Math.sqrt(ux*ux+uy*uy+uz*uz)||1;
+          ux/=ul; uy/=ul; uz/=ul;
+          const vx=ny*uz-nz*uy, vy=nz*ux-nx*uz, vz=nx*uy-ny*ux;
+          const ang=(tNow*1.25+innerPhase[i]*8.6);
+          const cs=Math.cos(ang), sn=Math.sin(ang);
+          const amp=pr*SPAWN_INNER_AMP*Math.pow(aI,1.75);
+          const sx=nx*pr*pe+(ux*cs+vx*sn)*amp;
+          const sy=ny*pr*pe+(uy*cs+vy*sn)*amp;
+          const sz=nz*pr*pe+(uz*cs+vz*sn)*amp;
+          innerArr[i3]=sx*(1-blend)+tx*blend;
+          innerArr[i3+1]=sy*(1-blend)+ty*blend;
+          innerArr[i3+2]=sz*(1-blend)+tz*blend;
+        }
+      }
+      innerVis[i]=vis;
+    }else{
+      innerVis[i]=1;
+      innerArr[i3]=tx; innerArr[i3+1]=ty; innerArr[i3+2]=tz;
+    }
   }
   innerPosAttr.needsUpdate=true;
   updateColors(t);
+  innerGeo.attributes.aSize.needsUpdate=true;
+
+  // Apply fade AFTER updateColors() (updateColors overwrites the color buffers)
+  // Shell stays fully visible; only apply per-particle fade to inner layer
+  for(let i=0;i<INNER_N;i++){
+    const v=innerVis[i];
+    if(v>=0.999) continue;
+    const i3=i*3;
+    innerColors[i3]*=v; innerColors[i3+1]*=v; innerColors[i3+2]*=v;
+  }
+  innerGeo.attributes.color.needsUpdate=true;
+
+  // Emit + update trail particles (after inner colors include fades)
+  for(let i=0;i<INNER_N;i++){
+    const vis=innerVis[i];
+    if(vis<0.05) continue;
+    const i3=i*3;
+    const px=innerArr[i3], py=innerArr[i3+1], pz=innerArr[i3+2];
+    const ox=innerPrev[i3], oy=innerPrev[i3+1], oz=innerPrev[i3+2];
+    const dx=px-ox, dy=py-oy, dz=pz-oz;
+    const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    if(dist<TRAIL_EMIT_STEP) continue;
+    const idx=trailHead++%TRAIL_POOL;
+    const t3=idx*3;
+    const jit=0.042;
+    trailPos[t3]=px+(Math.random()-0.5)*jit;
+    trailPos[t3+1]=py+(Math.random()-0.5)*jit;
+    trailPos[t3+2]=pz+(Math.random()-0.5)*jit;
+    trailVel[t3]=dx*0.4+(Math.random()-0.5)*0.028;
+    trailVel[t3+1]=dy*0.4+(Math.random()-0.5)*0.028+0.012;
+    trailVel[t3+2]=dz*0.4+(Math.random()-0.5)*0.028;
+    const cr=innerColors[i3]*vis, cg=innerColors[i3+1]*vis, cb=innerColors[i3+2]*vis;
+    trailBaseCol[t3]=cr;
+    trailBaseCol[t3+1]=cg;
+    trailBaseCol[t3+2]=cb;
+    trailCol[t3]=cr;
+    trailCol[t3+1]=cg;
+    trailCol[t3+2]=cb;
+    trailAge[idx]=TRAIL_LIFE;
+    if(!trailAlive[idx]){
+      trailAlive[idx]=1;
+      trailActive[trailActiveN++]=idx;
+    }
+    innerPrev[i3]=px;
+    innerPrev[i3+1]=py;
+    innerPrev[i3+2]=pz;
+  }
+  for(let a=trailActiveN-1;a>=0;a--){
+    const idx=trailActive[a];
+    let age=trailAge[idx]-dt;
+    const t3=idx*3;
+    if(age<=0){
+      trailAge[idx]=0;
+      trailAlive[idx]=0;
+      trailPos[t3]=trailPos[t3+1]=trailPos[t3+2]=0;
+      trailCol[t3]=trailCol[t3+1]=trailCol[t3+2]=0;
+      trailActive[a]=trailActive[--trailActiveN];
+      continue;
+    }
+    trailAge[idx]=age;
+    trailPos[t3]+=trailVel[t3]*dt;
+    trailPos[t3+1]+=trailVel[t3+1]*dt;
+    trailPos[t3+2]+=trailVel[t3+2]*dt;
+    trailVel[t3]*=0.985;
+    trailVel[t3+1]*=0.985;
+    trailVel[t3+2]*=0.985;
+    const fade=Math.pow(age/TRAIL_LIFE,1.5);
+    trailCol[t3]=trailBaseCol[t3]*fade;
+    trailCol[t3+1]=trailBaseCol[t3+1]*fade;
+    trailCol[t3+2]=trailBaseCol[t3+2]*fade;
+  }
+  trailGeo.attributes.position.needsUpdate=true;
+  trailGeo.attributes.color.needsUpdate=true;
 
   if(!isDragging){
     velX*=0.92; velY*=0.92;
@@ -867,6 +1484,13 @@ function animate(){
   }
   group.rotation.x=rotX;
   group.rotation.y=rotY;
+
+  const cwCloud=cycleOn?cycleStyleWeights():null;
+  const worldR=radius*sphere.scale;
+  const cloudRedMix=cwCloud?cwCloud.red:(activeEmotion==='red'?1:0);
+  const cloudPurpleMix=cwCloud?cwCloud.purple:(activeEmotion==='purple'?1:0);
+  const cloudBlueMix=cwCloud?cwCloud.calm:(activeEmotion==='blue'?1:0);
+  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix);
 
   renderer.render(scene,camera);
 }
@@ -876,6 +1500,7 @@ window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
+  cloudBg.onResize(innerWidth, innerHeight);
 });
 </script>
 </body>
