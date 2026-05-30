@@ -162,7 +162,7 @@ gl_FragColor.a*=vis*0.9;`
     loader.load(TEXTURE_URL, (texture) => {
       texture.minFilter = THREE.LinearFilter;
       const geo = new THREE.PlaneGeometry(1, 1);
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 18; i++) {
         const mat = new THREE.MeshLambertMaterial({
           map: texture,
           transparent: true,

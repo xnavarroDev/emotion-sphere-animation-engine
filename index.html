@@ -336,10 +336,10 @@ const group = new THREE.Group();
 scene.add(group);
 const cloudBg = createCloudBackground(scene, camera, group);
 
-const SHELL_N = 1500;
-const INNER_N = 200;
-const SHELL_PT_MUL = 0.0145;
-const INNER_PT_MUL = 0.055;
+const SHELL_N = 520;
+const INNER_N = 56;
+const SHELL_PT_MUL = 0.018;
+const INNER_PT_MUL = 0.062;
 const GLOW_PT_MUL = 20.0;
 const SWIRL_SPIN = 1.35;
 const SWIRL_TANG_SHELL = 0.14;
@@ -348,10 +348,10 @@ const SWIRL_IN_SHELL = 0.32;
 const SWIRL_IN_INNER = 0.4;
 
 // Slow, one-by-one continuous emitter (inner only; shell stays always-on)
-const SPAWN_INNER_LIFE = 4.1;
-const SPAWN_INNER_FADE = 1.0;
-const SPAWN_INNER_INTERVAL = 0.28; // slower
-const SPAWN_INNER_AMP = 0.38;
+const SPAWN_INNER_LIFE = 5.8;
+const SPAWN_INNER_FADE = 1.2;
+const SPAWN_INNER_INTERVAL = 0.65; // firefly pace: one-by-one, sparse
+const SPAWN_INNER_AMP = 0.34;
 let spawnEnabled=true;
 let innerSpawnCursor=0;
 let innerSpawnAcc=0;
@@ -457,7 +457,7 @@ const shellGeo=new THREE.BufferGeometry();
 shellGeo.setAttribute('position',new THREE.BufferAttribute(shellPos,3));
 shellGeo.setAttribute('color',new THREE.BufferAttribute(shellColors,3));
 const shellMat=new THREE.PointsMaterial({
-  size:0.018, map:glowTex, vertexColors:true, transparent:true, opacity:0.65,
+  size:0.018, map:glowTex, vertexColors:true, transparent:true, opacity:0.52,
   alphaTest:0.01, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true, fog:false
 });
 group.add(new THREE.Points(shellGeo,shellMat));
@@ -529,9 +529,9 @@ group.add(new THREE.Points(innerGeo,innerGlowMat));
 group.add(new THREE.Points(innerGeo,innerMat));
 
 // Emitted trail particles (each inner dot leaves glowing dots that drift + fade)
-const TRAIL_POOL=12000;
-const TRAIL_LIFE=1.25;
-const TRAIL_EMIT_STEP=0.016;
+const TRAIL_POOL=2200;
+const TRAIL_LIFE=1.55;
+const TRAIL_EMIT_STEP=0.042;
 const trailPos=new Float32Array(TRAIL_POOL*3);
 const trailCol=new Float32Array(TRAIL_POOL*3);
 const trailBaseCol=new Float32Array(TRAIL_POOL*3);
@@ -547,7 +547,7 @@ const trailGeo=new THREE.BufferGeometry();
 trailGeo.setAttribute('position',new THREE.BufferAttribute(trailPos,3));
 trailGeo.setAttribute('color',new THREE.BufferAttribute(trailCol,3));
 const trailMat=new THREE.PointsMaterial({
-  size:0.1, map:glowTex, vertexColors:true, transparent:true, opacity:0.88,
+  size:0.11, map:glowTex, vertexColors:true, transparent:true, opacity:0.72,
   blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, sizeAttenuation:true, fog:false
 });
 const trailPoints=new THREE.Points(trailGeo,trailMat);
@@ -698,14 +698,30 @@ function purpleEmpathyGlow(t,phase,ox,oy,oz){
 
 const RED_SHELL=hexRgb('#FF7868');
 const RED_SPARK=hexRgb('#FF6458');
-function redShellGlow(t,phase,ox,oy,oz){
-  const a=Math.sin(t*6.4+phase*2.1+ox*3.2);
-  const b=Math.cos(t*4.1+oy*2.6+phase*1.4);
-  const c=Math.sin(t*8.6+oz*2.2+phase*0.9);
-  const chaos=Math.pow(Math.abs(a*b*c),0.52);
-  const wave=Math.sin(t*2.6+phase+oy*1.1+ox*0.7)*0.5+0.5;
-  const spark=Math.pow(Math.max(0,Math.sin(t*9.4+phase*3.1+ox*2.6)*Math.sin(t*7.8+phase*2.2+oy*2.4)),1.85);
-  return {mul:0.95+chaos*0.05+wave*0.03, glow:0.024+chaos*0.08+wave*0.05+spark*0.07, spark, jitter:(chaos*0.02+wave*0.015)};
+const WARM_SHELL=hexRgb('#FFB848');
+const WARM_SPARK=hexRgb('#FFE070');
+
+const WARM_RED_STOPS=[
+  {at:0,c:hexRgb('#FFD060')},{at:0.22,c:hexRgb('#FF9838')},
+  {at:0.48,c:hexRgb('#E87028')},{at:0.72,c:hexRgb('#8A4020')},{at:1,c:hexRgb('#2A1408')},
+];
+
+function sparkleGate(i,phase,ox,oy,oz,thresh){
+  const h=Math.abs(Math.sin(i*127.1+phase*311.7+ox*89.3+oy*53.9+oz*71.2)*43758.5453)%1;
+  return Math.pow(Math.max(0,h-thresh)/(1-thresh),0.58);
+}
+
+function redShellGlow(t,phase,ox,oy,oz,idx){
+  const j=idx*0.17+phase*0.31;
+  const a=Math.sin(t*(4.8+j)+phase*(1.7+j*0.4)+ox*(1.9+idx*0.08));
+  const b=Math.cos(t*(3.6+j*1.3)+oy*(2.1+idx*0.06)+phase*1.2);
+  const c=Math.sin(t*(5.9+j*0.9)+oz*(1.6+idx*0.05)+phase*0.7);
+  const chaos=Math.pow(Math.abs(a*b*c),0.68);
+  const wave=Math.sin(t*2.1+phase*1.3+oy*0.9+ox*0.5+idx*0.22)*0.5+0.5;
+  const s1=Math.sin(t*(6.2+idx*0.41)+phase*(2.4+idx*0.13)+ox*1.7+oz*0.9);
+  const s2=Math.sin(t*(4.1+idx*0.29)+phase*(1.8+idx*0.09)+oy*2.1+ox*0.6);
+  const spark=Math.pow(Math.max(0,s1*s2),2.35);
+  return {mul:0.96+chaos*0.03+wave*0.02, glow:0.014+chaos*0.04+wave*0.03+spark*0.035, spark, jitter:(chaos*0.015+wave*0.01)};
 }
 
 function tintRedShell(r,g,b,glowAmt,out){
@@ -715,12 +731,13 @@ function tintRedShell(r,g,b,glowAmt,out){
   out[2]=Math.min(b*(1+gl*0.08)+RED_SHELL[2]*gl*0.05,1);
 }
 
-function redShardSparkle(t,phase,ox,oy,oz){
-  const a=Math.sin(t*7.6+phase*2.5+ox*3.1);
-  const b=Math.cos(t*5.8+oy*2.3+phase*1.5);
-  const c=Math.sin(t*10.2+oz*2.1+phase*0.85);
-  const spike=Math.pow(Math.abs(a*b*c),0.46);
-  return {mul:0.94+spike*0.05, flash:spike};
+function redShardSparkle(t,phase,ox,oy,oz,idx){
+  const j=idx*0.23+phase*0.19;
+  const a=Math.sin(t*(5.4+j)+phase*(2.1+j*0.5)+ox*(2.4+idx*0.11));
+  const b=Math.cos(t*(4.3+j*1.1)+oy*(1.9+idx*0.07)+phase*(1.4+j*0.3));
+  const c=Math.sin(t*(7.1+j*0.8)+oz*(1.7+idx*0.09)+phase*0.6);
+  const spike=Math.pow(Math.abs(a*b*c),0.72);
+  return {mul:0.97+spike*0.03, flash:spike};
 }
 
 function tintRedSpark(r,g,b,flash,out){
@@ -736,6 +753,29 @@ function pushRedSaturation(r,g,b,amt,out){
   out[0]=rn;
   out[1]=Math.min(g,rn*(1-t*0.38));
   out[2]=Math.min(b,rn*(1-t*0.42));
+}
+
+function tintWarmShell(r,g,b,glowAmt,out){
+  const gl=Math.min(glowAmt,0.62);
+  out[0]=Math.min(r*(1+gl*0.32)+WARM_SHELL[0]*gl*0.42,1);
+  out[1]=Math.min(g*(1+gl*0.28)+WARM_SHELL[1]*gl*0.38+AMBER_SHELL[1]*gl*0.1,1);
+  out[2]=Math.min(b*(1+gl*0.06)+WARM_SHELL[2]*gl*0.04,1);
+}
+
+function tintWarmSpark(r,g,b,flash,out){
+  const f=Math.min(flash*0.62,0.48);
+  out[0]=Math.min(r*(1+f*0.26)+WARM_SPARK[0]*f*0.36,1);
+  out[1]=Math.min(g*(1+f*0.34)+WARM_SPARK[1]*f*0.42+AMBER_SHELL[1]*f*0.16,1);
+  out[2]=Math.min(b*(1+f*0.06)+WARM_SPARK[2]*f*0.05,1);
+}
+
+function pushWarmSaturation(r,g,b,amt,out){
+  const t=Math.min(1,Math.max(0,amt));
+  const rn=Math.min(r*(1+t*0.14)+WARM_SHELL[0]*t*0.1,1);
+  const gn=Math.min(Math.max(g,rn*0.38),rn*(0.62+t*0.22)+WARM_SHELL[1]*t*0.18,1);
+  out[0]=rn;
+  out[1]=gn;
+  out[2]=Math.min(b,rn*(1-t*0.48));
 }
 
 const AMBER_SHELL=hexRgb('#FFE878');
@@ -913,9 +953,10 @@ function updateColors(shimmerT=0){
         edgeFade=1*(1-wCalmBlue)+calmFade*wCalmBlue;
       }
       if(wRedShell>0.001){
-        const rg=redShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
+        const rg=redShellGlow(shimmerT,shellPhase[i],ox,oy,oz,i);
         const rw=smoothstep(Math.min(1,wRedShell));
-        sampleD=d+rg.jitter*rw;
+        const sg=sparkleGate(i,shellPhase[i],ox,oy,oz,0.76);
+        sampleD=d+rg.jitter*rw*sg;
       }
       if(wYellowShell>0.001){
         const yg=yellowShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
@@ -927,19 +968,26 @@ function updateColors(shimmerT=0){
         sampleStops(sampleD,stopsB,_rgb2);
         lerpRgb(_rgb,_rgb2,blendSt,_rgb);
       }else sampleStops(sampleD,stops,_rgb);
+      if(wRedShell>0.001){
+        sampleStops(sampleD,WARM_RED_STOPS,_rgb2);
+        const rwMix=smoothstep(Math.min(1,wRedShell))*0.78;
+        lerpRgb(_rgb,_rgb2,rwMix,_rgb);
+      }
       _rgb2[0]=_rgb[0]; _rgb2[1]=_rgb[1]; _rgb2[2]=_rgb[2];
       let r=_rgb2[0],g=_rgb2[1],b=_rgb2[2];
       if(wRedShell>0.001){
-        const rg=redShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
-        const rs=redShardSparkle(shimmerT,shellPhase[i],ox,oy,oz);
+        const rg=redShellGlow(shimmerT,shellPhase[i],ox,oy,oz,i);
+        const rs=redShardSparkle(shimmerT,shellPhase[i],ox,oy,oz,i);
         const rw=smoothstep(Math.min(1,wRedShell))*0.78;
-        tintRedShell(r*rg.mul,g*rg.mul*0.9,b*rg.mul*0.86,(rg.glow+rg.spark*0.14)*rw,_rgb);
-        tintRedSpark(_rgb[0],_rgb[1],_rgb[2],rs.flash*rw*0.55,_rgb2);
-        pushRedSaturation(_rgb2[0],_rgb2[1],_rgb2[2],rw*0.55,_rgb);
+        const sg=sparkleGate(i,shellPhase[i],ox,oy,oz,0.74);
+        tintWarmShell(r*rg.mul,g*rg.mul*0.94,b*rg.mul*0.9,(rg.glow*0.45+rg.spark*0.06*sg)*rw,_rgb);
+        tintWarmSpark(_rgb[0],_rgb[1],_rgb[2],rs.flash*rw*sg*0.42,_rgb2);
+        pushWarmSaturation(_rgb2[0],_rgb2[1],_rgb2[2],rw*0.32*sg,_rgb);
         const rr=_rgb[0],rgG=_rgb[1],rb=_rgb[2];
-        r=r*(1-rw)+rr*rw;
-        g=g*(1-rw)+rgG*rw;
-        b=b*(1-rw)+rb*rw;
+        const rwTint=rw*(0.35+sg*0.65);
+        r=r*(1-rwTint)+rr*rwTint;
+        g=g*(1-rwTint)+rgG*rwTint;
+        b=b*(1-rwTint)+rb*rwTint;
       }
       if(wYellowShell>0.001){
         const yg=yellowShellGlow(shimmerT,shellPhase[i],ox,oy,oz);
@@ -978,15 +1026,18 @@ function updateColors(shimmerT=0){
         b=b*(1-pw)+sb*pw;
       }
       const edgeAccent=Math.max(0,Math.min(1,(d-0.62)/0.38));
-      const accTw=0.38+0.62*Math.sin(t*11.2+shellPhase[i]*4.1+ox*3.2+oy*2.6);
+      const accTw=0.38+0.62*Math.sin(t*(8.4+shellPhase[i]*0.17)+shellPhase[i]*5.3+ox*2.7+oy*2.1+oz*1.4);
       let accAmt=edgeAccent*(0.14+accTw*accTw*0.62);
-      if(wRedShell>0.2) accAmt*=1-wRedShell*0.82;
+      if(wRedShell>0.2){
+        const sg=sparkleGate(i,shellPhase[i],ox,oy,oz,0.8);
+        accAmt*=sg*(1-wRedShell*0.55);
+      }
       let bar=ar, bag=ag, bab=ab;
       if(wRedShell>0.001){
         const rwA=smoothstep(Math.min(1,wRedShell));
-        bar=RED_SHELL[0]*rwA+ar*(1-rwA);
-        bag=RED_SHELL[1]*rwA+ag*(1-rwA);
-        bab=RED_SHELL[2]*rwA+ab*(1-rwA);
+        bar=WARM_SHELL[0]*rwA+ar*(1-rwA);
+        bag=WARM_SHELL[1]*rwA+ag*(1-rwA);
+        bab=WARM_SHELL[2]*rwA+ab*(1-rwA);
       }
       r=r*(1-accAmt)+bar*accAmt;
       g=g*(1-accAmt)+bag*accAmt;
@@ -1029,17 +1080,19 @@ function updateColors(shimmerT=0){
         boost=1+(1-yw)*(boost-1);
       }
       if(wRedInner>0.001){
-        const rg=redShellGlow(shimmerT,innerPhase[i],ox,oy,oz);
-        const rs=redShardSparkle(shimmerT,innerPhase[i],ox,oy,oz);
+        const rg=redShellGlow(shimmerT,innerPhase[i],ox,oy,oz,i);
+        const rs=redShardSparkle(shimmerT,innerPhase[i],ox,oy,oz,i);
         const shardWt=Math.max(wShards,wRedInner*0.9);
         const rw=smoothstep(Math.min(1,wRedInner))*smoothstep(shardWt);
-        tintRedShell(r*rg.mul,g*rg.mul*0.88,b*rg.mul*0.84,(rg.glow+rg.spark*0.22+rs.flash*0.1)*rw*1.25,_rgb);
-        tintRedSpark(_rgb[0],_rgb[1],_rgb[2],rs.flash*rw*0.75,_rgb2);
-        pushRedSaturation(_rgb2[0],_rgb2[1],_rgb2[2],rw*0.85,_rgb);
+        const sg=sparkleGate(i,innerPhase[i],ox,oy,oz,0.77);
+        tintRedShell(r*rg.mul,g*rg.mul*0.9,b*rg.mul*0.86,(rg.glow*0.38+rg.spark*0.05*sg+rs.flash*0.04*sg)*rw,_rgb);
+        tintRedSpark(_rgb[0],_rgb[1],_rgb[2],rs.flash*rw*sg*0.48,_rgb2);
+        pushRedSaturation(_rgb2[0],_rgb2[1],_rgb2[2],rw*0.45*sg,_rgb);
         const rr=_rgb[0],rgG=_rgb[1],rb=_rgb[2];
-        r=r*(1-rw)+rr*rw;
-        g=g*(1-rw)+rgG*rw;
-        b=b*(1-rw)+rb*rw;
+        const rwTint=rw*(0.42+sg*0.58);
+        r=r*(1-rwTint)+rr*rwTint;
+        g=g*(1-rwTint)+rgG*rwTint;
+        b=b*(1-rwTint)+rb*rwTint;
       }
       if(wBlueInner>0.001){
         const cw=smoothstep(Math.min(1,wBlueInner));
@@ -1062,12 +1115,7 @@ function updateColors(shimmerT=0){
         b=b*(1-pw)+pb2*pw;
         boost=1+(1-pw)*(boost-1);
       }
-      let ir=r*boost, ig=g*boost, ib=b*boost;
-      if(wRedInner>0.001){
-        const cap=smoothstep(Math.min(1,wRedInner));
-        pushRedSaturation(ir,ig,ib,cap*0.65,_rgb);
-        ir=_rgb[0]; ig=_rgb[1]; ib=_rgb[2];
-      }
+      const ir=r*boost, ig=g*boost, ib=b*boost;
       innerColors[i3]=Math.min(ir,1);
       innerColors[i3+1]=Math.min(ig,1);
       innerColors[i3+2]=Math.min(ib,1);
