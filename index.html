@@ -18,7 +18,7 @@ body::after {
     rgba(255,255,255,0.018) 2px, rgba(255,255,255,0.028) 3px
   );
 }
-#label { position:fixed; top:24px; left:24px; z-index:100; color:rgba(255,255,255,0.55); font-size:9px; letter-spacing:5px; pointer-events:none; }
+#label { display:none; }
 #dots { position:fixed; top:24px; right:24px; z-index:100; display:flex; gap:10px; }
 .dot { width:10px; height:10px; border-radius:50%; cursor:pointer; opacity:0.35; transition:all 0.3s; }
 .dot:hover,.dot.active { opacity:1; transform:scale(1.5); }
@@ -27,7 +27,7 @@ body::after {
   background:conic-gradient(from 90deg,#22b8e8,#c890b0,#E83040,#FFE066,#22b8e8);
   box-shadow:0 0 8px rgba(255,255,255,0.35);
 }
-#hint { position:fixed; bottom:24px; right:24px; z-index:100; color:rgba(255,255,255,0.2); font-size:9px; letter-spacing:2px; pointer-events:none; }
+#hint { display:none; }
 </style>
 </head>
 <body>
@@ -339,8 +339,8 @@ const cloudBg = createCloudBackground(scene, camera, group);
 const SHELL_N = 520;
 const INNER_N = 56;
 const SHELL_PT_MUL = 0.018;
-const INNER_PT_MUL = 0.062;
-const GLOW_PT_MUL = 20.0;
+const INNER_PT_MUL = 0.054;
+const GLOW_PT_MUL = 17.5;
 const SWIRL_SPIN = 1.35;
 const SWIRL_TANG_SHELL = 0.14;
 const SWIRL_TANG_INNER = 0.1;
@@ -1169,7 +1169,7 @@ function animate(){
       innerSpawnAcc-=SPAWN_INNER_INTERVAL;
       const idx=innerSpawnCursor++%INNER_N;
       innerBirth[idx]=tNow;
-      innerSize[idx]=1.05+Math.random()*0.9;
+      innerSize[idx]=1.0+Math.random()*0.75;
       const p3=idx*3;
       innerPrev[p3]=innerPrev[p3+1]=innerPrev[p3+2]=0;
     }
