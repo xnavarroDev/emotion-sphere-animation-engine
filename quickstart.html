@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quickstart Particle Field</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #000; color: rgba(255,255,255,0.85); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace; }
+body { display: flex; overflow: hidden; }
+
+#stage-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: #000;
+}
+#stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#panel {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-left: 1px solid rgba(255,255,255,0.08);
+  background: rgba(8,8,12,0.95);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+h1 {
+  font-size: 11px;
+  letter-spacing: 3px;
+  font-weight: 400;
+  color: rgba(160,202,239,0.9);
+  text-transform: uppercase;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.8);
+  font: inherit;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover { background: rgba(255,255,255,0.08); }
+
+#presets { display: flex; flex-wrap: wrap; gap: 8px; }
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 92px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+}
+.row span { text-transform: lowercase; }
+.row em {
+  font-style: normal;
+  text-align: right;
+  color: rgba(160,202,239,0.85);
+  font-size: 10px;
+}
+.row input[type="range"] {
+  width: 100%;
+  accent-color: #a0caef;
+}
+
+#back {
+  margin-top: auto;
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  text-decoration: none;
+}
+#back:hover { color: rgba(160,202,239,0.8); }
+</style>
+</head>
+<body>
+<div id="stage-wrap">
+  <canvas id="stage"></canvas>
+</div>
+<aside id="panel">
+  <h1>Quickstart Particles</h1>
+  <div class="toolbar">
+    <button id="playToggle" type="button">Pause</button>
+    <button id="savePng" type="button">Save PNG</button>
+  </div>
+  <div id="presets"></div>
+  <div id="controls"></div>
+  <a id="back" href="index.html">← Emotion Sphere</a>
+</aside>
+<script type="module" src="app.js"></script>
+</body>
+</html>

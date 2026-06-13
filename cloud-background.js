@@ -1,5 +1,5 @@
 /**
- * Interior nebula — orange default, cyan on blue, warm plum on purple, red-orange on red.
+ * Interior nebula — orange default; tints follow emotion identity (blue, purple, red, yellow).
  */
 (function (global) {
   const TEXTURE_URL = 'https://assets.codepen.io/682745/cloud2.png';
@@ -12,18 +12,23 @@
   const COOL_PURPLE_DEEP = new THREE.Color(0.22, 0.08, 0.18);
   const CYAN_TINT = new THREE.Color(0.38, 0.9, 1.0);
   const CYAN_DEEP = new THREE.Color(0.05, 0.16, 0.38);
+  const YELLOW_TINT = new THREE.Color(1.0, 0.82, 0.28);
+  const YELLOW_DEEP = new THREE.Color(0.45, 0.32, 0.05);
   const CLOUD_AMB_DEFAULT = new THREE.Color(0x664422);
   const CLOUD_AMB_RED = new THREE.Color(0x5a2418);
   const CLOUD_AMB_COOL = new THREE.Color(0x281820);
   const CLOUD_AMB_CYAN = new THREE.Color(0x081828);
+  const CLOUD_AMB_YELLOW = new THREE.Color(0x4a3808);
   const CLOUD_POINT_DEFAULT = [0xff8833, 0xff4466, 0xffaa66];
   const CLOUD_POINT_RED = [0xff5522, 0xff3355, 0xff7733];
   const CLOUD_POINT_COOL = [0xd888b0, 0xf0b8d0, 0xa86898];
   const CLOUD_POINT_CYAN = [0x44ddff, 0xb8f0ff, 0x28c8f0];
+  const CLOUD_POINT_YELLOW = [0xffd040, 0xffe878, 0xf0c820];
   const CLOUD_PT_DEFAULT = CLOUD_POINT_DEFAULT.map((h) => new THREE.Color(h));
   const CLOUD_PT_RED = CLOUD_POINT_RED.map((h) => new THREE.Color(h));
   const CLOUD_PT_COOL = CLOUD_POINT_COOL.map((h) => new THREE.Color(h));
   const CLOUD_PT_CYAN = CLOUD_POINT_CYAN.map((h) => new THREE.Color(h));
+  const CLOUD_PT_YELLOW = CLOUD_POINT_YELLOW.map((h) => new THREE.Color(h));
 
   function patchCloudInsideSphere(mat, uniforms) {
     mat.fog = false;
@@ -132,28 +137,29 @@ gl_FragColor.a*=vis*0.9;`
       cloudTintDeep: { value: ORANGE_DEEP.clone() },
     };
 
-    function mixCloudColor(out, orange, red, purple, cyan, wO, wR, wP, wB) {
-      const s = Math.max(0.001, wO + wR + wP + wB);
+    function mixCloudColor(out, orange, red, purple, cyan, yellow, wO, wR, wP, wB, wY) {
+      const s = Math.max(0.001, wO + wR + wP + wB + wY);
       out.setRGB(
-        (orange.r * wO + red.r * wR + purple.r * wP + cyan.r * wB) / s,
-        (orange.g * wO + red.g * wR + purple.g * wP + cyan.g * wB) / s,
-        (orange.b * wO + red.b * wR + purple.b * wP + cyan.b * wB) / s
+        (orange.r * wO + red.r * wR + purple.r * wP + cyan.r * wB + yellow.r * wY) / s,
+        (orange.g * wO + red.g * wR + purple.g * wP + cyan.g * wB + yellow.g * wY) / s,
+        (orange.b * wO + red.b * wR + purple.b * wP + cyan.b * wB + yellow.b * wY) / s
       );
     }
 
-    function applyCloudPalette(redMix, purpleMix, blueMix) {
+    function applyCloudPalette(redMix, purpleMix, blueMix, yellowMix) {
       const r = Math.min(1, Math.max(0, redMix || 0));
       const p = Math.min(1, Math.max(0, purpleMix || 0));
       const b = Math.min(1, Math.max(0, blueMix || 0));
-      const wO = Math.max(0, 1 - r - p - b);
+      const y = Math.min(1, Math.max(0, yellowMix || 0));
+      const wO = Math.max(0, 1 - r - p - b - y);
 
-      mixCloudColor(uniforms.cloudTint.value, ORANGE_TINT, RED_ORANGE_TINT, COOL_PURPLE_TINT, CYAN_TINT, wO, r, p, b);
-      mixCloudColor(uniforms.cloudTintDeep.value, ORANGE_DEEP, RED_ORANGE_DEEP, COOL_PURPLE_DEEP, CYAN_DEEP, wO, r, p, b);
-      mixCloudColor(_ambColor, CLOUD_AMB_DEFAULT, CLOUD_AMB_RED, CLOUD_AMB_COOL, CLOUD_AMB_CYAN, wO, r, p, b);
+      mixCloudColor(uniforms.cloudTint.value, ORANGE_TINT, RED_ORANGE_TINT, COOL_PURPLE_TINT, CYAN_TINT, YELLOW_TINT, wO, r, p, b, y);
+      mixCloudColor(uniforms.cloudTintDeep.value, ORANGE_DEEP, RED_ORANGE_DEEP, COOL_PURPLE_DEEP, CYAN_DEEP, YELLOW_DEEP, wO, r, p, b, y);
+      mixCloudColor(_ambColor, CLOUD_AMB_DEFAULT, CLOUD_AMB_RED, CLOUD_AMB_COOL, CLOUD_AMB_CYAN, CLOUD_AMB_YELLOW, wO, r, p, b, y);
       amb.color.copy(_ambColor);
 
       for (let i = 0; i < pointLights.length; i++) {
-        mixCloudColor(_ptColor, CLOUD_PT_DEFAULT[i], CLOUD_PT_RED[i], CLOUD_PT_COOL[i], CLOUD_PT_CYAN[i], wO, r, p, b);
+        mixCloudColor(_ptColor, CLOUD_PT_DEFAULT[i], CLOUD_PT_RED[i], CLOUD_PT_COOL[i], CLOUD_PT_CYAN[i], CLOUD_PT_YELLOW[i], wO, r, p, b, y);
         pointLights[i].color.copy(_ptColor);
       }
     }
@@ -265,9 +271,9 @@ gl_FragColor.a*=vis*0.9;`
     }
 
     return {
-      update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix) {
+      update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix, yellowMix) {
         const t = time || 0;
-        applyCloudPalette(redMix, purpleMix, blueMix);
+        applyCloudPalette(redMix, purpleMix, blueMix, yellowMix);
         const r = Math.max(0.5, (worldRadius || 1.5) * 1.05);
         uniforms.sphereRadius.value = r;
 

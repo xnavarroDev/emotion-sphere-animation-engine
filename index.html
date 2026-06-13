@@ -28,6 +28,67 @@ body::after {
   box-shadow:0 0 8px rgba(255,255,255,0.35);
 }
 #hint { display:none; }
+
+#params-toggle {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 120;
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(8,8,12,0.82);
+  color: rgba(255,255,255,0.75);
+  font: 10px/1 'Courier New', monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#params-toggle:hover { color: #a0caef; border-color: rgba(160,202,239,0.35); }
+
+#params-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  z-index: 110;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  background: rgba(8,8,12,0.94);
+  padding: 20px 16px 24px;
+  transform: translateX(0);
+  transition: transform 0.25s ease;
+}
+#params-panel.hidden { transform: translateX(-100%); pointer-events: none; }
+#params-panel h2 {
+  font-size: 10px;
+  letter-spacing: 3px;
+  font-weight: 400;
+  color: rgba(160,202,239,0.9);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+#params-panel .row {
+  display: grid;
+  grid-template-columns: 92px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 8px;
+}
+#params-panel .row span { text-transform: lowercase; }
+#params-panel .row em {
+  font-style: normal;
+  text-align: right;
+  color: rgba(160,202,239,0.85);
+}
+#params-panel input[type="range"] {
+  width: 100%;
+  accent-color: #a0caef;
+}
 </style>
 </head>
 <body>
@@ -40,6 +101,11 @@ body::after {
   <div class="dot dot-cycle" onclick="toggleCycle()" id="d-cycle" title="Cycle: blue → purple → red → yellow (click a colour dot to stop)"></div>
 </div>
 <div id="hint">DRAG TO ROTATE · CYCLE RUNS ALL FOUR · CLICK A DOT TO STOP</div>
+<button id="params-toggle" type="button">Params</button>
+<aside id="params-panel" class="hidden">
+  <h2>Core Particles</h2>
+  <div id="params-controls"></div>
+</aside>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="cloud-background.js"></script>
@@ -82,25 +148,25 @@ const EMOTIONS={
     label:'BLUE · CALM · FRIENDLY · SAFE',
     shadowHex:'#040a18',deepHex:'#0a2848',baseHex:'#22b8e8',midHex:'#5ce4ff',highlightHex:'#e8fcff',
     coreHex:'#f6feff',hotHex:'#88f0ff',accentHex:'#ffcf66',
-    pulse:2.75,pulseMode:'calm',pulseAmp:0.02,chaos:0.025,chaosFreq:0.3,edgeFlicker:false,
-    glowSize:0.058,glowOp:0.14,silver:0.07,silverStyle:'droplets',
-    autoSpeed:0.0015,density:0.64,size:6,radius:1.78,
+    pulse:6.5,pulseMode:'wave',pulseAmp:0.095,chaos:0.035,chaosFreq:0.12,edgeFlicker:false,
+    glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'orbs',
+    autoSpeed:0.0016,density:0.68,size:6,radius:1.85,
   }),
   yellow:emotionPalette({
     label:'YELLOW · CURIOUS · PROCESSING · TRANSITION',
     shadowHex:'#2A1800',deepHex:'#5A4200',baseHex:'#F0C820',midHex:'#FFE878',highlightHex:'#FFFDE8',
     accentHex:'#6fb0ff',
-    pulse:0.75,pulseMode:'burst',pulseAmp:0.05,chaos:0.3,chaosFreq:0.65,edgeFlicker:true,
-    glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'sparks',
-    autoSpeed:0.014,density:0.5,size:4.75,radius:1.5,
+    pulse:6.5,pulseMode:'wave',pulseAmp:0.095,chaos:0.035,chaosFreq:0.12,edgeFlicker:false,
+    glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'orbs',
+    autoSpeed:0.0016,density:0.68,size:4.75,radius:1.85,
   }),
   red:emotionPalette({
     label:'RED · DANGER · AGGRESSION · ALERT',
     shadowHex:'#280808',deepHex:'#7A2828',baseHex:'#F04048',hotHex:'#FF7060',coreHex:'#FF8878',
     accentHex:'#74e8ff',
-    pulse:0.4,pulseMode:'heartbeat',pulseAmp:0.075,chaos:0.75,chaosFreq:1.4,edgeFlicker:false,
-    glowSize:0.02,glowOp:0.78,silver:0.1,silverStyle:'shards',
-    autoSpeed:0.022,density:0.55,size:6,radius:1.45,
+    pulse:6.5,pulseMode:'wave',pulseAmp:0.095,chaos:0.035,chaosFreq:0.12,edgeFlicker:false,
+    glowSize:0.034,glowOp:0.48,silver:0.09,silverStyle:'orbs',
+    autoSpeed:0.0016,density:0.68,size:6,radius:1.85,
   }),
   purple:emotionPalette({
     label:'PURPLE · EMPATHY · BOND · CONNECTION',
@@ -118,8 +184,8 @@ const SLIDER_KEYS=['pulse','density','chaos','radius','size'];
 const LOCKED_PARAMS={
   blue:{ size:6 },
   purple:{ size:4 },
-  yellow:{ pulse:0.75, density:0.5, chaos:0.3, radius:1.5, size:4.75 },
-  red:{ pulse:0.4, size:6 },
+  yellow:{ size:4.75 },
+  red:{ size:6 },
 };
 const ANGER_PULSE_BASE=0.4;
 const CYCLE_ORDER=['blue','purple','red','yellow'];
@@ -184,17 +250,10 @@ function cycleColorBlendSt(seg){
   return smootherstep(smootherstep(smootherstep(seg.t)));
 }
 
+const FLAT_BREATH={breath:0.5,swell:0,scale:1,disperse:0,innerScale:1};
+
 function getSphereBreathForEmotion(t,emotion){
-  const prev=activeEmotion;
-  activeEmotion=emotion;
-  const e=emotionPreset(emotion);
-  const mode=e.pulseMode;
-  const period=mode==='calm'?Math.max(e.pulse,2.75):mode==='wave'?Math.max(e.pulse,5.5):emotion==='red'?ANGER_PULSE_BASE:Math.max(e.pulse,0.4);
-  let amp=e.pulseAmp||0.06;
-  if(emotion==='red'&&mode==='heartbeat') amp*=getAngerMod(t).amp;
-  const r=getSphereBreath(t,period,mode,amp);
-  activeEmotion=prev;
-  return r;
+  return FLAT_BREATH;
 }
 
 function cycleStyleWeights(){
@@ -216,6 +275,25 @@ function cycleStyleWeights(){
   return w;
 }
 
+function emotionPick(cw,name){
+  if(!cw) return activeEmotion===name?1:0;
+  return (cw.a===name?cw.wa:0)+(cw.b===name?cw.wb:0);
+}
+
+function shellShimmerRgb(cw,params,target){
+  const pick=(name)=>{
+    const e=EMOTIONS[name];
+    return e.hot||e.highlight||e.mid||e.base||e.accent||[0.5,0.5,0.5];
+  };
+  if(cw){
+    const ea=pick(cw.a), eb=pick(cw.b);
+    return [ea[0]*cw.wa+eb[0]*cw.wb, ea[1]*cw.wa+eb[1]*cw.wb, ea[2]*cw.wa+eb[2]*cw.wb];
+  }
+  const p=target||params;
+  const c=p.hot||p.highlight||p.mid||p.base||p.accent;
+  return c?[c[0],c[1],c[2]]:[0.5,0.5,0.5];
+}
+
 function cyclePaintWeights(){
   const cw=cycleStyleWeights();
   if(!cw) return null;
@@ -224,7 +302,7 @@ function cyclePaintWeights(){
   return {
     wYellow:from(e=>e.silverStyle==='sparks'),
     wShards:from(e=>e.silverStyle==='shards'),
-    wOrbs:from(e=>e.silverStyle==='orbs'),
+    wOrbs:(a==='purple'?wa:0)+(b==='purple'?wb:0),
     wCalmBlue:(a==='blue'?wa:0)+(b==='blue'?wb:0),
   };
 }
@@ -525,8 +603,10 @@ innerHalo3Pts.renderOrder=2;
 innerHalo2Pts.renderOrder=3;
 group.add(innerHalo3Pts);
 group.add(innerHalo2Pts);
-group.add(new THREE.Points(innerGeo,innerGlowMat));
-group.add(new THREE.Points(innerGeo,innerMat));
+const innerGlowPts=new THREE.Points(innerGeo,innerGlowMat);
+const innerMatPts=new THREE.Points(innerGeo,innerMat);
+group.add(innerGlowPts);
+group.add(innerMatPts);
 
 // Emitted trail particles (each inner dot leaves glowing dots that drift + fade)
 const TRAIL_POOL=2200;
@@ -554,6 +634,20 @@ const trailPoints=new THREE.Points(trailGeo,trailMat);
 trailPoints.renderOrder=6;
 trailPoints.frustumCulled=false;
 group.add(trailPoints);
+
+let sphereCore=null;
+import('./sphere-core.js').then(({attachSphereCore})=>{
+  sphereCore=attachSphereCore({
+    THREE,
+    group,
+    innerLayers:[innerHalo3Pts,innerHalo2Pts,innerGlowPts,innerMatPts,trailPoints],
+    controlsRoot:document.getElementById('params-controls'),
+  });
+  const panel=document.getElementById('params-panel');
+  document.getElementById('params-toggle')?.addEventListener('click',()=>{
+    panel?.classList.toggle('hidden');
+  });
+}).catch(err=>console.error('sphere-core failed',err));
 
 function lerpRgb(a,b,t,out){
   if(!a||!b){ out[0]=out[1]=out[2]=0.5; return; }
@@ -831,30 +925,7 @@ function tintBrightYellow(r,g,b,flash,out){
 }
 
 function getSphereBreath(t,period,mode,pulseAmp){
-  const f=(1/Math.max(period,0.05))*Math.PI*2;
-  if(mode==='calm'){
-    const breath=(1-Math.cos(t*f))*0.5;
-    const swell=(breath-0.5)*2;
-    return {breath,swell,scale:1+swell*0.045,disperse:Math.max(0,swell)*0.055,innerScale:1+swell*0.042};
-  }
-  if(mode==='wave'&&activeEmotion==='purple'){
-    const w1=(1-Math.cos(t*f))*0.5;
-    const w2=(1-Math.cos(t*f*0.48+0.6))*0.5;
-    const breath=w1*0.65+w2*0.35;
-    const swell=(breath-0.5)*2;
-    const amp=pulseAmp||0.095;
-    return {breath,swell,scale:1+swell*amp*1.15,disperse:Math.max(0,swell)*amp*1.05,innerScale:1+swell*amp*1.05};
-  }
-  const breath=getPulseWave(t,period,mode);
-  const swell=(breath-0.5)*2;
-  let amp=pulseAmp||0.06;
-  let scaleMul=0.85, disperseMul=0.55, innerMul=0.7;
-  if(mode==='heartbeat'&&activeEmotion==='red'){
-    scaleMul=0.72;
-    disperseMul=0.48;
-    innerMul=0.58;
-  }
-  return {breath,swell,scale:1+swell*amp*scaleMul,disperse:Math.max(0,swell)*amp*disperseMul,innerScale:1+swell*amp*innerMul};
+  return FLAT_BREATH;
 }
 
 // Glossy glints from a slow virtual light (no drag/rotate needed).
@@ -914,30 +985,17 @@ function updateColors(shimmerT=0){
       if(style==='orbs'){ shellSilver=silver*0.08; innerSilver=silver*0.38; }
     }
 
-    const mode=target.pulseMode||params.pulseMode||'breath';
     const wYellow=pw?pw.wYellow:(activeEmotion==='yellow'&&style==='sparks'?1:0);
-    const wCalmBlue=pw?pw.wCalmBlue:(activeEmotion==='blue'&&mode==='calm'?1:0);
-    const wPurpleOrb=pw?pw.wOrbs:(activeEmotion==='purple'&&style==='orbs'?1:0);
-    const wBlueInner=pw?pw.wCalmBlue:(activeEmotion==='blue'?1:0);
+    const wCalmBlue=0;
+    const wPurpleOrb=emotionPick(cw,'purple');
+    const wBlueInner=0;
     const wShards=pw?pw.wShards:(style==='shards'?1:0);
-    const wRedEmotion=cw?cw.red:(activeEmotion==='red'?1:0);
-    const wRedInner=wRedEmotion;
-    const wRedShell=wRedEmotion;
-    const wYellowShell=cw?cw.yellow:(activeEmotion==='yellow'?1:0);
+    const wRedInner=0;
+    const wRedShell=0;
+    const wYellowShell=0;
     const seqBase=cycleOn?activeEmotion:activeEmotion;
-    let ar=0.5, ag=0.5, ab=0.5;
-    if(cw){
-      const ea=EMOTIONS[cw.a].accent, eb=EMOTIONS[cw.b].accent;
-      if(ea&&eb){
-        ar=ea[0]*cw.wa+eb[0]*cw.wb;
-        ag=ea[1]*cw.wa+eb[1]*cw.wb;
-        ab=ea[2]*cw.wa+eb[2]*cw.wb;
-      }
-    }else if(params.accent){
-      ar=params.accent[0]; ag=params.accent[1]; ab=params.accent[2];
-    }else if(target.accent){
-      ar=target.accent[0]; ag=target.accent[1]; ab=target.accent[2];
-    }
+    const shimmer=shellShimmerRgb(cw,params,target);
+    let ar=shimmer[0], ag=shimmer[1], ab=shimmer[2];
     for(let i=0;i<SHELL_N;i++){
       const i3=i*3;
       const ox=shellOrig[i3],oy=shellOrig[i3+1],oz=shellOrig[i3+2];
@@ -1207,7 +1265,7 @@ function animate(){
   const wCalm=cw?cw.calm:(mode==='calm'?1:0);
   const wPurple=cw?cw.purple:(mode==='wave'?1:0);
   const wRed=cw?cw.red:(mode==='heartbeat'?1:0);
-  const wYellow=cw?cw.yellow:(style==='sparks'||mode==='burst'?1:0);
+  const wYellow=0;
   const wChaosMotion=wRed+wYellow;
   // Avoid stacking fast chaos on top of red/yellow shell motion (causes runaway jitter).
   const wChaosShell=wChaosMotion*Math.max(0,1-wRed*0.95-wYellow*0.95);
@@ -1535,10 +1593,20 @@ function animate(){
 
   const cwCloud=cycleOn?cycleStyleWeights():null;
   const worldR=radius*sphere.scale;
-  const cloudRedMix=cwCloud?cwCloud.red:(activeEmotion==='red'?1:0);
-  const cloudPurpleMix=cwCloud?cwCloud.purple:(activeEmotion==='purple'?1:0);
-  const cloudBlueMix=cwCloud?cwCloud.calm:(activeEmotion==='blue'?1:0);
-  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix);
+  const cloudRedMix=emotionPick(cwCloud,'red');
+  const cloudPurpleMix=emotionPick(cwCloud,'purple');
+  const cloudBlueMix=emotionPick(cwCloud,'blue');
+  const cloudYellowMix=emotionPick(cwCloud,'yellow');
+  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix);
+
+  if(sphereCore){
+    if(cycleOn) sphereCore.setCycleBlend(cycleSegment);
+    else sphereCore.setCycleBlend(null);
+    sphereCore.update(t,{
+      params:{...params,emotion:activeEmotion},
+      scale:radius*sphere.innerScale*1.35,
+    });
+  }
 
   renderer.render(scene,camera);
 }
