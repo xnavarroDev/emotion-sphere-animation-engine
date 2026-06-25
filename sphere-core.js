@@ -84,6 +84,10 @@ export function attachSphereCore({ THREE, group, innerLayers = [], controlsRoot 
 
   let cycleSeg = null;
   let userOverrides = {};
+  // Prototype layer: a named particle parameter set chosen from the UI.
+  // Sits on top of the per-emotion tuning but below live slider tweaks,
+  // and deliberately carries no color so it composes with the emotion dots.
+  let prototypeParams = {};
 
   if (controlsRoot) {
     attachParticleControls(field, controlsRoot, {
@@ -98,6 +102,12 @@ export function attachSphereCore({ THREE, group, innerLayers = [], controlsRoot 
     field,
     setCycleBlend(seg) {
       cycleSeg = seg;
+    },
+    setPrototype(params) {
+      prototypeParams = params || {};
+      // Loading a prototype is a fresh preset: drop prior live slider tweaks
+      // so the rendered look matches the (now re-synced) panel.
+      userOverrides = {};
     },
     update(time, { params, scale = 1.8 }) {
       let tuning = { ...GENTLE, ...EMOTION_TUNING.red };
@@ -122,6 +132,8 @@ export function attachSphereCore({ THREE, group, innerLayers = [], controlsRoot 
         breathAmp: 0,
         breathSpeed: 0,
         glowOscAmp: 0,
+        // Prototype can re-enable breathing etc.; live sliders still win.
+        ...prototypeParams,
         ...userOverrides,
       });
       field.draw(time);

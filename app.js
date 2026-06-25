@@ -72,6 +72,8 @@ if (controls) {
     return { row, val };
   };
 
+  // Keep references so presets can sync the sliders.
+  const sliders = {};
   for (const [key, min, max, step] of SLIDERS) {
     const input = document.createElement("input");
     input.type = "range";
@@ -87,24 +89,82 @@ if (controls) {
       field.setParams({ [key]: v });
     });
     controls.appendChild(row);
+    sliders[key] = { input, val, step };
   }
 
+  const syncSliders = () => {
+    for (const [key, { input, val, step }] of Object.entries(sliders)) {
+      input.value = field.params[key];
+      val.textContent = (+input.value).toFixed(step < 1 ? 2 : 0);
+    }
+  };
+
   const presetBar = document.getElementById("presets");
+  // The "sensor" look shared by every prototype (dark backdrop, blue additive glow).
+  const SENSOR = {
+    blendMode: "additive",
+    background: [0, 0, 0, 1],
+    color: [0.627, 0.792, 0.937],
+  };
   const PRESETS = {
+    // Original — calm, even blue nebula.
     "Black (sensor)": {
-      blendMode: "additive",
-      background: [0, 0, 0, 1],
-      color: [0.627, 0.792, 0.937],
+      ...SENSOR,
       brightness: 0.8,
       pointSize: 4.5,
       coreBias: 1.0,
       count: 30000,
     },
+    // Prototype A — dense, hot core that fades to a soft rim.
+    "Dense core": {
+      ...SENSOR,
+      count: 90000,
+      coreBias: 2.8,
+      edgeFeather: 0.32,
+      pointSize: 3.0,
+      sizeJitter: 0.8,
+      glow: 8.5,
+      brightness: 0.95,
+    },
+    // Prototype B — turbulent filaments, lots of independent drift.
+    "Turbulent flow": {
+      ...SENSOR,
+      count: 60000,
+      coreBias: 1.2,
+      flowAmp: 0.34,
+      flowFreq: 3.2,
+      flowSpeed: 0.45,
+      jitter: 0.1,
+      jitterSpeed: 1.2,
+      diffSwirl: 1.4,
+      pointSize: 4.0,
+      brightness: 0.85,
+    },
+    // Prototype C — large, slow, breathing sphere with big soft grains.
+    "Slow breath": {
+      ...SENSOR,
+      count: 40000,
+      scale: 0.85,
+      coreBias: 0.9,
+      breathAmp: 0.13,
+      breathSpeed: 0.4,
+      rotSpeed: 0.03,
+      rotWander: 1.6,
+      pointSize: 7.5,
+      sizeJitter: 0.4,
+      glow: 7.0,
+      brightness: 0.75,
+    },
   };
   for (const [name, preset] of Object.entries(PRESETS)) {
     const b = document.createElement("button");
     b.textContent = name;
-    b.addEventListener("click", () => field.setParams(preset));
+    // Reset to defaults first so each prototype is reproducible regardless of
+    // which preset (or slider tweaks) came before it.
+    b.addEventListener("click", () => {
+      field.setParams({ ...DEFAULTS, ...preset });
+      syncSliders();
+    });
     presetBar.appendChild(b);
   }
 
