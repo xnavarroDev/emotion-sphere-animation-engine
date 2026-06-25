@@ -334,6 +334,12 @@ gl_FragColor.a*=vis*0.9;`
       onResize(w, h) {
         uniforms.viewport.value.set(w, h);
       },
+      setVisible(v) {
+        cloudGroup.visible = v !== false;
+      },
+      get visible() {
+        return cloudGroup.visible;
+      },
     };
   }
 

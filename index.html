@@ -28,6 +28,37 @@ body::after {
   box-shadow:0 0 8px rgba(255,255,255,0.35);
 }
 #hint { display:none; }
+#proto-switch {
+  position:fixed; right:24px; bottom:24px;
+  z-index:120; display:flex; gap:6px; align-items:center;
+}
+.proto {
+  appearance:none; font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  color:rgba(255,255,255,0.6);
+  background:rgba(8,8,12,0.82); border:1px solid rgba(255,255,255,0.15);
+  border-radius:4px; padding:8px 11px; cursor:pointer; transition:all 0.25s;
+}
+.proto:hover { color:rgba(255,255,255,0.9); border-color:rgba(160,202,239,0.4); }
+.proto.active {
+  color:#a0caef; border-color:rgba(160,202,239,0.6);
+  box-shadow:0 0 10px rgba(160,202,239,0.25);
+}
+
+#view-toggles {
+  position:fixed; right:24px; bottom:62px;
+  z-index:120; display:flex; gap:6px; align-items:center;
+}
+.vtoggle {
+  appearance:none; font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  text-transform:uppercase; color:rgba(255,255,255,0.32);
+  background:rgba(8,8,12,0.82); border:1px solid rgba(255,255,255,0.12);
+  border-radius:4px; padding:8px 11px; cursor:pointer; transition:all 0.25s;
+}
+.vtoggle:hover { color:rgba(255,255,255,0.7); border-color:rgba(160,202,239,0.35); }
+.vtoggle.active {
+  color:#a0caef; border-color:rgba(160,202,239,0.55);
+  box-shadow:0 0 10px rgba(160,202,239,0.2);
+}
 
 #params-toggle {
   position: fixed;
@@ -70,6 +101,14 @@ body::after {
   text-transform: uppercase;
   margin-bottom: 14px;
 }
+#params-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+#params-actions button {
+  flex: 1; appearance: none; font: 10px/1 'Courier New', monospace;
+  letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px; padding: 8px; cursor: pointer; transition: all 0.2s;
+}
+#params-actions button:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
 #params-panel .row {
   display: grid;
   grid-template-columns: 92px 1fr 44px;
@@ -89,6 +128,33 @@ body::after {
   width: 100%;
   accent-color: #a0caef;
 }
+#params-panel input[type="color"] {
+  width: 100%; height: 20px; padding: 0; cursor: pointer;
+  background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 3px;
+}
+.ilayer-reset {
+  appearance:none; font:12px/1 'Courier New',monospace;
+  color:rgba(255,255,255,0.5);
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  border-radius:3px; padding:3px 0; cursor:pointer; transition:all 0.2s;
+}
+.ilayer-reset:hover { color:#a0caef; border-color:rgba(160,202,239,0.5); }
+.ilayer-reset.on { color:#a0caef; border-color:rgba(160,202,239,0.55); box-shadow:0 0 6px rgba(160,202,239,0.2); }
+#inner-layer-tabs {
+  display:flex; gap:8px; align-items:center; margin-bottom:14px;
+  margin-top:22px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.08);
+}
+.ilayer-arrow {
+  appearance:none; font:14px/1 'Courier New',monospace;
+  color:rgba(255,255,255,0.7);
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  border-radius:4px; padding:4px 10px; cursor:pointer; transition:all 0.2s;
+}
+.ilayer-arrow:hover { color:#a0caef; border-color:rgba(160,202,239,0.5); }
+.ilayer-title {
+  flex:1; text-align:center; font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  text-transform:uppercase; color:rgba(160,202,239,0.9);
+}
 </style>
 </head>
 <body>
@@ -101,10 +167,26 @@ body::after {
   <div class="dot dot-cycle" onclick="toggleCycle()" id="d-cycle" title="Cycle: blue → purple → red → yellow (click a colour dot to stop)"></div>
 </div>
 <div id="hint">DRAG TO ROTATE · CYCLE RUNS ALL FOUR · CLICK A DOT TO STOP</div>
+<div id="proto-switch">
+  <button class="proto active" data-proto="core" onclick="switchPrototype('core')">1</button>
+  <button class="proto" data-proto="dense" onclick="switchPrototype('dense')">2</button>
+  <button class="proto" data-proto="flow" onclick="switchPrototype('flow')">3</button>
+  <button class="proto" data-proto="breath" onclick="switchPrototype('breath')">4</button>
+</div>
+<div id="view-toggles">
+  <button class="vtoggle active" id="toggle-glow" type="button" title="Show/hide the background glow">Glow</button>
+  <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
+</div>
 <button id="params-toggle" type="button">Params</button>
 <aside id="params-panel" class="hidden">
   <h2>Core Particles</h2>
+  <div id="params-actions">
+    <button id="copy-params" type="button">Copy</button>
+    <button id="save-params" type="button">Save</button>
+  </div>
   <div id="params-controls"></div>
+  <div id="inner-layer-tabs"></div>
+  <div id="inner-layer-controls"></div>
 </aside>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -381,6 +463,7 @@ function switchEmotion(name){
   innerSpawnCursor=0;
   document.getElementById('label').textContent=target.label||'';
   setDotActive('d-'+name);
+  if(innerSyncUI) innerSyncUI();
 }
 
 function toggleCycle(){
@@ -538,7 +621,171 @@ const shellMat=new THREE.PointsMaterial({
   size:0.018, map:glowTex, vertexColors:true, transparent:true, opacity:0.52,
   alphaTest:0.01, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true, fog:false
 });
-group.add(new THREE.Points(shellGeo,shellMat));
+const shellPoints=new THREE.Points(shellGeo,shellMat);
+group.add(shellPoints);
+
+// View toggles: independently hide the background glow (cloud layer) and the
+// firefly particles (shell dots), leaving the core sphere sprite untouched.
+(function(){
+  const glowBtn=document.getElementById('toggle-glow');
+  const fireBtn=document.getElementById('toggle-fireflies');
+  glowBtn?.addEventListener('click',()=>{
+    cloudBg.setVisible(glowBtn.classList.toggle('active'));
+  });
+  fireBtn?.addEventListener('click',()=>{
+    shellPoints.visible=fireBtn.classList.toggle('active');
+  });
+})();
+
+// ---- 5 adjustable inner layers ------------------------------------------
+// Each layer is its own full ParticleField (same engine as the core sphere),
+// rendered to an offscreen canvas -> CanvasTexture -> additive Sprite. That
+// way every Core-Particles slider (flow, swirl, glow, breathing, ...) is
+// meaningful per layer. The "< Layer N >" stepper picks which layer the
+// sliders edit. Defaults give a warm hot-core -> ember -> dust gradient.
+// All layers start from one shared colour; variety comes from shape/density/motion.
+const INNER_BASE_COLOR=[0.95,0.35,0.28];
+const INNER_LAYER_PRESETS=[
+  { color:INNER_BASE_COLOR, count:9000,  scale:0.30, coreBias:2.4, pointSize:5.0, glow:7.5, brightness:0.95, flowAmp:0.10 }, // hot core
+  { color:INNER_BASE_COLOR, count:16000, scale:0.46, coreBias:1.4, pointSize:3.5, glow:6.5, brightness:0.70, flowAmp:0.20, diffSwirl:0.9 }, // mid
+  { color:INNER_BASE_COLOR, count:12000, scale:0.60, coreBias:0.9, pointSize:6.0, glow:8.0, brightness:0.50, flowAmp:0.26, flowFreq:2.8 }, // ember
+  { color:INNER_BASE_COLOR, count:22000, scale:0.72, coreBias:1.0, pointSize:2.5, glow:5.5, brightness:0.42, jitter:0.07, jitterSpeed:1.0 }, // dust
+  { color:INNER_BASE_COLOR, count:6000,  scale:0.88, coreBias:0.7, pointSize:8.0, glow:8.5, brightness:0.30, breathAmp:0.09, breathSpeed:0.5 }, // orbs
+];
+let innerLayers=[];
+let innerLayersReady=false;
+let innerSyncUI=null; // re-sync the panel when the emotion changes
+// The colour the core sphere is currently showing (mirrors sphere-core's
+// colorFromParams), so layers with no override match the active emotion dot.
+function currentEmotionColor(){
+  const base=params.base||[0.627,0.792,0.937];
+  const mid=params.mid||base;
+  const hot=params.hot||mid;
+  const r=base[0]+(mid[0]-base[0])*0.55, g=base[1]+(mid[1]-base[1])*0.55, b=base[2]+(mid[2]-base[2])*0.55;
+  return [r+(hot[0]-r)*0.25, g+(hot[1]-g)*0.25, b+(hot[2]-b)*0.25];
+}
+// The core-style colour for one specific emotion's static palette (used to
+// blend layer colours smoothly during the cycle, overrides included).
+function emotionCoreColor(name){
+  const e=EMOTIONS[name]||{};
+  const base=e.base||[0.627,0.792,0.937];
+  const mid=e.mid||base;
+  const hot=e.hot||mid;
+  const r=base[0]+(mid[0]-base[0])*0.55, g=base[1]+(mid[1]-base[1])*0.55, b=base[2]+(mid[2]-base[2])*0.55;
+  return [r+(hot[0]-r)*0.25, g+(hot[1]-g)*0.25, b+(hot[2]-b)*0.25];
+}
+// Redraw every layer's field each frame. Colour overrides are stored per
+// emotion, so a custom colour only applies to the emotion it was set on. In
+// cycle mode each layer blends between its seg.a and seg.b colours (override
+// or emotion-follow) with the same easing the core uses, so a per-emotion
+// override eases in/out instead of snapping at the segment midpoint.
+function updateInnerLayers(t){
+  if(!innerLayersReady) return;
+  const cyc=cycleOn&&cycleSegment;
+  const emo=currentEmotionColor();
+  const ae=activeEmotion;
+  let segA,segB,st=0;
+  if(cyc){ segA=cycleSegment.a; segB=cycleSegment.b; st=cycleColorBlendSt(cycleSegment); }
+  for(const L of innerLayers){
+    let color;
+    if(cyc){
+      const a=L.overrides[segA]||emotionCoreColor(segA);
+      const b=L.overrides[segB]||emotionCoreColor(segB);
+      color=[a[0]+(b[0]-a[0])*st, a[1]+(b[1]-a[1])*st, a[2]+(b[2]-a[2])*st];
+    }else{
+      color=L.overrides[ae]||emo;
+    }
+    L.field.params.color=color;
+    L.field.draw(t);
+    L.tex.needsUpdate=true;
+  }
+}
+Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fieldMod,ctrlMod])=>{
+  const { ParticleField, DEFAULTS }=fieldMod;
+  const { SLIDER_DEFS }=ctrlMod;
+
+  innerLayers=INNER_LAYER_PRESETS.map((preset)=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=canvas.height=512;
+    const field=new ParticleField(canvas,{ ...DEFAULTS, background:[0,0,0,0], glowOscAmp:0, breathAmp:0, breathSpeed:0, ...preset });
+    field.resize(512,512,1);
+    const tex=new THREE.CanvasTexture(canvas);
+    tex.minFilter=THREE.LinearFilter;
+    tex.magFilter=THREE.LinearFilter;
+    tex.premultiplyAlpha=true;
+    const mat=new THREE.SpriteMaterial({ map:tex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false });
+    const sprite=new THREE.Sprite(mat);
+    sprite.center.set(0.5,0.5);
+    sprite.renderOrder=4;
+    sprite.scale.set(1.8,1.8,1);
+    group.add(sprite);
+    return { field, tex, sprite, overrides:{} };
+  });
+  innerLayersReady=true;
+
+  // Params-panel UI: a "< Layer N >" stepper + the full Core-Particles slider set.
+  const stepEl=document.getElementById('inner-layer-tabs');
+  const ctrlEl=document.getElementById('inner-layer-controls');
+  if(!stepEl||!ctrlEl) return;
+  let active=0;
+  const prev=document.createElement('button'); prev.type='button'; prev.className='ilayer-arrow'; prev.textContent='‹';
+  const title=document.createElement('span'); title.className='ilayer-title';
+  const next=document.createElement('button'); next.type='button'; next.className='ilayer-arrow'; next.textContent='›';
+  stepEl.append(prev,title,next);
+
+  // Per-layer colour picker (sits above the sliders). hexRgb() is the global
+  // hex -> [r,g,b] helper; rgbHex does the reverse for syncing the swatch.
+  const rgbHex=(c)=>'#'+[0,1,2].map(i=>Math.round(Math.max(0,Math.min(1,c[i]||0))*255).toString(16).padStart(2,'0')).join('');
+  const colorRow=document.createElement('div'); colorRow.className='row';
+  const colorSpan=document.createElement('span'); colorSpan.textContent='colour';
+  const colorInput=document.createElement('input'); colorInput.type='color';
+  const resetBtn=document.createElement('button'); resetBtn.type='button';
+  resetBtn.className='ilayer-reset'; resetBtn.textContent='↺'; resetBtn.title='Follow emotion colour';
+  colorRow.append(colorSpan,colorInput,resetBtn); ctrlEl.appendChild(colorRow);
+  // Picking a colour overrides this layer for the active emotion only.
+  colorInput.addEventListener('input',()=>{
+    innerLayers[active].overrides[activeEmotion]=hexRgb(colorInput.value);
+    resetBtn.classList.remove('on');
+  });
+  // Reset clears the override for the active emotion (layer follows it again).
+  resetBtn.addEventListener('click',()=>{
+    delete innerLayers[active].overrides[activeEmotion];
+    sync();
+  });
+
+  const rows={};
+  for(const [key,min,max,step] of SLIDER_DEFS){
+    const row=document.createElement('label'); row.className='row';
+    const span=document.createElement('span'); span.textContent=key;
+    const input=document.createElement('input');
+    input.type='range'; input.min=min; input.max=max; input.step=step;
+    const em=document.createElement('em');
+    row.append(span,input,em); ctrlEl.appendChild(row);
+    input.addEventListener('input',()=>{
+      const v=parseFloat(input.value);
+      em.textContent=v.toFixed(step<1?2:0);
+      innerLayers[active].field.setParams({ [key]:v });
+    });
+    rows[key]={input,em,step};
+  }
+  function sync(){
+    const L=innerLayers[active];
+    const f=L.field;
+    const ov=L.overrides[activeEmotion];
+    title.textContent='Core Particles · Layer '+(active+1)+' / '+innerLayers.length;
+    colorInput.value=rgbHex(ov||currentEmotionColor());
+    resetBtn.classList.toggle('on',!ov); // lit = following this emotion
+    for(const [key,,,step] of SLIDER_DEFS){
+      const { input,em }=rows[key];
+      input.value=f.params[key];
+      em.textContent=(+f.params[key]).toFixed(step<1?2:0);
+    }
+  }
+  prev.addEventListener('click',()=>{ active=(active-1+innerLayers.length)%innerLayers.length; sync(); });
+  next.addEventListener('click',()=>{ active=(active+1)%innerLayers.length; sync(); });
+  innerSyncUI=sync; // let emotion switches re-sync the swatch/reset state
+  sync();
+}).catch(err=>console.error('inner layers failed',err));
 
 // Inner core + glow halo
 const innerPos=new Float32Array(INNER_N*3);
@@ -635,17 +882,105 @@ trailPoints.renderOrder=6;
 trailPoints.frustumCulled=false;
 group.add(trailPoints);
 
+// Particle-parameter prototypes for the sphere core. Each is a distinct
+// motion/shape/glow look; they carry no color, so they compose with the
+// emotion-colour dots above. "core" = the original gentle look (no overrides).
+const PROTOTYPES={
+  // Button 1 = the original look, with the exact parameters shown in the panel.
+  // Listed explicitly so the render matches the displayed values (the per-frame
+  // "gentle" tuning no longer silently overrides them).
+  core:{
+    count:15000, scale:0.58, coreBias:1.0, edgeFeather:0.18,
+    flowAmp:0.16, flowFreq:1.9, flowSpeed:0.18,
+    jitter:0.04, jitterSpeed:0.6,
+    rotSpeed:0.06, rotWander:0.9, rotWanderFreq:0.09, diffSwirl:0.5,
+    breathAmp:0, breathSpeed:0,
+    pointSize:4.5, sizeJitter:0.6, glow:6.5, brightness:0.8, seed:1,
+  },
+};
+// 2/3/4 are variations on the same baseline so they stay consistent with #1.
+PROTOTYPES.dense  = { ...PROTOTYPES.core, count:45000, coreBias:2.8, edgeFeather:0.30, pointSize:3.0, sizeJitter:0.8, glow:8.5, brightness:0.95 };
+PROTOTYPES.flow   = { ...PROTOTYPES.core, count:30000, coreBias:1.2, flowAmp:0.22, flowFreq:2.4, flowSpeed:0.22, jitter:0.05, jitterSpeed:0.7, diffSwirl:0.8, pointSize:4.0, brightness:0.85 };
+PROTOTYPES.breath = { ...PROTOTYPES.core, count:20000, coreBias:0.9, breathAmp:0.12, breathSpeed:0.40, rotWander:1.6, pointSize:7.0, sizeJitter:0.4, glow:7.0, brightness:0.78 };
+let activeProto='core';
+// Snap the panel sliders + labels to a given parameter set so the panel
+// reflects the active prototype (each prototype carries all slider keys).
+function syncControls(values){
+  if(!values) return;
+  document.querySelectorAll('#params-controls .row').forEach(row=>{
+    const key=row.querySelector('span')?.textContent.trim();
+    const input=row.querySelector('input');
+    const em=row.querySelector('em');
+    if(!key||!input||!(key in values)) return;
+    const step=parseFloat(input.step)||1;
+    input.value=values[key];
+    if(em) em.textContent=(+values[key]).toFixed(step<1?2:0);
+  });
+}
+function switchPrototype(name){
+  if(!PROTOTYPES[name]) return;
+  activeProto=name;
+  document.querySelectorAll('.proto').forEach(b=>b.classList.toggle('active',b.dataset.proto===name));
+  if(sphereCore) sphereCore.setPrototype(PROTOTYPES[name]);
+  syncControls(PROTOTYPES[name]);
+}
+
 let sphereCore=null;
-import('./sphere-core.js').then(({attachSphereCore})=>{
+import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
   sphereCore=attachSphereCore({
     THREE,
     group,
     innerLayers:[innerHalo3Pts,innerHalo2Pts,innerGlowPts,innerMatPts,trailPoints],
     controlsRoot:document.getElementById('params-controls'),
   });
+  sphereCore.setPrototype(PROTOTYPES[activeProto]);
+  syncControls(PROTOTYPES[activeProto]);
   const panel=document.getElementById('params-panel');
   document.getElementById('params-toggle')?.addEventListener('click',()=>{
     panel?.classList.toggle('hidden');
+  });
+
+  // Build the parameter text in the same layout as the panel:
+  // a heading line, then one "key value" line per slider, using each
+  // slider's own precision (2 decimals when step<1, otherwise integer).
+  function paramsToText(){
+    const heading=document.querySelector('#params-panel h2')?.textContent.trim()||'Particles';
+    const lines=[heading];
+    document.querySelectorAll('#params-controls .row').forEach(row=>{
+      const key=row.querySelector('span')?.textContent.trim();
+      const input=row.querySelector('input');
+      if(!key||!input) return;
+      const step=parseFloat(input.step)||1;
+      const v=(sphereCore && key in sphereCore.field.params)
+        ? sphereCore.field.params[key]
+        : parseFloat(input.value);
+      lines.push(key+' '+(+v).toFixed(step<1?2:0));
+    });
+    return lines.join('\n');
+  }
+
+  const flash=(btn,msg)=>{
+    const orig=btn.textContent;
+    btn.textContent=msg;
+    setTimeout(()=>{ btn.textContent=orig; },1200);
+  };
+
+  document.getElementById('copy-params')?.addEventListener('click',(e)=>{
+    const text=paramsToText();
+    navigator.clipboard?.writeText(text)
+      .then(()=>flash(e.target,'Copied'))
+      .catch(()=>flash(e.target,'Failed'));
+  });
+
+  document.getElementById('save-params')?.addEventListener('click',(e)=>{
+    const text=paramsToText();
+    const blob=new Blob([text],{type:'text/plain'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`particle-params-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    flash(e.target,'Saved');
   });
 }).catch(err=>console.error('sphere-core failed',err));
 
@@ -1608,6 +1943,7 @@ function animate(){
     });
   }
 
+  updateInnerLayers(t);
   renderer.render(scene,camera);
 }
 animate();
