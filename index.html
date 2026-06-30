@@ -183,6 +183,7 @@ body::after {
   <div id="params-actions">
     <button id="copy-params" type="button">Copy</button>
     <button id="save-params" type="button">Save</button>
+    <button id="load-params" type="button" title="Paste a copied snapshot and apply it">Load</button>
   </div>
   <div id="params-controls"></div>
   <div id="inner-layer-tabs"></div>
@@ -943,20 +944,83 @@ import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
   // Build the parameter text in the same layout as the panel:
   // a heading line, then one "key value" line per slider, using each
   // slider's own precision (2 decimals when step<1, otherwise integer).
+  const fmt=(v,step)=>(+v).toFixed(step<1?2:0);
+  const rgbHex=(c)=>'#'+[0,1,2].map(i=>Math.round(Math.max(0,Math.min(1,c[i]||0))*255).toString(16).padStart(2,'0')).join('');
+  // Key + step for each inner-layer slider, read from the panel rows (shared by
+  // all layers); the colour row is excluded (it isn't a numeric slider).
+  const innerSliderDefs=()=>[...document.querySelectorAll('#inner-layer-controls .row')]
+    .map(row=>[row.querySelector('span')?.textContent.trim(), parseFloat(row.querySelector('input')?.step)||1])
+    .filter(d=>d[0]&&d[0]!=='colour');
+
+  // Snapshot the WHOLE prototype as readable, re-loadable text: the core
+  // sphere, every inner layer (params + per-emotion colour overrides as
+  // "@emotion #hex"), the active emotion and the Glow/Fireflies toggles.
   function paramsToText(){
-    const heading=document.querySelector('#params-panel h2')?.textContent.trim()||'Particles';
-    const lines=[heading];
+    const lines=['Core Particles'];
     document.querySelectorAll('#params-controls .row').forEach(row=>{
       const key=row.querySelector('span')?.textContent.trim();
       const input=row.querySelector('input');
       if(!key||!input) return;
       const step=parseFloat(input.step)||1;
-      const v=(sphereCore && key in sphereCore.field.params)
-        ? sphereCore.field.params[key]
-        : parseFloat(input.value);
-      lines.push(key+' '+(+v).toFixed(step<1?2:0));
+      const v=(sphereCore && key in sphereCore.field.params)?sphereCore.field.params[key]:parseFloat(input.value);
+      lines.push(key+' '+fmt(v,step));
     });
+    if(innerLayersReady){
+      const defs=innerSliderDefs();
+      innerLayers.forEach((L,i)=>{
+        lines.push('','Layer '+(i+1));
+        for(const [key,step] of defs){
+          const v=L.field.params[key];
+          if(typeof v==='number') lines.push(key+' '+fmt(v,step));
+        }
+        for(const [emo,c] of Object.entries(L.overrides)) lines.push('@'+emo+' '+rgbHex(c));
+      });
+    }
+    lines.push('','View','emotion '+activeEmotion,
+      'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
+      'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0));
     return lines.join('\n');
+  }
+
+  // Parse a snapshot and apply it to the core, the layers, the emotion and the
+  // toggles. Tolerant of the old core-only format (just a "Core Particles" list).
+  function applyParamsText(text){
+    const coreInputs={};
+    document.querySelectorAll('#params-controls .row').forEach(row=>{
+      const k=row.querySelector('span')?.textContent.trim();
+      const inp=row.querySelector('input');
+      if(k&&inp) coreInputs[k]=inp;
+    });
+    // A full snapshot resets layer overrides so it reproduces exactly; an old
+    // core-only file leaves the current layers untouched.
+    if(/^layer\s+\d+/im.test(text) && innerLayersReady) innerLayers.forEach(L=>L.overrides={});
+    let section=null, li=-1;
+    const setToggle=(id,on,apply)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('active',on); apply(on); };
+    for(const raw of text.split(/\r?\n/)){
+      const line=raw.trim();
+      if(!line) continue;
+      if(/^core particles$/i.test(line)){ section='core'; continue; }
+      let m=line.match(/^layer\s+(\d+)$/i);
+      if(m){ section='layer'; li=parseInt(m[1],10)-1; continue; }
+      if(/^(view|toggles)$/i.test(line)){ section='view'; continue; }
+      m=line.match(/^@(\w+)\s+(#[0-9a-fA-F]{6})$/);
+      if(m){ if(section==='layer'&&innerLayers[li]) innerLayers[li].overrides[m[1].toLowerCase()]=hexRgb(m[2]); continue; }
+      m=line.match(/^emotion\s+(\w+)$/i);
+      if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
+      m=line.match(/^([a-zA-Z]\w*)\s+(-?[\d.]+)$/);
+      if(!m) continue;
+      const key=m[1], val=parseFloat(m[2]);
+      if(section==='core'){
+        const inp=coreInputs[key];
+        if(inp){ inp.value=val; inp.dispatchEvent(new Event('input',{bubbles:true})); }
+      }else if(section==='layer'){
+        if(innerLayers[li]) innerLayers[li].field.setParams({ [key]: val });
+      }else if(section==='view'){
+        if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
+        if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
+      }
+    }
+    if(innerSyncUI) innerSyncUI();
   }
 
   const flash=(btn,msg)=>{
@@ -966,21 +1030,28 @@ import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
   };
 
   document.getElementById('copy-params')?.addEventListener('click',(e)=>{
-    const text=paramsToText();
-    navigator.clipboard?.writeText(text)
+    navigator.clipboard?.writeText(paramsToText())
       .then(()=>flash(e.target,'Copied'))
       .catch(()=>flash(e.target,'Failed'));
   });
 
   document.getElementById('save-params')?.addEventListener('click',(e)=>{
-    const text=paramsToText();
-    const blob=new Blob([text],{type:'text/plain'});
+    const blob=new Blob([paramsToText()],{type:'text/plain'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     a.download=`particle-params-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
     flash(e.target,'Saved');
+  });
+
+  document.getElementById('load-params')?.addEventListener('click',(e)=>{
+    if(!navigator.clipboard?.readText){ flash(e.target,'No clip'); return; }
+    navigator.clipboard.readText().then(txt=>{
+      if(!txt||!txt.trim()){ flash(e.target,'Empty'); return; }
+      try{ applyParamsText(txt); flash(e.target,'Loaded'); }
+      catch(err){ console.error('load failed',err); flash(e.target,'Failed'); }
+    }).catch(()=>flash(e.target,'Failed'));
   });
 }).catch(err=>console.error('sphere-core failed',err));
 
