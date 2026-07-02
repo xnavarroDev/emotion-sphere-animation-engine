@@ -1,5 +1,5 @@
 export const SLIDER_DEFS = [
-  ["count", 5000, 120000, 1000],
+  ["count", 0, 120000, 1000],
   ["scale", 0.2, 0.95, 0.01],
   ["coreBias", 0.5, 3.5, 0.05],
   ["edgeFeather", 0.0, 0.6, 0.01],
