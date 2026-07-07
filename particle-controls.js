@@ -1,5 +1,5 @@
 export const SLIDER_DEFS = [
-  ["count", 0, 120000, 1000],
+  ["count", 0, 1000, 1],
   ["scale", 0.2, 0.95, 0.01],
   ["coreBias", 0.5, 3.5, 0.05],
   ["edgeFeather", 0.0, 0.6, 0.01],
@@ -14,7 +14,7 @@ export const SLIDER_DEFS = [
   ["diffSwirl", 0.0, 2.0, 0.05],
   ["breathAmp", 0.0, 0.2, 0.005],
   ["breathSpeed", 0.0, 3.0, 0.05],
-  ["pointSize", 1.0, 12.0, 0.5],
+  ["pointSize", 1.0, 80.0, 0.5],
   ["sizeJitter", 0.0, 1.0, 0.05],
   ["glow", 1.0, 10.0, 0.1],
   ["brightness", 0.1, 1.6, 0.02],

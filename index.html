@@ -48,6 +48,13 @@ body::after {
   position:fixed; right:24px; bottom:62px;
   z-index:120; display:flex; gap:6px; align-items:center;
 }
+#glow-color {
+  width:22px; height:22px; border:1px solid rgba(255,255,255,0.12); border-radius:3px;
+  background:none; cursor:pointer; padding:0; flex-shrink:0;
+}
+#glow-opacity {
+  width:52px; accent-color:#a0caef; cursor:pointer;
+}
 .vtoggle {
   appearance:none; font:10px/1 'Courier New',monospace; letter-spacing:1px;
   text-transform:uppercase; color:rgba(255,255,255,0.32);
@@ -102,13 +109,20 @@ body::after {
   margin-bottom: 14px;
 }
 #params-actions { display: flex; gap: 8px; margin-bottom: 16px; }
-#params-actions button {
+#params-actions button, #inner-layer-actions button {
   flex: 1; appearance: none; font: 10px/1 'Courier New', monospace;
   letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.7);
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
   border-radius: 4px; padding: 8px; cursor: pointer; transition: all 0.2s;
 }
-#params-actions button:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
+#params-actions button:hover, #inner-layer-actions button:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
+#inner-layers-heading {
+  font-size: 10px; letter-spacing: 3px; font-weight: 400;
+  color: rgba(160,202,239,0.9); text-transform: uppercase;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 14px;
+}
+#inner-layer-actions { display: flex; gap: 8px; margin-bottom: 14px; }
 #params-panel .row {
   display: grid;
   grid-template-columns: 92px 1fr 44px;
@@ -142,7 +156,6 @@ body::after {
 .ilayer-reset.on { color:#a0caef; border-color:rgba(160,202,239,0.55); box-shadow:0 0 6px rgba(160,202,239,0.2); }
 #inner-layer-tabs {
   display:flex; gap:8px; align-items:center; margin-bottom:14px;
-  margin-top:22px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.08);
 }
 .ilayer-arrow {
   appearance:none; font:14px/1 'Courier New',monospace;
@@ -170,13 +183,16 @@ body::after {
 #anim-chevron { font-size:8px; transition:transform 0.2s; }
 #anim-body { }
 .anim-phase-row {
-  display:grid; grid-template-columns:16px 1fr auto 36px 24px;
-  align-items:center; gap:6px;
-  margin-bottom:9px; font:10px/1 'Courier New',monospace;
+  display:flex; align-items:center; gap:7px;
+  font:10px/1 'Courier New',monospace;
+}
+.anim-phase-label {
+  font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  color:rgba(160,202,239,0.75); text-transform:uppercase; flex:1;
 }
 .anim-dot {
-  width:7px; height:7px; border-radius:50%;
-  background:rgba(255,255,255,0.15); justify-self:center;
+  width:7px; height:7px; border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,0.15);
   transition:background 0.25s,box-shadow 0.25s;
 }
 .anim-dot.set { background:#a0caef; box-shadow:0 0 6px rgba(160,202,239,0.55); }
@@ -184,13 +200,18 @@ body::after {
   appearance:none; font:9px/1 'Courier New',monospace; letter-spacing:1px;
   color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.12); border-radius:3px;
-  padding:4px 6px; cursor:pointer; transition:all 0.2s; text-align:center;
+  padding:4px 7px; cursor:pointer; transition:all 0.2s; text-align:center;
 }
 .anim-cap:hover { color:#a0caef; border-color:rgba(160,202,239,0.4); }
+.anim-dur-row {
+  display:flex; align-items:center; gap:5px;
+  padding:4px 0 4px 12px; /* indent under phase label */
+  border-left:1px solid rgba(255,255,255,0.08); margin:3px 0 3px 3px;
+}
 .anim-dur {
-  width:36px; font:10px/1 'Courier New',monospace;
+  width:42px; font:10px/1 'Courier New',monospace;
   background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
-  border-radius:3px; color:rgba(255,255,255,0.7); padding:3px 4px;
+  border-radius:3px; color:rgba(255,255,255,0.7); padding:3px 5px;
   text-align:right;
 }
 .anim-dur:focus { outline:none; border-color:rgba(160,202,239,0.4); }
@@ -238,6 +259,8 @@ body::after {
 </div>
 <div id="view-toggles">
   <button class="vtoggle active" id="toggle-glow" type="button" title="Show/hide the background glow">Glow</button>
+  <input type="color" id="glow-color" value="#ffffff" title="Glow colour">
+  <input type="range" id="glow-opacity" min="0" max="1" step="0.01" value="1" title="Glow opacity">
   <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
 </div>
 <button id="params-toggle" type="button">Params</button>
@@ -250,6 +273,8 @@ body::after {
     <button id="reset-core-params" type="button" title="Reset core to prototype defaults">↺</button>
   </div>
   <div id="params-controls"></div>
+  <h3 id="inner-layers-heading">Inner Layers</h3>
+  <div id="inner-layer-actions"></div>
   <div id="inner-layer-tabs"></div>
   <div id="inner-layer-controls"></div>
   <div id="anim-section">
@@ -269,7 +294,7 @@ body::after {
 </aside>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="cloud-background.js"></script>
+<script src="cloud-background.js?v=3"></script>
 <script>
 // Show runtime errors on-screen (helps when the canvas is blank)
 (function(){
@@ -543,6 +568,11 @@ function switchEmotion(name){
   document.getElementById('label').textContent=target.label||'';
   setDotActive('d-'+name);
   if(innerSyncUI) innerSyncUI();
+  // reset glow tint so each emotion shows its natural palette
+  glowUserColor='#ffffff';
+  const _gc=document.getElementById('glow-color');
+  if(_gc) _gc.value='#ffffff';
+  cloudBg.setUserTint('#ffffff',null);
 }
 
 function toggleCycle(){
@@ -708,12 +738,16 @@ group.add(shellPoints);
 (function(){
   const glowBtn=document.getElementById('toggle-glow');
   const fireBtn=document.getElementById('toggle-fireflies');
+  const glowColor=document.getElementById('glow-color');
+  const glowOpacity=document.getElementById('glow-opacity');
   glowBtn?.addEventListener('click',()=>{
     cloudBg.setVisible(glowBtn.classList.toggle('active'));
   });
   fireBtn?.addEventListener('click',()=>{
     shellPoints.visible=fireBtn.classList.toggle('active');
   });
+  glowColor?.addEventListener('input',()=>{ glowUserColor=glowColor.value; cloudBg.setUserTint(glowColor.value, null); });
+  glowOpacity?.addEventListener('input',()=>{ glowUserOpacity=parseFloat(glowOpacity.value); cloudBg.setUserTint(null, glowUserOpacity); });
 })();
 
 // ---- 5 adjustable inner layers ------------------------------------------
@@ -725,24 +759,28 @@ group.add(shellPoints);
 // All layers start from one shared colour; variety comes from shape/density/motion.
 const INNER_BASE_COLOR=[0.95,0.35,0.28];
 const INNER_LAYER_PRESETS=[
-  { color:INNER_BASE_COLOR, count:9000,  scale:0.30, coreBias:2.4, pointSize:5.0, glow:7.5, brightness:0.95, flowAmp:0.10 }, // hot core
-  { color:INNER_BASE_COLOR, count:16000, scale:0.46, coreBias:1.4, pointSize:3.5, glow:6.5, brightness:0.70, flowAmp:0.20, diffSwirl:0.9 }, // mid
-  { color:INNER_BASE_COLOR, count:12000, scale:0.60, coreBias:0.9, pointSize:6.0, glow:8.0, brightness:0.50, flowAmp:0.26, flowFreq:2.8 }, // ember
-  { color:INNER_BASE_COLOR, count:22000, scale:0.72, coreBias:1.0, pointSize:2.5, glow:5.5, brightness:0.42, jitter:0.07, jitterSpeed:1.0 }, // dust
-  { color:INNER_BASE_COLOR, count:6000,  scale:0.88, coreBias:0.7, pointSize:8.0, glow:8.5, brightness:0.30, breathAmp:0.09, breathSpeed:0.5 }, // orbs
+  { color:INNER_BASE_COLOR, count:1000, scale:0.30, coreBias:2.4, pointSize:5.0, glow:7.5, brightness:0.95, flowAmp:0.10 }, // hot core
+  { color:INNER_BASE_COLOR, count:1000, scale:0.46, coreBias:1.4, pointSize:3.5, glow:6.5, brightness:0.70, flowAmp:0.20, diffSwirl:0.9 }, // mid
+  { color:INNER_BASE_COLOR, count:1000, scale:0.60, coreBias:0.9, pointSize:6.0, glow:8.0, brightness:0.50, flowAmp:0.26, flowFreq:2.8 }, // ember
+  { color:INNER_BASE_COLOR, count:1000, scale:0.72, coreBias:1.0, pointSize:2.5, glow:5.5, brightness:0.42, jitter:0.07, jitterSpeed:1.0 }, // dust
+  { color:INNER_BASE_COLOR, count:1000, scale:0.88, coreBias:0.7, pointSize:8.0, glow:8.5, brightness:0.30, breathAmp:0.09, breathSpeed:0.5 }, // orbs
 ];
 let innerLayers=[];
 let innerLayersReady=false;
 let innerSyncUI=null; // re-sync the panel when the emotion changes
 
+// ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
+let glowUserColor='#ffffff';
+let glowUserOpacity=1.0;
+
 // ---- Animation editor state ----
 const ANIM_N=5;
-const animPhases=Array.from({length:ANIM_N},()=>({duration:2.0,snapshot:null}));
+const animPhases=Array.from({length:ANIM_N},()=>({duration:5.0,snapshot:null}));
 let animPlaying=false;
 let animTime=0;
 let animLoop=true;
 let animPhaseEls=[]; // {dotEl} per phase row, set once UI is built
-let animPlayBtn=null, animFill=null;
+let animPlayBtn=null, animFill=null, animStop=null;
 // The colour the core sphere is currently showing (mirrors sphere-core's
 // colorFromParams), so layers with no override match the active emotion dot.
 function currentEmotionColor(){
@@ -768,15 +806,46 @@ function emotionCoreColor(name){
 // or emotion-follow) with the same easing the core uses, so a per-emotion
 // override eases in/out instead of snapping at the segment midpoint.
 function lerpLayersTo(snapA,snapB,frac){
+  const layersA=Array.isArray(snapA)?snapA:snapA.layers;
+  const layersB=Array.isArray(snapB)?snapB:snapB.layers;
   for(let li=0;li<innerLayers.length;li++){
-    const a=snapA[li], b=snapB[li];
+    const a=layersA[li], b=layersB[li];
     if(!a||!b) continue;
     const p={};
     for(const k of Object.keys(a)){
-      if(k==='color') continue; // color handled by emotion system
-      if(typeof a[k]==='number') p[k]=a[k]+(b[k]-a[k])*frac;
+      if(typeof a[k]==='number'){
+        // coreBias and seed rebuild particle positions — skip during animation
+        // to avoid per-frame GPU rebuilds that cause jitter. count is quantised
+        // to 50 so rebuilds only happen every 50 particles, not every frame.
+        if(k==='coreBias'||k==='seed') continue;
+        const v=a[k]+(b[k]-a[k])*frac;
+        p[k]=k==='count'?Math.round(v):v;
+      }
     }
     innerLayers[li].field.setParams(p);
+  }
+  // lerp core params if both snapshots captured them
+  const cA=Array.isArray(snapA)?null:snapA.core;
+  const cB=Array.isArray(snapB)?null:snapB.core;
+  if(cA&&cB){
+    const p={};
+    for(const k of Object.keys(cA)){
+      if(typeof cA[k]==='number'&&typeof cB[k]==='number'){
+        const v=cA[k]+(cB[k]-cA[k])*frac;
+        // quantise core count to reduce GPU rebuilds (every 200 particles)
+        p[k]=k==='count'?Math.round(v):v;
+      }
+    }
+    setCoreParams(p);
+  }
+  // lerp glow opacity between phases
+  const goA=snapA.glowOpacity, goB=snapB.glowOpacity;
+  if(typeof goA==='number'&&typeof goB==='number'){
+    const op=goA+(goB-goA)*frac;
+    glowUserOpacity=op;
+    cloudBg.setUserTint(null,op);
+    const goEl=document.getElementById('glow-opacity');
+    if(goEl) goEl.value=op;
   }
   if(innerSyncUI) innerSyncUI();
 }
@@ -791,7 +860,7 @@ function applyAnimFrame(dt){
   let t=animTime;
   if(t>=totalDur){
     if(animLoop){ animTime=t%totalDur; t=animTime; }
-    else{ animTime=totalDur; t=totalDur; animPlaying=false; if(animPlayBtn) animPlayBtn.classList.remove('active'); }
+    else{ animTime=totalDur; t=totalDur; if(animStop) animStop(); }
   }
   if(animFill) animFill.style.width=(Math.min(t/totalDur,1)*100)+'%';
   let acc=0;
@@ -828,9 +897,24 @@ function updateInnerLayers(t,dt){
     L.tex.needsUpdate=true;
   }
 }
-Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fieldMod,ctrlMod])=>{
+Promise.all([import('./field.js?v=7'),import('./particle-controls.js?v=6')]).then(([fieldMod,ctrlMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
+
+  // Edge-only alpha mask: white in the centre, fades to black only in the
+  // outermost 60px at each side. This prevents the canvas boundary from
+  // appearing as a hard straight line when large point sprites are clipped,
+  // without affecting particles in the main body of the field.
+  const _maskC=document.createElement('canvas'); _maskC.width=_maskC.height=512;
+  const _mctx=_maskC.getContext('2d');
+  _mctx.fillStyle='white'; _mctx.fillRect(0,0,512,512);
+  const _f=60;
+  const _eg=(x0,y0,x1,y1)=>{ const g=_mctx.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'black'); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
+  _mctx.fillStyle=_eg(0,0,_f,0);       _mctx.fillRect(0,0,_f,512);
+  _mctx.fillStyle=_eg(512,0,512-_f,0); _mctx.fillRect(512-_f,0,_f,512);
+  _mctx.fillStyle=_eg(0,0,0,_f);       _mctx.fillRect(0,0,512,_f);
+  _mctx.fillStyle=_eg(0,512,0,512-_f); _mctx.fillRect(0,512-_f,512,_f);
+  const _maskTex=new THREE.CanvasTexture(_maskC);
 
   innerLayers=INNER_LAYER_PRESETS.map((preset)=>{
     const canvas=document.createElement('canvas');
@@ -841,7 +925,7 @@ Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fiel
     tex.minFilter=THREE.LinearFilter;
     tex.magFilter=THREE.LinearFilter;
     tex.premultiplyAlpha=true;
-    const mat=new THREE.SpriteMaterial({ map:tex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false });
+    const mat=new THREE.SpriteMaterial({ map:tex, alphaMap:_maskTex, alphaTest:0.01, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false });
     const sprite=new THREE.Sprite(mat);
     sprite.center.set(0.5,0.5);
     sprite.renderOrder=4;
@@ -851,18 +935,33 @@ Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fiel
   });
   innerLayersReady=true;
 
-  // Params-panel UI: a "< Layer N >" stepper + the full Core-Particles slider set.
+  // Params-panel UI: action row + "< Layer N >" stepper + the full Core-Particles slider set.
   const stepEl=document.getElementById('inner-layer-tabs');
+  const actEl=document.getElementById('inner-layer-actions');
   const ctrlEl=document.getElementById('inner-layer-controls');
   if(!stepEl||!ctrlEl) return;
   let active=0;
+
+  // Shared flash helper for layer action buttons
+  const flashLayer=(btn,msg)=>{
+    const orig=btn.textContent; btn.textContent=msg;
+    setTimeout(()=>{ btn.textContent=orig; },1200);
+  };
+
+  // Action row: Copy, Load, ↺, + Phase
+  const copyLayerBtn=document.createElement('button'); copyLayerBtn.type='button'; copyLayerBtn.textContent='Copy';
+  const loadLayerBtn=document.createElement('button'); loadLayerBtn.type='button'; loadLayerBtn.textContent='Paste';
+  const resetLayerBtn=document.createElement('button'); resetLayerBtn.type='button'; resetLayerBtn.textContent='↺';
+  resetLayerBtn.title='Reset this layer to defaults';
+  const capturePhaseBtn=document.createElement('button'); capturePhaseBtn.type='button'; capturePhaseBtn.textContent='+ Phase';
+  capturePhaseBtn.title='Add current state as a new animation phase';
+  actEl.append(copyLayerBtn,loadLayerBtn,resetLayerBtn,capturePhaseBtn);
+
   const prev=document.createElement('button'); prev.type='button'; prev.className='ilayer-arrow'; prev.textContent='‹';
   const title=document.createElement('span'); title.className='ilayer-title';
   const next=document.createElement('button'); next.type='button'; next.className='ilayer-arrow'; next.textContent='›';
-  const resetLayerBtn=document.createElement('button'); resetLayerBtn.type='button';
-  resetLayerBtn.className='ilayer-reset'; resetLayerBtn.style.padding='3px 7px';
-  resetLayerBtn.textContent='↺'; resetLayerBtn.title='Reset this layer to defaults';
-  stepEl.append(prev,title,next,resetLayerBtn);
+  stepEl.append(prev,title,next);
+
   resetLayerBtn.addEventListener('click',()=>{
     innerLayers[active].field.setParams({...DEFAULTS,background:[0,0,0,0],glowOscAmp:0,breathAmp:0,breathSpeed:0,...INNER_LAYER_PRESETS[active]});
     sync();
@@ -907,7 +1006,7 @@ Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fiel
     const L=innerLayers[active];
     const f=L.field;
     const ov=L.overrides[activeEmotion];
-    title.textContent='Core Particles · Layer '+(active+1)+' / '+innerLayers.length;
+    title.textContent='Layer '+(active+1)+' / '+innerLayers.length;
     colorInput.value=rgbHex(ov||currentEmotionColor());
     resetBtn.classList.toggle('on',!ov); // lit = following this emotion
     for(const [key,,,step] of SLIDER_DEFS){
@@ -921,6 +1020,51 @@ Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fiel
   innerSyncUI=sync; // let emotion switches re-sync the swatch/reset state
   sync();
 
+  // Copy the active layer's params as text (Layer N format)
+  copyLayerBtn.addEventListener('click',()=>{
+    const L=innerLayers[active];
+    const lines=['Layer '+(active+1)];
+    for(const [key,,,step] of SLIDER_DEFS){
+      const v=L.field.params[key];
+      if(typeof v==='number') lines.push(key+' '+(+v).toFixed(step<1?2:0));
+    }
+    for(const [emo,c] of Object.entries(L.overrides)) lines.push('@'+emo+' '+rgbHex(c));
+    navigator.clipboard?.writeText(lines.join('\n'))
+      .then(()=>flashLayer(copyLayerBtn,'Copied'))
+      .catch(()=>flashLayer(copyLayerBtn,'Failed'));
+  });
+
+  // Load a copied layer snapshot into the active layer
+  loadLayerBtn.addEventListener('click',()=>{
+    if(!navigator.clipboard?.readText){ flashLayer(loadLayerBtn,'No clip'); return; }
+    navigator.clipboard.readText().then(txt=>{
+      if(!txt?.trim()){ flashLayer(loadLayerBtn,'Empty'); return; }
+      try{
+        const L=innerLayers[active];
+        for(const raw of txt.split(/\r?\n/)){
+          const line=raw.trim();
+          let m=line.match(/^@(\w+)\s+(#[0-9a-fA-F]{6})$/);
+          if(m){ L.overrides[m[1].toLowerCase()]=hexRgb(m[2]); continue; }
+          m=line.match(/^([a-zA-Z]\w*)\s+(-?[\d.]+)$/);
+          if(m) L.field.setParams({ [m[1]]:parseFloat(m[2]) });
+        }
+        sync();
+        flashLayer(loadLayerBtn,'Loaded');
+      }catch(err){ flashLayer(loadLayerBtn,'Failed'); }
+    }).catch(()=>flashLayer(loadLayerBtn,'Failed'));
+  });
+
+  // Capture current full state as a new animation phase
+  capturePhaseBtn.addEventListener('click',()=>{
+    const coreSnap=sphereCore
+      ? Object.fromEntries(Object.entries(sphereCore.field.params).filter(([,v])=>typeof v==='number'))
+      : null;
+    animPhases.push({ duration:5.0, snapshot:{ layers:innerLayers.map(L=>({...L.field.params})), core:coreSnap, glowOpacity:glowUserOpacity } });
+    rebuildPhaseRows();
+    flashLayer(capturePhaseBtn,'Added!');
+    document.getElementById('anim-section')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  });
+
   // ---- Animation editor UI ----
   const animPhasesEl=document.getElementById('anim-phases');
   animPlayBtn=document.getElementById('anim-play-btn');
@@ -929,42 +1073,92 @@ Promise.all([import('./field.js'),import('./particle-controls.js')]).then(([fiel
   animLoop=animLoopChk.checked;
   animLoopChk.addEventListener('change',()=>{ animLoop=animLoopChk.checked; });
 
-  animPhaseEls=animPhases.map((phase,i)=>{
+  function makePhaseBlock(phase,i){
+    const frag=document.createDocumentFragment();
+    // Phase row: ● Phase N  [Capture] [×]
     const row=document.createElement('div'); row.className='anim-phase-row';
     const dot=document.createElement('div'); dot.className='anim-dot';
-    const capBtn=document.createElement('button'); capBtn.className='anim-cap'; capBtn.textContent='Ph '+(i+1)+' Capture';
-    const durInput=document.createElement('input'); durInput.type='number';
-    durInput.className='anim-dur'; durInput.value=phase.duration; durInput.min=0.1; durInput.step=0.1;
-    const durS=document.createElement('span'); durS.className='anim-dur-s'; durS.textContent='s';
+    if(phase.snapshot) dot.classList.add('set');
+    const label=document.createElement('span'); label.className='anim-phase-label';
+    label.textContent=i===0?'Starting Phase':'Phase '+(i+1);
+    const capBtn=document.createElement('button'); capBtn.className='anim-cap'; capBtn.textContent='Capture';
+    const clearBtn=document.createElement('button'); clearBtn.className='anim-cap';
+    clearBtn.textContent='×'; clearBtn.title='Clear this phase';
+    clearBtn.style.color='rgba(255,100,100,0.6)';
+    row.append(dot,label,capBtn,clearBtn);
+    frag.appendChild(row);
 
     capBtn.addEventListener('click',()=>{
-      phase.snapshot=innerLayers.map(L=>({...L.field.params}));
+      const coreSnap=sphereCore
+        ? Object.fromEntries(Object.entries(sphereCore.field.params).filter(([,v])=>typeof v==='number'))
+        : null;
+      phase.snapshot={layers:innerLayers.map(L=>({...L.field.params})),core:coreSnap,glowOpacity:glowUserOpacity};
       dot.classList.add('set');
     });
-    durInput.addEventListener('change',()=>{ phase.duration=Math.max(0.1,parseFloat(durInput.value)||0.1); });
+    clearBtn.addEventListener('click',()=>{ phase.snapshot=null; dot.classList.remove('set'); });
 
-    if(i<ANIM_N-1){
-      row.append(dot,capBtn,durInput,durS);
-    } else {
-      // last phase: no duration (nothing after it)
-      const nodur=document.createElement('span');
-      nodur.className='anim-dur-s'; nodur.style.gridColumn='3/5'; nodur.textContent='—';
-      row.append(dot,capBtn,nodur);
+    // Duration row between this phase and the next (not on last phase)
+    if(i<animPhases.length-1){
+      const durRow=document.createElement('div'); durRow.className='anim-dur-row';
+      const durInput=document.createElement('input'); durInput.type='number';
+      durInput.className='anim-dur'; durInput.value=phase.duration; durInput.min=0.1; durInput.step=0.5;
+      const durS=document.createElement('span'); durS.className='anim-dur-s'; durS.textContent='s';
+      durInput.addEventListener('change',()=>{ phase.duration=Math.max(0.1,parseFloat(durInput.value)||0.1); });
+      durRow.append(durInput,durS);
+      frag.appendChild(durRow);
     }
-    animPhasesEl.appendChild(row);
-    return {dot};
-  });
+    return frag;
+  }
 
+  function rebuildPhaseRows(){
+    animPhasesEl.innerHTML='';
+    animPhases.forEach((phase,i)=>animPhasesEl.appendChild(makePhaseBlock(phase,i)));
+    const addBtn=document.createElement('button'); addBtn.className='anim-cap';
+    addBtn.textContent='+ Add Phase'; addBtn.style.cssText='margin-top:10px;width:100%;padding:6px;';
+    addBtn.addEventListener('click',()=>{
+      animPhases.push({duration:5.0,snapshot:null});
+      rebuildPhaseRows();
+    });
+    animPhasesEl.appendChild(addBtn);
+  }
+  rebuildPhaseRows();
+
+  animStop=function(){
+    animPlaying=false;
+    if(animPlayBtn) animPlayBtn.classList.remove('active');
+  };
   animPlayBtn.addEventListener('click',()=>{
     const seq=animPhases.filter(p=>p.snapshot);
-    if(seq.length<2){ return; }
-    animPlaying=!animPlaying;
-    if(animPlaying) animPlayBtn.classList.add('active');
-    else animPlayBtn.classList.remove('active');
+    if(seq.length<2) return;
+    if(!animPlaying){
+      // Pre-allocate each inner layer to the max count across all phases so
+      // animation can sweep count 0→N without any per-frame GPU rebuilds.
+      for(let li=0;li<innerLayers.length;li++){
+        const maxC=Math.max(...seq.map(p=>p.snapshot.layers[li]?.count||0));
+        if(maxC>innerLayers[li].field._count){
+          const saved=innerLayers[li].field.params.count;
+          innerLayers[li].field.setParams({count:maxC}); // one rebuild to expand buffer
+          innerLayers[li].field.params.count=saved;       // restore display count (no rebuild)
+        }
+      }
+      // Same for core
+      if(sphereCore){
+        const coreCounts=seq.map(p=>p.snapshot.core?.count).filter(v=>typeof v==='number');
+        if(coreCounts.length){
+          const maxC=Math.max(...coreCounts);
+          if(maxC>sphereCore.field._count){
+            const saved=sphereCore.field.params.count;
+            sphereCore.field.setParams({count:maxC});
+            sphereCore.field.params.count=saved;
+          }
+        }
+      }
+      animPlaying=true; animPlayBtn.classList.add('active');
+    }
+    else animStop();
   });
   document.getElementById('anim-reset-btn').addEventListener('click',()=>{
-    animTime=0; animPlaying=false;
-    animPlayBtn.classList.remove('active');
+    animTime=0; animStop();
     if(animFill) animFill.style.width='0%';
   });
   document.getElementById('anim-zero-btn').addEventListener('click',()=>{
@@ -1121,6 +1315,20 @@ function syncControls(values){
     if(em) em.textContent=(+values[key]).toFixed(step<1?2:0);
   });
 }
+// Like syncControls but also fires input events so onChange → userOverrides is updated.
+function setCoreParams(values){
+  if(!values) return;
+  document.querySelectorAll('#params-controls .row').forEach(row=>{
+    const key=row.querySelector('span')?.textContent.trim();
+    const input=row.querySelector('input');
+    const em=row.querySelector('em');
+    if(!key||!input||!(key in values)) return;
+    const step=parseFloat(input.step)||1;
+    input.value=values[key];
+    if(em) em.textContent=(+values[key]).toFixed(step<1?2:0);
+    input.dispatchEvent(new Event('input'));
+  });
+}
 function switchPrototype(name){
   if(!PROTOTYPES[name]) return;
   activeProto=name;
@@ -1184,7 +1392,9 @@ import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
     }
     lines.push('','View','emotion '+activeEmotion,
       'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
-      'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0));
+      'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
+      'glowcolor '+glowUserColor,
+      'glowopacity '+glowUserOpacity.toFixed(2));
     return lines.join('\n');
   }
 
@@ -1213,6 +1423,8 @@ import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
       if(m){ if(section==='layer'&&innerLayers[li]) innerLayers[li].overrides[m[1].toLowerCase()]=hexRgb(m[2]); continue; }
       m=line.match(/^emotion\s+(\w+)$/i);
       if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
+      m=line.match(/^glowcolor\s+(#[0-9a-fA-F]{6})$/i);
+      if(m&&section==='view'){ glowUserColor=m[1]; const el=document.getElementById('glow-color'); if(el) el.value=m[1]; cloudBg.setUserTint(m[1],null); continue; }
       m=line.match(/^([a-zA-Z]\w*)\s+(-?[\d.]+)$/);
       if(!m) continue;
       const key=m[1], val=parseFloat(m[2]);
@@ -1224,6 +1436,7 @@ import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
       }else if(section==='view'){
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
+        if(key==='glowopacity'){ glowUserOpacity=val; const el=document.getElementById('glow-opacity'); if(el) el.value=val; cloudBg.setUserTint(null,val); }
       }
     }
     if(innerSyncUI) innerSyncUI();

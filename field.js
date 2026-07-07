@@ -254,18 +254,23 @@ export class ParticleField {
     this.buffers.bright = mk(this.loc.a_bright, bright, 1);
     gl.bindVertexArray(null);
     this._count = count;
+    this._drawCount = null; // reset soft cap on rebuild
+  }
+
+  // Override how many particles are drawn without rebuilding GPU buffers.
+  // Pass null to restore full count. Clamped to allocated count.
+  setDrawCount(n) {
+    this._drawCount = n == null ? null : Math.min(Math.max(0, Math.floor(n)), this._count);
   }
 
   setParams(next = {}) {
     const prevSeed = this.params.seed;
-    const prevCount = this.params.count;
     const prevBias = this.params.coreBias;
     this.params = { ...this.params, ...next };
-    // particle buffers only depend on seed / count / coreBias
     if (
       this.params.seed !== prevSeed ||
-      this.params.count !== prevCount ||
-      this.params.coreBias !== prevBias
+      this.params.coreBias !== prevBias ||
+      this.params.count > this._count  // only rebuild when we need more particles than allocated
     ) {
       this._buildParticles();
     }
@@ -333,7 +338,7 @@ export class ParticleField {
     gl.uniform1f(this.u.u_glow, glow);
     gl.uniform1i(this.u.u_mode, mode);
 
-    gl.drawArrays(gl.POINTS, 0, this._count);
+    gl.drawArrays(gl.POINTS, 0, Math.min(this._drawCount ?? this.params.count, this._count));
     gl.bindVertexArray(null);
   }
 }

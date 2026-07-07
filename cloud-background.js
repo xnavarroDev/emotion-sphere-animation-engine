@@ -137,6 +137,9 @@ gl_FragColor.a*=vis*0.9;`
       cloudTintDeep: { value: ORANGE_DEEP.clone() },
     };
 
+    let userTintColor = new THREE.Color(1, 1, 1);
+    let userOpacity = 1.0;
+
     function mixCloudColor(out, orange, red, purple, cyan, yellow, wO, wR, wP, wB, wY) {
       const s = Math.max(0.001, wO + wR + wP + wB + wY);
       out.setRGB(
@@ -274,6 +277,10 @@ gl_FragColor.a*=vis*0.9;`
       update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix, yellowMix) {
         const t = time || 0;
         applyCloudPalette(redMix, purpleMix, blueMix, yellowMix);
+        uniforms.cloudTint.value.multiply(userTintColor);
+        uniforms.cloudTintDeep.value.multiply(userTintColor);
+        amb.color.multiply(userTintColor);
+        for (const pl of pointLights) pl.color.multiply(userTintColor);
         const r = Math.max(0.5, (worldRadius || 1.5) * 1.05);
         uniforms.sphereRadius.value = r;
 
@@ -327,8 +334,8 @@ gl_FragColor.a*=vis*0.9;`
 
           const op = m.opacityBase + Math.sin(t * m.pulseSp * 0.9 + m.ph2) * m.opacityPulse;
           c.material.opacity = Math.max(0.04, op);
-
           applyAutoStir(c, m, t, r, gph);
+          c.material.opacity = Math.max(0, c.material.opacity * userOpacity);
         }
       },
       onResize(w, h) {
@@ -336,6 +343,10 @@ gl_FragColor.a*=vis*0.9;`
       },
       setVisible(v) {
         cloudGroup.visible = v !== false;
+      },
+      setUserTint(hex, opacity) {
+        if (hex != null) userTintColor.set(hex);
+        if (opacity != null) userOpacity = Math.max(0, Math.min(1, opacity));
       },
       get visible() {
         return cloudGroup.visible;
