@@ -18,6 +18,9 @@ export const SLIDER_DEFS = [
   ["sizeJitter", 0.0, 1.0, 0.05],
   ["glow", 1.0, 10.0, 0.1],
   ["brightness", 0.1, 1.6, 0.02],
+  ["twinkle", 0.0, 1.0, 0.01],
+  ["twinkleSpeed", 0.1, 3.0, 0.05],
+  ["spawnSpan", 0, 30, 0.5],
   ["seed", 1, 200, 1],
 ];
 

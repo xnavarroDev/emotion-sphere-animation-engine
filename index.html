@@ -897,7 +897,7 @@ function updateInnerLayers(t,dt){
     L.tex.needsUpdate=true;
   }
 }
-Promise.all([import('./field.js?v=7'),import('./particle-controls.js?v=6')]).then(([fieldMod,ctrlMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7')]).then(([fieldMod,ctrlMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
 
@@ -1338,7 +1338,7 @@ function switchPrototype(name){
 }
 
 let sphereCore=null;
-import('./sphere-core.js?v=proto2').then(({attachSphereCore})=>{
+import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   sphereCore=attachSphereCore({
     THREE,
     group,

@@ -1,5 +1,5 @@
-import { ParticleField, DEFAULTS } from "./field.js";
-import { attachParticleControls } from "./particle-controls.js";
+import { ParticleField, DEFAULTS } from "./field.js?v=8";
+import { attachParticleControls } from "./particle-controls.js?v=7";
 
 const GENTLE = {
   flowAmp: 0.14,

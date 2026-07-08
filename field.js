@@ -40,6 +40,10 @@ export const DEFAULTS = {
   glowOscAmp: 1.0, // hover amount: glow ranges glow-1 .. glow+1
   glowOscSpeed: 0.8, // rad/s of the glow pulsing
   brightness: 0.8, // per-particle opacity / additive intensity
+  // firefly-style life: per-particle blink + staggered population growth
+  twinkle: 0, // 0 = steady glow, 1 = each particle blinks on its own rhythm
+  twinkleSpeed: 1.0, // blink rate multiplier
+  spawnSpan: 0, // seconds over which particles are born (0 = all visible at start)
   // Light blue sampled from the real Apple Quick Start reference (~#a0caef).
   color: [0.627, 0.792, 0.937],
   background: [0, 0, 0, 1], // black sensor backdrop
@@ -73,6 +77,9 @@ uniform float u_pointSize;
 uniform float u_sizeJitter;
 uniform float u_dpr;
 uniform float u_fieldSeed;
+uniform float u_twinkle;      // 0 = steady, 1 = full firefly blink
+uniform float u_twinkleSpeed; // blink rate multiplier
+uniform float u_spawnSpan;    // seconds over which particles are born (0 = all on)
 
 out float v_alpha;
 out float v_bright;
@@ -119,6 +126,21 @@ void main(){
   // feathered radial mask using the stable original radius
   float mask = 1.0 - smoothstep(1.0 - u_edgeFeather, 1.0, r0);
   v_alpha = mask;
+
+  // per-particle twinkle: pow(...,3) keeps each dot dim most of its cycle
+  // with brief bright flashes, each on its own rhythm (firefly look).
+  float pulse = 0.5 + 0.5 * sin(u_time * (0.5 + a_seed * 1.5) * u_twinkleSpeed + a_seed * 41.0);
+  float blink = pow(pulse, 3.0);
+  v_alpha *= mix(1.0, 0.12 + 0.95 * blink, u_twinkle);
+
+  // staggered birth: each particle gets a birth time in [0, spawnSpan],
+  // sqrt-distributed so the field starts sparse, fills quickly, then tapers.
+  // Fades in over its first second. spawnSpan = 0 disables (all on at t=0).
+  float birthT = u_spawnSpan * sqrt(fract(a_seed * 337.73));
+  float age = u_time - birthT;
+  float fadeIn = smoothstep(0.0, 1.0, age) * step(0.0, age);
+  v_alpha *= mix(1.0, fadeIn, step(0.001, u_spawnSpan));
+
   v_bright = a_bright;
 
   float sz = u_pointSize * (1.0 - u_sizeJitter + a_seed * u_sizeJitter * 2.0);
@@ -210,7 +232,7 @@ export class ParticleField {
       "u_flowFreq", "u_flowSpeed", "u_jitter", "u_jitterSpeed", "u_rotSpeed",
       "u_rotWander", "u_rotWanderFreq", "u_diffSwirl", "u_breathAmp", "u_breathSpeed",
       "u_pointSize", "u_sizeJitter", "u_dpr", "u_fieldSeed", "u_color",
-      "u_brightness", "u_glow", "u_mode",
+      "u_brightness", "u_glow", "u_mode", "u_twinkle", "u_twinkleSpeed", "u_spawnSpan",
     ]) {
       this.u[name] = gl.getUniformLocation(prog, name);
     }
@@ -331,6 +353,9 @@ export class ParticleField {
     gl.uniform1f(this.u.u_sizeJitter, p.sizeJitter);
     gl.uniform1f(this.u.u_dpr, this._dpr || 1);
     gl.uniform1f(this.u.u_fieldSeed, p.seed * 0.123);
+    gl.uniform1f(this.u.u_twinkle, p.twinkle);
+    gl.uniform1f(this.u.u_twinkleSpeed, p.twinkleSpeed);
+    gl.uniform1f(this.u.u_spawnSpan, p.spawnSpan);
     gl.uniform3fv(this.u.u_color, p.color);
     gl.uniform1f(this.u.u_brightness, p.brightness);
     // glow hovers +/- glowOscAmp around the slider value
