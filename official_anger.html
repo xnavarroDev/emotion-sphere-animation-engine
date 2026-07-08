@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>The Classic Firefly Scene (Background + Fireflies)</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #02030a;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<script type="module">
+  import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+
+  let scene, camera, renderer;
+  let fireflyMesh;
+  let clock = new THREE.Clock();
+  let mouse = new THREE.Vector2(0, 0);
+
+  init();
+  animate();
+
+  function init() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x02030a, 0.12);
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    camera.position.set(0, 1.5, 6);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x02030a, 1); // 아주 어두운 밤색
+    document.body.appendChild(renderer.domElement);
+
+    // 배경: 아주 부드러운 그라디언트 느낌의 큰 평면
+    const bgGeo = new THREE.PlaneGeometry(20, 12);
+    const bgMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTopColor: { value: new THREE.Color(0x061326) },   // 위쪽: 짙은 남색
+        uBottomColor: { value: new THREE.Color(0x02070f) } // 아래쪽: 거의 검은 초록/남색
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform vec3 uTopColor;
+        uniform vec3 uBottomColor;
+        void main() {
+          float t = smoothstep(0.0, 1.0, vUv.y);
+          vec3 col = mix(uBottomColor, uTopColor, t);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      depthWrite: false
+    });
+    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+    bgMesh.position.set(0, 1.5, -5);
+    scene.add(bgMesh);
+
+    // 반딧불 파티클 생성
+    createFireflies();
+
+    window.addEventListener('resize', onWindowResize);
+    window.addEventListener('mousemove', onMouseMove);
+  }
+
+  function createFireflies() {
+    const count = 900; // 반딧불 개수 (3배로 늘림)
+    const positions = new Float32Array(count * 3); // 각자의 출발(스폰) 위치
+    const drifts = new Float32Array(count * 3);    // 일생 동안 흘러가는 방향(주로 멀리)
+    const scales = new Float32Array(count);
+    const phases = new Float32Array(count);
+    const speeds = new Float32Array(count);
+    const births = new Float32Array(count);  // 첫 등장 시각
+    const lives = new Float32Array(count);   // 한 번의 일생 길이(초) — 끝나면 다시 스폰
+    const ranges = new Float32Array(count);  // 떠도는 반경
+    const tempos = new Float32Array(count);  // 개체별 떠도는 속도
+    const glows = new Float32Array(count);   // 후광 세기 (대부분 약하게)
+    const fars = new Float32Array(count);    // 멀리 있어 보이는 정도(부드럽고 투명하게)
+    const brights = new Float32Array(count); // 개체별 밝기 (어떤 건 밝고 어떤 건 흐려서 깊이감)
+
+    // 화면 중앙으로 모이게 하는 분포: 세 난수의 평균으로 가운데에 몰린다 (-0.5~0.5)
+    const centerBias = () => ((Math.random() + Math.random() + Math.random()) / 3) - 0.5;
+
+    const areaX = 22;  // 화면 전체를 채우도록 가로로 크게
+    const areaY = 13;  // 세로도 화면 전체로
+    const areaZ = 11;  // 깊이(앞뒤)로도 골고루
+    const centerY = 2.0; // 같은 상대 배치를 유지한 채 바깥으로 펼친다
+
+    // 처음엔 아주 적게 시작해 점점 늘어나도록 첫 등장 시각을 sqrt 분포로 흩뿌린다.
+    const spawnSpan = 26.0;
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      // 대부분 화면 가운데로 모이도록 중앙 편향 분포로 스폰 (가장자리는 드물게)
+      positions[i3 + 0] = centerBias() * areaX;          // x
+      positions[i3 + 1] = centerY + centerBias() * areaY; // y
+      positions[i3 + 2] = -1.0 - Math.random() * areaZ;  // z (가까운 곳~먼 곳)
+
+      // 일생 동안 흘러갈 방향: 대체로 멀어지며(−z), 옆/위로도 조금씩 제각각
+      // 가운데에 머물도록 옆/위 흐름은 다소 줄였다
+      drifts[i3 + 0] = (Math.random() - 0.5) * 2.5;
+      drifts[i3 + 1] = (Math.random() - 0.5) * 2.0;
+      drifts[i3 + 2] = -(3.0 + Math.random() * 11.0);          // 멀리 사라지는 깊이
+
+      scales[i] = (0.8 + Math.random() * 1.8) * 1.75;         // 크기 (1.75배 크게)
+      phases[i] = Math.random() * Math.PI * 2.0;              // 위상(제각각)
+      speeds[i] = 0.5 + Math.random() * 1.5;                  // 깜빡임 속도
+
+      births[i] = spawnSpan * Math.sqrt(Math.random());       // 첫 등장 시각
+      lives[i] = 14.0 + Math.random() * 20.0;                 // 일생 길이(초)
+      ranges[i] = 0.4 + Math.random() * 1.0;                  // 떠도는 반경
+      tempos[i] = 0.12 + Math.random() * 0.22;                // 떠도는 속도
+      glows[i] = Math.pow(Math.random(), 3.0);               // 대부분 약하고, 일부만 강한 후광
+      fars[i] = Math.pow(Math.random(), 2.0);                // 일부는 멀리 있어 보이게(부드럽고 투명)
+      brights[i] = 0.35 + Math.pow(Math.random(), 1.6) * 1.85; // 밝기 편차(0.35~2.2): 깊이감을 위한 명암
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('aDrift', new THREE.BufferAttribute(drifts, 3));
+    geometry.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
+    geometry.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+    geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
+    geometry.setAttribute('aBirth', new THREE.BufferAttribute(births, 1));
+    geometry.setAttribute('aLife', new THREE.BufferAttribute(lives, 1));
+    geometry.setAttribute('aRange', new THREE.BufferAttribute(ranges, 1));
+    geometry.setAttribute('aTempo', new THREE.BufferAttribute(tempos, 1));
+    geometry.setAttribute('aGlow', new THREE.BufferAttribute(glows, 1));
+    geometry.setAttribute('aFar', new THREE.BufferAttribute(fars, 1));
+    geometry.setAttribute('aBright', new THREE.BufferAttribute(brights, 1));
+
+    const uniforms = {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(0xff3b30) }, // ANGER — 강렬한 빨강
+      uIntensity: { value: 3.0 }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: `
+        attribute vec3 aDrift;
+        attribute float aScale;
+        attribute float aPhase;
+        attribute float aSpeed;
+        attribute float aBirth;
+        attribute float aLife;
+        attribute float aRange;
+        attribute float aTempo;
+        attribute float aGlow;
+        attribute float aFar;
+        attribute float aBright;
+        uniform float uTime;
+        varying float vAlpha;
+        varying float vGlow;
+        varying float vBlink;
+        varying float vFar;
+        varying float vBright;
+
+        void main() {
+          vGlow = aGlow;
+          vFar = aFar;
+          vBright = aBright;
+          vec3 pos = position;
+
+          // 스폰: 첫 등장 시각이 되면 서서히 나타나 그대로 켜져 있는다
+          float age = uTime - aBirth;
+          float born = step(0.0, age);
+          float fadeIn = smoothstep(0.0, 1.0, age);
+
+          // 원래의 떠도는 움직임(제자리 부유) — 멀리 흘러가거나 사라지지는 않는다
+          float t = uTime * aTempo + aPhase;
+          vec3 wander = vec3(
+            sin(t * 0.9),
+            sin(t * 1.1 + 1.7),
+            sin(t * 0.7 + 3.1)
+          );
+          pos += wander * aRange;
+
+          // 원래의 깜빡임
+          float pulse = 0.5 + 0.5 * sin(uTime * aSpeed + aPhase);
+          float blink = pow(pulse, 3.0);
+          float glow = 0.12 + 0.95 * blink;
+          vBlink = blink;
+
+          vAlpha = glow * fadeIn * born;
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          // 빛무리가 보이도록 충분히 크게, 강한 개체는 더 크게
+          gl_PointSize = aScale * 32.0 * (1.0 + aGlow * 1.4) * (1.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uIntensity;
+        varying float vAlpha;
+        varying float vGlow;
+        varying float vBlink;
+        varying float vFar;
+        varying float vBright;
+
+        void main() {
+          vec2 uv = gl_PointCoord - 0.5;
+          float d = length(uv);
+
+          float core = smoothstep(0.5, 0.0, d);   // 또렷한 중심
+          float aura = pow(core, 0.55);           // 넓고 부드러운 빛무리
+
+          // 모든 반딧불에 은은한 빛무리, 강한 개체일수록 더 넓게
+          // 깜빡일 때(vBlink) 빛무리가 살짝 더 퍼진다
+          float auraAmt = 0.35 + vGlow * 1.0 + vBlink * 0.3;
+
+          // 멀리 있어 보이는 개체는 또렷한 중심이 약해지고 빛무리만 부드럽게 남는다
+          float coreAmt = mix(1.0, 0.25, vFar);
+          float shape = core * coreAmt + aura * (auraAmt + vFar * 0.5);
+          // 그리고 더 투명하게 — 멀리 흐릿하게 떠 있는 느낌
+          // 개체별 밝기(vBright)로 어떤 건 밝고 어떤 건 흐리게 — 깊이감
+          float alpha = vAlpha * shape * (1.0 - 0.6 * vFar) * vBright;
+
+          vec3 col = uColor * uIntensity * (1.0 + vGlow * 2.5) * vBright;
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    fireflyMesh = new THREE.Points(geometry, material);
+    scene.add(fireflyMesh);
+  }
+
+  function onWindowResize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+  }
+
+  function onMouseMove(event) {
+    mouse.x = (event.clientX / window.innerWidth) - 0.5;
+    mouse.y = (event.clientY / window.innerHeight) - 0.5;
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const elapsed = clock.getElapsedTime();
+
+    if (fireflyMesh) {
+      fireflyMesh.material.uniforms.uTime.value = elapsed;
+    }
+
+    // 카메라에 아주 약한 패럴랙스
+    camera.position.x = mouse.x * 0.6;
+    camera.position.y = 1.5 + mouse.y * 0.4;
+    camera.lookAt(0, 1.5, -3);
+
+    renderer.render(scene, camera);
+  }
+</script>
+</body>
+</html>
