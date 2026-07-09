@@ -854,6 +854,7 @@ function lerpLayersTo(snapA,snapB,frac){
     const p={};
     for(const k of Object.keys(fA)){
       if(typeof fA[k]==='number'&&typeof fB[k]==='number'){
+        if(k==='coreBias') continue; // rebuilds spawn positions — skip during lerp
         const v=fA[k]+(fB[k]-fA[k])*frac;
         p[k]=k==='count'?Math.round(v):v;
       }
@@ -916,8 +917,7 @@ function updateInnerLayers(t,dt){
       color=L.overrides[ae]||emo;
     }
     L.field.params.color=color;
-    L.field.draw(t);
-    L.tex.needsUpdate=true;
+    if(L.sprite.visible){ L.field.draw(t); L.tex.needsUpdate=true; }
   }
   // Firefly field follows the active emotion with the official palette;
   // in cycle mode it blends seg.a -> seg.b like the layers do.
@@ -933,7 +933,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=1')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=2')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -972,13 +972,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   });
   innerLayersReady=true;
 
-  // Full-scene firefly environment: lives in the scene (not the drag-rotated
-  // group) so the world of light stays still while the sphere spins.
+  // The firefly circles ARE the sphere on this branch: spawned as a ball,
+  // living in the drag-rotated group, replacing the old particle cloud
+  // (whose sprites are hidden below).
   fireflyField=createFireflyField(THREE,{
+    shape:'sphere',
+    radius:1.6,
     color:FIREFLY_EMOTION_COLORS[activeEmotion]??0xffc24a,
     dpr:renderer.getPixelRatio(),
   });
-  scene.add(fireflyField.points);
+  group.add(fireflyField.points);
+  // Hide the old particle-cloud layers; the editor now drives the circles.
+  for(const L of innerLayers) L.sprite.visible=false;
   document.getElementById('toggle-field')?.addEventListener('click',function(){
     fireflyField.points.visible=this.classList.toggle('active');
   });
@@ -987,6 +992,8 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const ffCtrlEl=document.getElementById('firefly-field-controls');
   const FF_SLIDERS=[
     ['count',0,FIREFLY_POOL,10],
+    ['radius',0.2,4,0.05],
+    ['coreBias',0.3,3,0.05],
     ['intensity',0.2,6,0.05],
     ['size',0.2,3,0.05],
     ['blinkSpeed',0.1,3,0.05],
@@ -1432,6 +1439,9 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     innerLayers:[innerHalo3Pts,innerHalo2Pts,innerGlowPts,innerMatPts,trailPoints],
     controlsRoot:document.getElementById('params-controls'),
   });
+  // Circles-as-sphere branch: the firefly field replaces the core particle
+  // cloud, so its sprite stays hidden (and skips its per-frame draw below).
+  sphereCore.sprite.visible=false;
   sphereCore.setPrototype(PROTOTYPES[activeProto]);
   syncControls(PROTOTYPES[activeProto]);
   const panel=document.getElementById('params-panel');
@@ -2527,7 +2537,7 @@ function animate(){
   const cloudYellowMix=emotionPick(cwCloud,'yellow');
   cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix);
 
-  if(sphereCore){
+  if(sphereCore&&sphereCore.sprite.visible){
     if(cycleOn) sphereCore.setCycleBlend(cycleSegment);
     else sphereCore.setCycleBlend(null);
     sphereCore.update(t,{

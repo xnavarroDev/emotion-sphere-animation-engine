@@ -28,6 +28,8 @@ export const FIREFLY_DEFAULTS = {
   blinkSpeed: 1.0, // twinkle rate multiplier
   wander: 1.0, // in-place drift range multiplier
   spawnSpan: 26.0, // seconds over which the field populates (official value)
+  radius: 1.0, // sphere shape: cluster radius (live uniform, animatable)
+  coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
 };
 
 export const FIREFLY_POOL = 2200;
@@ -35,12 +37,9 @@ export const FIREFLY_POOL = 2200;
 export function createFireflyField(THREE, opts = {}) {
   const params = { ...FIREFLY_DEFAULTS };
   for (const k of Object.keys(FIREFLY_DEFAULTS)) if (k in opts) params[k] = opts[k];
-
-  // Spawn volume from the official pages (world units; camera-facing box that
-  // fills the frame at our 60° camera). centerY 0 keeps it centred on the sphere.
-  const areaX = 22, areaY = 13, areaZ = 11;
-  // Average of three randoms biases spawns toward the centre of the frame.
-  const centerBias = () => (Math.random() + Math.random() + Math.random()) / 3 - 0.5;
+  // 'sphere' arranges the circles as a ball around the origin (the Emotion
+  // Sphere itself); 'box' is the official pages' full-frame environment.
+  const shape = opts.shape || 'sphere';
 
   const positions = new Float32Array(FIREFLY_POOL * 3);
   const scales = new Float32Array(FIREFLY_POOL); // per-particle size
@@ -53,17 +52,43 @@ export function createFireflyField(THREE, opts = {}) {
   const fars = new Float32Array(FIREFLY_POOL); // "distant" softening factor
   const brights = new Float32Array(FIREFLY_POOL); // brightness variance for depth
 
-  for (let i = 0; i < FIREFLY_POOL; i++) {
-    const i3 = i * 3;
-    positions[i3] = centerBias() * areaX;
-    positions[i3 + 1] = centerBias() * areaY;
-    positions[i3 + 2] = -1.0 - Math.random() * areaZ;
+  function fillPositions() {
+    if (shape === 'sphere') {
+      // uniform direction, coreBias-shaped radius in a unit ball; the live
+      // `radius` param scales it in the shader so radius changes are free
+      for (let i = 0; i < FIREFLY_POOL; i++) {
+        const i3 = i * 3;
+        const th = Math.random() * Math.PI * 2;
+        const ph = Math.acos(2 * Math.random() - 1);
+        const r = Math.pow(Math.random(), params.coreBias);
+        positions[i3] = r * Math.sin(ph) * Math.cos(th);
+        positions[i3 + 1] = r * Math.sin(ph) * Math.sin(th);
+        positions[i3 + 2] = r * Math.cos(ph);
+      }
+    } else {
+      // official pages' camera-facing spawn box (world units)
+      const areaX = 22, areaY = 13, areaZ = 11;
+      const centerBias = () => (Math.random() + Math.random() + Math.random()) / 3 - 0.5;
+      for (let i = 0; i < FIREFLY_POOL; i++) {
+        const i3 = i * 3;
+        positions[i3] = centerBias() * areaX;
+        positions[i3 + 1] = centerBias() * areaY;
+        positions[i3 + 2] = -1.0 - Math.random() * areaZ;
+      }
+    }
+  }
+  fillPositions();
 
+  // In sphere mode the wander amplitude is scaled to the unit ball; the box
+  // keeps the official world-unit range.
+  const wanderScale = shape === 'sphere' ? 0.12 : 1.0;
+
+  for (let i = 0; i < FIREFLY_POOL; i++) {
     scales[i] = (0.8 + Math.random() * 1.8) * 1.75;
     phases[i] = Math.random() * Math.PI * 2.0;
     speeds[i] = 0.5 + Math.random() * 1.5;
     rands[i] = Math.random();
-    ranges[i] = 0.4 + Math.random() * 1.0;
+    ranges[i] = (0.4 + Math.random() * 1.0) * wanderScale;
     tempos[i] = 0.12 + Math.random() * 0.22;
     glows[i] = Math.pow(Math.random(), 3.0);
     fars[i] = Math.pow(Math.random(), 2.0);
@@ -90,6 +115,7 @@ export function createFireflyField(THREE, opts = {}) {
     uBlinkSpeed: { value: params.blinkSpeed },
     uWander: { value: params.wander },
     uSpawnSpan: { value: params.spawnSpan },
+    uRadius: { value: params.radius },
     uDpr: { value: opts.dpr != null ? opts.dpr : 1 },
   };
 
@@ -110,6 +136,7 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uBlinkSpeed;
       uniform float uWander;
       uniform float uSpawnSpan;
+      uniform float uRadius;
       uniform float uDpr;
       varying float vAlpha;
       varying float vGlow;
@@ -121,7 +148,7 @@ export function createFireflyField(THREE, opts = {}) {
         vGlow = aGlow;
         vFar = aFar;
         vBright = aBright;
-        vec3 pos = position;
+        vec3 pos = position * uRadius;
 
         // staggered births: sqrt distribution starts sparse and fills quickly,
         // each firefly fades in over its first second then stays lit
@@ -190,6 +217,7 @@ export function createFireflyField(THREE, opts = {}) {
   points.frustumCulled = false; // spawn box exceeds default bounding sphere
 
   function setParams(patch = {}) {
+    const prevBias = params.coreBias;
     for (const [k, v] of Object.entries(patch)) {
       if (k in params && typeof v === 'number') params[k] = v;
     }
@@ -199,6 +227,13 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uBlinkSpeed.value = params.blinkSpeed;
     uniforms.uWander.value = params.wander;
     uniforms.uSpawnSpan.value = params.spawnSpan;
+    uniforms.uRadius.value = params.radius;
+    // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
+    // on change, so skip it during animation lerps like the layers do)
+    if (params.coreBias !== prevBias) {
+      fillPositions();
+      geometry.getAttribute('position').needsUpdate = true;
+    }
   }
   setParams({});
 
