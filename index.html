@@ -246,7 +246,24 @@ body::after {
 #inner-layer-tabs, #inner-layer-controls, #reset-core-params, #proto-switch {
   display: none;
 }
-#firefly-field-heading { margin-top: 0; padding-top: 0; border-top: none; }
+#firefly-field-heading, #classic-heading { margin-top: 0; padding-top: 0; border-top: none; }
+#classic-heading {
+  font-size: 10px; letter-spacing: 3px; font-weight: 400;
+  color: rgba(160,202,239,0.9); text-transform: uppercase; margin-bottom: 14px;
+}
+/* Circles / Fireflies mode switch */
+#sphere-mode { display: flex; gap: 8px; margin-bottom: 16px; }
+.mode-btn {
+  flex: 1; appearance: none; font: 10px/1 'Courier New', monospace;
+  letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px; padding: 8px; cursor: pointer; transition: all 0.2s;
+}
+.mode-btn:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
+.mode-btn.active {
+  color: #a0caef; border-color: rgba(160,202,239,0.55);
+  box-shadow: 0 0 8px rgba(160,202,239,0.2);
+}
 </style>
 </head>
 <body>
@@ -286,8 +303,14 @@ body::after {
   <div id="inner-layer-actions"></div>
   <div id="inner-layer-tabs"></div>
   <div id="inner-layer-controls"></div>
+  <div id="sphere-mode">
+    <button id="mode-circles" class="mode-btn active" type="button" title="Sphere made of official firefly circles">Circles</button>
+    <button id="mode-fireflies" class="mode-btn" type="button" title="Classic one-by-one firefly emitter with trails">Fireflies</button>
+  </div>
   <h3 id="firefly-field-heading">Firefly Field</h3>
   <div id="firefly-field-controls"></div>
+  <h3 id="classic-heading" style="display:none">Fireflies</h3>
+  <div id="classic-controls" style="display:none"></div>
   <div id="anim-section">
     <div id="anim-heading"><span id="anim-chevron" style="transform:rotate(90deg)">▸</span> Animation</div>
     <div id="anim-body">
@@ -628,11 +651,20 @@ const SWIRL_TANG_INNER = 0.1;
 const SWIRL_IN_SHELL = 0.32;
 const SWIRL_IN_INNER = 0.4;
 
-// Slow, one-by-one continuous emitter (inner only; shell stays always-on)
-const SPAWN_INNER_LIFE = 5.8;
-const SPAWN_INNER_FADE = 1.2;
-const SPAWN_INNER_INTERVAL = 0.65; // firefly pace: one-by-one, sparse
-const SPAWN_INNER_AMP = 0.34;
+// Slow, one-by-one continuous emitter (inner only; shell stays always-on).
+// Editable via the Fireflies mode of the params panel.
+const CLASSIC = {
+  scale: 1, // whole-sphere radius multiplier (shell + fireflies)
+  coreBias: 0.45, // firefly home-radius exponent: >1 packs toward the centre (applies to newborns)
+  interval: 0.65, // s between births (firefly pace: one-by-one, sparse)
+  life: 5.8, // s each firefly lives
+  fade: 1.2, // s fade — used symmetrically for appearing AND disappearing
+  swirl: 0.34, // orbital wobble amplitude while emerging
+  dotSize: 1, // firefly dot size multiplier
+  shellSize: 1, // shell dot size multiplier
+  glowSize: 1, // glow halo size multiplier
+  trailLife: 1.55, // s trail dots persist
+};
 let spawnEnabled=true;
 let innerSpawnCursor=0;
 let innerSpawnAcc=0;
@@ -785,6 +817,11 @@ let innerSyncUI=null; // re-sync the panel when the emotion changes
 const FIREFLY_EMOTION_COLORS={ red:0xff3b30, purple:0xa070ff, yellow:0xffc24a, blue:0x5599ee };
 let fireflyField=null;
 let fireflyFieldSyncUI=null; // re-sync its sliders after animation lerps
+// Sphere visual mode: 'circles' (official firefly circles) or 'fireflies'
+// (classic one-by-one emitter with trails, driven by the CLASSIC params).
+let sphereMode='circles';
+let applySphereModeFn=null; // set once the panel is built
+let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
 
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
 let glowUserColor='#ffffff';
@@ -869,6 +906,14 @@ function lerpLayersTo(snapA,snapB,frac){
     }
     fireflyField.setParams(p);
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
+  }
+  // lerp the classic (Fireflies mode) emitter params between phases
+  const clA=snapA.classic, clB=snapB.classic;
+  if(clA&&clB){
+    for(const k of Object.keys(clA)){
+      if(typeof clA[k]==='number'&&typeof clB[k]==='number') CLASSIC[k]=clA[k]+(clB[k]-clA[k])*frac;
+    }
+    if(classicSyncUI) classicSyncUI();
   }
   // lerp glow opacity between phases
   const goA=snapA.glowOpacity, goB=snapB.glowOpacity;
@@ -1036,6 +1081,64 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   fireflyFieldSyncUI=ffSync;
   ffSync();
 
+  // ---- Fireflies mode: classic emitter sliders ----
+  const classicCtrl=document.getElementById('classic-controls');
+  const CLASSIC_SLIDERS=[
+    ['scale',0.3,2,0.02],
+    ['coreBias',0.2,3,0.05],
+    ['interval',0.1,3,0.05],
+    ['life',1,15,0.1],
+    ['fade',0.1,3,0.05],
+    ['swirl',0,1,0.02],
+    ['dotSize',0.2,3,0.05],
+    ['shellSize',0.2,3,0.05],
+    ['glowSize',0.2,3,0.05],
+    ['trailLife',0.2,4,0.05],
+  ];
+  const classicRows={};
+  for(const [key,min,max,step] of CLASSIC_SLIDERS){
+    const row=document.createElement('label'); row.className='row';
+    const span=document.createElement('span'); span.textContent=key;
+    const input=document.createElement('input');
+    input.type='range'; input.min=min; input.max=max; input.step=step;
+    input.value=CLASSIC[key];
+    const em=document.createElement('em');
+    em.textContent=(+CLASSIC[key]).toFixed(2);
+    row.append(span,input,em); classicCtrl.appendChild(row);
+    input.addEventListener('input',()=>{
+      CLASSIC[key]=parseFloat(input.value);
+      em.textContent=CLASSIC[key].toFixed(2);
+    });
+    classicRows[key]={input,em};
+  }
+  classicSyncUI=function(){
+    for(const key of Object.keys(classicRows)){
+      classicRows[key].input.value=CLASSIC[key];
+      classicRows[key].em.textContent=(+CLASSIC[key]).toFixed(2);
+    }
+  };
+
+  // ---- Circles / Fireflies mode switch ----
+  // 'circles': the official firefly-circle ball; 'fireflies': the classic
+  // one-by-one emitter (dots + halos + trails) with the shell cloud.
+  function applySphereMode(mode){
+    sphereMode=mode;
+    const ff=mode==='fireflies';
+    document.getElementById('mode-circles')?.classList.toggle('active',!ff);
+    document.getElementById('mode-fireflies')?.classList.toggle('active',ff);
+    if(fireflyField) fireflyField.points.visible=!ff&&(document.getElementById('toggle-field')?.classList.contains('active')??true);
+    for(const o of [innerHalo3Pts,innerHalo2Pts,innerGlowPts,innerMatPts,trailPoints]) o.visible=ff;
+    shellPoints.visible=ff;
+    document.getElementById('toggle-fireflies')?.classList.toggle('active',ff);
+    document.getElementById('firefly-field-heading').style.display=ff?'none':'';
+    document.getElementById('firefly-field-controls').style.display=ff?'none':'';
+    document.getElementById('classic-heading').style.display=ff?'':'none';
+    document.getElementById('classic-controls').style.display=ff?'':'none';
+  }
+  applySphereModeFn=applySphereMode;
+  document.getElementById('mode-circles')?.addEventListener('click',()=>applySphereMode('circles'));
+  document.getElementById('mode-fireflies')?.addEventListener('click',()=>applySphereMode('fireflies'));
+
   // Params-panel UI: action row + "< Layer N >" stepper + the full Core-Particles slider set.
   const stepEl=document.getElementById('inner-layer-tabs');
   const actEl=document.getElementById('inner-layer-actions');
@@ -1160,7 +1263,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const coreSnap=sphereCore
       ? Object.fromEntries(Object.entries(sphereCore.field.params).filter(([,v])=>typeof v==='number'))
       : null;
-    animPhases.push({ duration:5.0, snapshot:{ layers:innerLayers.map(L=>({...L.field.params})), core:coreSnap, glowOpacity:glowUserOpacity, fireflies:fireflyField?{...fireflyField.params}:null } });
+    animPhases.push({ duration:5.0, snapshot:{ layers:innerLayers.map(L=>({...L.field.params})), core:coreSnap, glowOpacity:glowUserOpacity, fireflies:fireflyField?{...fireflyField.params}:null, classic:{...CLASSIC} } });
     rebuildPhaseRows();
     flashLayer(capturePhaseBtn,'Added!');
     document.getElementById('anim-section')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -1193,7 +1296,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       const coreSnap=sphereCore
         ? Object.fromEntries(Object.entries(sphereCore.field.params).filter(([,v])=>typeof v==='number'))
         : null;
-      phase.snapshot={layers:innerLayers.map(L=>({...L.field.params})),core:coreSnap,glowOpacity:glowUserOpacity,fireflies:fireflyField?{...fireflyField.params}:null};
+      phase.snapshot={layers:innerLayers.map(L=>({...L.field.params})),core:coreSnap,glowOpacity:glowUserOpacity,fireflies:fireflyField?{...fireflyField.params}:null,classic:{...CLASSIC}};
       dot.classList.add('set');
     });
     clearBtn.addEventListener('click',()=>{ phase.snapshot=null; dot.classList.remove('set'); });
@@ -1303,15 +1406,14 @@ for(let i=0;i<INNER_N;i++){
   const h=Math.abs(Math.sin(i*12.9898)*43758.5453)%1;
   innerSeqTint[i]=h<0.2?2:(h<0.5?1:0);
 }
-for(let i=0;i<INNER_N;i++){
+// (Re)roll one inner dot's home position + wobble axis. Used at init and at
+// each respawn, so the live coreBias applies to every newly born firefly.
+function rollInnerDot(i){
   const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
-  const rad=Math.pow(Math.random(),0.45)*0.75;
+  const rad=Math.pow(Math.random(),CLASSIC.coreBias)*0.75;
   innerPos[i*3]=innerOrig[i*3]=rad*Math.sin(ph)*Math.cos(th);
   innerPos[i*3+1]=innerOrig[i*3+1]=rad*Math.sin(ph)*Math.sin(th);
   innerPos[i*3+2]=innerOrig[i*3+2]=rad*Math.cos(ph);
-  innerPhase[i]=Math.random()*Math.PI*2;
-  innerBirth[i]=-1;
-  innerVis[i]=1;
   const nx=innerOrig[i*3], ny=innerOrig[i*3+1], nz=innerOrig[i*3+2];
   const inv=1/(Math.sqrt(nx*nx+ny*ny+nz*nz)||1);
   const ux=nx*inv, uy=ny*inv, uz=nz*inv;
@@ -1320,6 +1422,12 @@ for(let i=0;i<INNER_N;i++){
   const al=Math.sqrt(ax*ax+ay*ay+az*az)||1;
   ax/=al; ay/=al; az/=al;
   innerAxis[i*3]=ax; innerAxis[i*3+1]=ay; innerAxis[i*3+2]=az;
+}
+for(let i=0;i<INNER_N;i++){
+  rollInnerDot(i);
+  innerPhase[i]=Math.random()*Math.PI*2;
+  innerBirth[i]=-1;
+  innerVis[i]=1;
 }
 const innerGeo=new THREE.BufferGeometry();
 innerGeo.setAttribute('position',new THREE.BufferAttribute(innerPos,3));
@@ -1360,7 +1468,6 @@ group.add(innerMatPts);
 
 // Emitted trail particles (each inner dot leaves glowing dots that drift + fade)
 const TRAIL_POOL=2200;
-const TRAIL_LIFE=1.55;
 const TRAIL_EMIT_STEP=0.042;
 const trailPos=new Float32Array(TRAIL_POOL*3);
 const trailCol=new Float32Array(TRAIL_POOL*3);
@@ -1453,6 +1560,9 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   // Circles-as-sphere branch: the firefly field replaces the core particle
   // cloud, so its sprite stays hidden (and skips its per-frame draw below).
   sphereCore.sprite.visible=false;
+  // attachSphereCore hides the emitter layers; restore the active mode's
+  // visibility in case the user already switched to Fireflies.
+  if(applySphereModeFn) applySphereModeFn(sphereMode);
   sphereCore.setPrototype(PROTOTYPES[activeProto]);
   syncControls(PROTOTYPES[activeProto]);
   const panel=document.getElementById('params-panel');
@@ -1492,7 +1602,15 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(typeof v==='number') lines.push(key+' '+fmt(v,step));
       }
     }
+    lines.push('','Classic');
+    for(const [key,step] of [...document.querySelectorAll('#classic-controls .row')]
+      .map(row=>[row.querySelector('span')?.textContent.trim(), parseFloat(row.querySelector('input')?.step)||1])
+      .filter(d=>d[0])){
+      const v=CLASSIC[key];
+      if(typeof v==='number') lines.push(key+' '+fmt(v,step));
+    }
     lines.push('','View','emotion '+activeEmotion,
+      'mode '+sphereMode,
       'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
       'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
       'field '+(document.getElementById('toggle-field')?.classList.contains('active')?1:0),
@@ -1522,7 +1640,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       let m=line.match(/^layer\s+(\d+)$/i);
       if(m){ section='layer'; li=parseInt(m[1],10)-1; continue; }
       if(/^firefly field$/i.test(line)){ section='ffield'; continue; }
+      if(/^classic$/i.test(line)){ section='classic'; continue; }
       if(/^(view|toggles)$/i.test(line)){ section='view'; continue; }
+      m=line.match(/^mode\s+(circles|fireflies)$/i);
+      if(m){ if(applySphereModeFn) applySphereModeFn(m[1].toLowerCase()); continue; }
       m=line.match(/^@(\w+)\s+(#[0-9a-fA-F]{6})$/);
       if(m){ if(section==='layer'&&innerLayers[li]) innerLayers[li].overrides[m[1].toLowerCase()]=hexRgb(m[2]); continue; }
       m=line.match(/^emotion\s+(\w+)$/i);
@@ -1539,6 +1660,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(innerLayers[li]) innerLayers[li].field.setParams({ [key]: val });
       }else if(section==='ffield'){
         if(fireflyField) fireflyField.setParams({ [key]: val });
+      }else if(section==='classic'){
+        if(key in CLASSIC) CLASSIC[key]=val;
       }else if(section==='view'){
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
@@ -1548,6 +1671,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     }
     if(innerSyncUI) innerSyncUI();
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
+    if(classicSyncUI) classicSyncUI();
   }
 
   const flash=(btn,msg)=>{
@@ -2156,9 +2280,10 @@ function animate(){
 
   if(spawnEnabled){
     innerSpawnAcc+=dt;
-    while(innerSpawnAcc>=SPAWN_INNER_INTERVAL){
-      innerSpawnAcc-=SPAWN_INNER_INTERVAL;
+    while(innerSpawnAcc>=CLASSIC.interval){
+      innerSpawnAcc-=CLASSIC.interval;
       const idx=innerSpawnCursor++%INNER_N;
+      rollInnerDot(idx); // newborns take the live coreBias distribution
       innerBirth[idx]=tNow;
       innerSize[idx]=1.0+Math.random()*0.75;
       const p3=idx*3;
@@ -2245,7 +2370,7 @@ function animate(){
 
   const yellowPulse=wYellow>0.35;
   const purpleGlow=wPurple>0.35;
-  shellMat.size=pSize*SHELL_PT_MUL*((yellowPulse||purpleGlow)
+  shellMat.size=pSize*SHELL_PT_MUL*CLASSIC.shellSize*((yellowPulse||purpleGlow)
     ?0.97+0.03*Math.sin(t*pulseFreq*0.35)
     :wChaosShell>0.35?0.97+Math.sin(t*6)*0.025:1);
   let shellOp=wCalm*density*(0.52+sphere.breath*0.08)+wPurple*density*(0.6+(breath-0.5)*0.18)+wChaosMotion*density*(0.66+breath*0.16);
@@ -2263,11 +2388,11 @@ function animate(){
   const glowBreath=(
     wCalm*gbCalm+wPurple*gbBurst+wRed*gbRed+wYellow*gbBurst+wGlowChaos*gbBurst
   )*gNorm;
-  innerMat.size=pSize*INNER_PT_MUL*glowBreath;
+  innerMat.size=pSize*INNER_PT_MUL*CLASSIC.dotSize*glowBreath;
   innerMat.opacity=Math.min(density*(wRed*(0.9+(breath-0.5)*0.08)+(1-wRed)*(0.88+breath*0.12)),1);
   const gmCalm=1.08, gmBurst=1, gmRed=0.9+(breath-0.5)*0.1, gmChaos=0.85;
   const glowSizeMul=(wCalm*gmCalm+wPurple*gmBurst+wRed*gmRed+wYellow*gmBurst+wGlowChaos*gmChaos)*gNorm;
-  innerGlowMat.size=(params.glowSize||0.03)*GLOW_PT_MUL*glowBreath*glowSizeMul;
+  innerGlowMat.size=(params.glowSize||0.03)*GLOW_PT_MUL*CLASSIC.glowSize*glowBreath*glowSizeMul;
   const opCalm=0.88+(breath-0.5)*0.06, opPulse=0.75+breath*0.25;
   innerGlowMat.opacity=Math.min(density*(params.glowOp||0.35)*(
     wCalm*opCalm+(wPurple+wRed+wYellow+wGlowChaos)*opPulse
@@ -2339,7 +2464,7 @@ function animate(){
     }
     const sw=swirlInward(t,shellPhase[i],ox,oy,oz,len,SWIRL_TANG_SHELL,SWIRL_IN_SHELL*(0.7+sphere.breath*0.35));
     dx+=sw.dx; dy+=sw.dy; dz+=sw.dz;
-    const r=radius*sphere.scale*(1+(ripple-0.5)*rippleAmt);
+    const r=radius*sphere.scale*CLASSIC.scale*(1+(ripple-0.5)*rippleAmt);
     const nx=ox/len,ny=oy/len,nz=oz/len;
     const pr=len*r*expand*sw.radScale;
     const tx=nx*pr+dx, ty=ny*pr+dy, tz=nz*pr+dz;
@@ -2385,7 +2510,7 @@ function animate(){
     const sw=swirlInward(t,innerPhase[i],ox,oy,oz,len,SWIRL_TANG_INNER,SWIRL_IN_INNER*(0.75+breath*0.3));
     dx+=sw.dx; dy+=sw.dy; dz+=sw.dz;
     const innerExpand=1+sphere.disperse*(wPurple*0.92+wChaosInner*0.12);
-    const r=radius*sphere.innerScale*(1+(ripple-0.5)*rippleAmt)*sw.radScale;
+    const r=radius*sphere.innerScale*CLASSIC.scale*(1+(ripple-0.5)*rippleAmt)*sw.radScale;
     const innerC=target.chaos*(wPurple*0.016+wYellow*0.022+wRed*0.012+wChaosInner*(wShards*0.028+0.022*(1-wShards)));
     const streakMul=wRed*0.85+wPurple*0.32+wYellow*0.55+wChaosInner*0.45;
     const streakWave=Math.sin(t*streakMul+innerPhase[i])*innerC;
@@ -2403,19 +2528,22 @@ function animate(){
         innerPrev[i3]=innerPrev[i3+1]=innerPrev[i3+2]=0;
       }else{
         const age=tNow-born;
-        if(age>=SPAWN_INNER_LIFE){
+        if(age>=CLASSIC.life){
           innerBirth[i]=-1;
           vis=0;
           innerArr[i3]=innerArr[i3+1]=innerArr[i3+2]=0;
           innerPrev[i3]=innerPrev[i3+1]=innerPrev[i3+2]=0;
         }else{
-          const p=Math.max(0,Math.min(1,age/(SPAWN_INNER_LIFE-SPAWN_INNER_FADE)));
+          const p=Math.max(0,Math.min(1,age/Math.max(0.1,CLASSIC.life-CLASSIC.fade)));
           const pe=smootherstep(p);
           const blend=smoothstep(pe);
           const aI=1-pe;
-          if(age>SPAWN_INNER_LIFE-SPAWN_INNER_FADE){
-            const f=Math.max(0,(SPAWN_INNER_LIFE-age)/SPAWN_INNER_FADE);
+          if(age>CLASSIC.life-CLASSIC.fade){
+            const f=Math.max(0,(CLASSIC.life-age)/CLASSIC.fade);
             vis=smootherstep(f);
+          }else if(age<CLASSIC.fade){
+            // appear as smoothly as we disappear (same curve, same duration)
+            vis=smootherstep(age/CLASSIC.fade);
           }
           const nx=ox/len, ny=oy/len, nz=oz/len;
           const pr=len*r*innerExpand*sw.radScale;
@@ -2426,7 +2554,7 @@ function animate(){
           const vx=ny*uz-nz*uy, vy=nz*ux-nx*uz, vz=nx*uy-ny*ux;
           const ang=(tNow*1.25+innerPhase[i]*8.6);
           const cs=Math.cos(ang), sn=Math.sin(ang);
-          const amp=pr*SPAWN_INNER_AMP*Math.pow(aI,1.75);
+          const amp=pr*CLASSIC.swirl*Math.pow(aI,1.75);
           const sx=nx*pr*pe+(ux*cs+vx*sn)*amp;
           const sy=ny*pr*pe+(uy*cs+vy*sn)*amp;
           const sz=nz*pr*pe+(uz*cs+vz*sn)*amp;
@@ -2481,7 +2609,7 @@ function animate(){
     trailCol[t3]=cr;
     trailCol[t3+1]=cg;
     trailCol[t3+2]=cb;
-    trailAge[idx]=TRAIL_LIFE;
+    trailAge[idx]=CLASSIC.trailLife;
     if(!trailAlive[idx]){
       trailAlive[idx]=1;
       trailActive[trailActiveN++]=idx;
@@ -2509,7 +2637,7 @@ function animate(){
     trailVel[t3]*=0.985;
     trailVel[t3+1]*=0.985;
     trailVel[t3+2]*=0.985;
-    const fade=Math.pow(age/TRAIL_LIFE,1.5);
+    const fade=Math.pow(Math.min(1,age/CLASSIC.trailLife),1.5);
     trailCol[t3]=trailBaseCol[t3]*fade;
     trailCol[t3+1]=trailBaseCol[t3+1]*fade;
     trailCol[t3+2]=trailBaseCol[t3+2]*fade;
