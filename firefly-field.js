@@ -1,0 +1,218 @@
+/**
+ * firefly-field.js — the full-scene firefly environment from the official
+ * emotion pages (official_anger / official_calm / official_sad / official
+ * warm.html), ported as an editor module.
+ *
+ * Faithful to the official shader: particles spawn across the whole space
+ * with staggered sqrt-distributed births (sparse start, quick fill, taper),
+ * wander in place on three sines, blink on their own pow(sin,3) rhythm, and
+ * render as additive core+aura sprites whose hot centres clip to white.
+ * Depth comes from perspective point-size attenuation plus per-particle
+ * "far" softening and brightness variance.
+ *
+ * All look parameters are live-tunable uniforms (no buffer rebuilds); count
+ * changes only adjust the geometry draw range within a fixed pool.
+ *
+ * Usage:
+ *   import { createFireflyField, FIREFLY_DEFAULTS } from './firefly-field.js';
+ *   const ff = createFireflyField(THREE, { color: 0xffc24a, dpr: renderer.getPixelRatio() });
+ *   scene.add(ff.points);
+ *   // per frame: ff.update(elapsedSeconds);
+ *   // live edits: ff.setParams({ intensity: 4 });  ff.setColor(0xff3b30);
+ */
+
+export const FIREFLY_DEFAULTS = {
+  count: 900, // visible fireflies (official page count; pool allows up to FIREFLY_POOL)
+  intensity: 3.0, // additive colour intensity — hot centres over-saturate to white
+  size: 1.0, // global point-size multiplier
+  blinkSpeed: 1.0, // twinkle rate multiplier
+  wander: 1.0, // in-place drift range multiplier
+  spawnSpan: 26.0, // seconds over which the field populates (official value)
+};
+
+export const FIREFLY_POOL = 2200;
+
+export function createFireflyField(THREE, opts = {}) {
+  const params = { ...FIREFLY_DEFAULTS };
+  for (const k of Object.keys(FIREFLY_DEFAULTS)) if (k in opts) params[k] = opts[k];
+
+  // Spawn volume from the official pages (world units; camera-facing box that
+  // fills the frame at our 60° camera). centerY 0 keeps it centred on the sphere.
+  const areaX = 22, areaY = 13, areaZ = 11;
+  // Average of three randoms biases spawns toward the centre of the frame.
+  const centerBias = () => (Math.random() + Math.random() + Math.random()) / 3 - 0.5;
+
+  const positions = new Float32Array(FIREFLY_POOL * 3);
+  const scales = new Float32Array(FIREFLY_POOL); // per-particle size
+  const phases = new Float32Array(FIREFLY_POOL); // blink/wander phase offset
+  const speeds = new Float32Array(FIREFLY_POOL); // blink rate
+  const rands = new Float32Array(FIREFLY_POOL); // birth-order random (sqrt-distributed in shader)
+  const ranges = new Float32Array(FIREFLY_POOL); // wander radius
+  const tempos = new Float32Array(FIREFLY_POOL); // wander speed
+  const glows = new Float32Array(FIREFLY_POOL); // aura strength (few strong, most weak)
+  const fars = new Float32Array(FIREFLY_POOL); // "distant" softening factor
+  const brights = new Float32Array(FIREFLY_POOL); // brightness variance for depth
+
+  for (let i = 0; i < FIREFLY_POOL; i++) {
+    const i3 = i * 3;
+    positions[i3] = centerBias() * areaX;
+    positions[i3 + 1] = centerBias() * areaY;
+    positions[i3 + 2] = -1.0 - Math.random() * areaZ;
+
+    scales[i] = (0.8 + Math.random() * 1.8) * 1.75;
+    phases[i] = Math.random() * Math.PI * 2.0;
+    speeds[i] = 0.5 + Math.random() * 1.5;
+    rands[i] = Math.random();
+    ranges[i] = 0.4 + Math.random() * 1.0;
+    tempos[i] = 0.12 + Math.random() * 0.22;
+    glows[i] = Math.pow(Math.random(), 3.0);
+    fars[i] = Math.pow(Math.random(), 2.0);
+    brights[i] = 0.35 + Math.pow(Math.random(), 1.6) * 1.85;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
+  geometry.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+  geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
+  geometry.setAttribute('aRand', new THREE.BufferAttribute(rands, 1));
+  geometry.setAttribute('aRange', new THREE.BufferAttribute(ranges, 1));
+  geometry.setAttribute('aTempo', new THREE.BufferAttribute(tempos, 1));
+  geometry.setAttribute('aGlow', new THREE.BufferAttribute(glows, 1));
+  geometry.setAttribute('aFar', new THREE.BufferAttribute(fars, 1));
+  geometry.setAttribute('aBright', new THREE.BufferAttribute(brights, 1));
+
+  const uniforms = {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color(opts.color != null ? opts.color : 0xffc24a) },
+    uIntensity: { value: params.intensity },
+    uSize: { value: params.size },
+    uBlinkSpeed: { value: params.blinkSpeed },
+    uWander: { value: params.wander },
+    uSpawnSpan: { value: params.spawnSpan },
+    uDpr: { value: opts.dpr != null ? opts.dpr : 1 },
+  };
+
+  const material = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: `
+      attribute float aScale;
+      attribute float aPhase;
+      attribute float aSpeed;
+      attribute float aRand;
+      attribute float aRange;
+      attribute float aTempo;
+      attribute float aGlow;
+      attribute float aFar;
+      attribute float aBright;
+      uniform float uTime;
+      uniform float uSize;
+      uniform float uBlinkSpeed;
+      uniform float uWander;
+      uniform float uSpawnSpan;
+      uniform float uDpr;
+      varying float vAlpha;
+      varying float vGlow;
+      varying float vBlink;
+      varying float vFar;
+      varying float vBright;
+
+      void main() {
+        vGlow = aGlow;
+        vFar = aFar;
+        vBright = aBright;
+        vec3 pos = position;
+
+        // staggered births: sqrt distribution starts sparse and fills quickly,
+        // each firefly fades in over its first second then stays lit
+        float birthT = uSpawnSpan * sqrt(aRand);
+        float age = uTime - birthT;
+        float born = step(0.0, age);
+        float fadeIn = smoothstep(0.0, 1.0, age);
+
+        // in-place wander on three offset sines
+        float t = uTime * aTempo + aPhase;
+        vec3 wander = vec3(
+          sin(t * 0.9),
+          sin(t * 1.1 + 1.7),
+          sin(t * 0.7 + 3.1)
+        );
+        pos += wander * aRange * uWander;
+
+        // firefly blink: dim most of the cycle with brief bright flashes
+        float pulse = 0.5 + 0.5 * sin(uTime * aSpeed * uBlinkSpeed + aPhase);
+        float blink = pow(pulse, 3.0);
+        float glow = 0.12 + 0.95 * blink;
+        vBlink = blink;
+
+        vAlpha = glow * fadeIn * born;
+
+        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+        gl_PointSize = aScale * 32.0 * uSize * uDpr * (1.0 + aGlow * 1.4) * (1.0 / -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uIntensity;
+      varying float vAlpha;
+      varying float vGlow;
+      varying float vBlink;
+      varying float vFar;
+      varying float vBright;
+
+      void main() {
+        vec2 uv = gl_PointCoord - 0.5;
+        float d = length(uv);
+
+        float core = smoothstep(0.5, 0.0, d);  // crisp centre
+        float aura = pow(core, 0.55);          // wide soft halo
+
+        // every firefly gets a faint aura, strong ones wider; the aura
+        // spreads slightly during a blink
+        float auraAmt = 0.35 + vGlow * 1.0 + vBlink * 0.3;
+
+        // distant fireflies lose their crisp centre and keep only soft aura
+        float coreAmt = mix(1.0, 0.25, vFar);
+        float shape = core * coreAmt + aura * (auraAmt + vFar * 0.5);
+        float alpha = vAlpha * shape * (1.0 - 0.6 * vFar) * vBright;
+
+        vec3 col = uColor * uIntensity * (1.0 + vGlow * 2.5) * vBright;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false; // spawn box exceeds default bounding sphere
+
+  function setParams(patch = {}) {
+    for (const [k, v] of Object.entries(patch)) {
+      if (k in params && typeof v === 'number') params[k] = v;
+    }
+    geometry.setDrawRange(0, Math.max(0, Math.min(FIREFLY_POOL, Math.round(params.count))));
+    uniforms.uIntensity.value = params.intensity;
+    uniforms.uSize.value = params.size;
+    uniforms.uBlinkSpeed.value = params.blinkSpeed;
+    uniforms.uWander.value = params.wander;
+    uniforms.uSpawnSpan.value = params.spawnSpan;
+  }
+  setParams({});
+
+  return {
+    points,
+    params,
+    setParams,
+    setColor(c) { uniforms.uColor.value.set(c); },
+    color() { return uniforms.uColor.value; },
+    setDpr(d) { uniforms.uDpr.value = d; },
+    update(t) { uniforms.uTime.value = t; },
+    dispose() {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}

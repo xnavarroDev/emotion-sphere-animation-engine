@@ -116,7 +116,7 @@ body::after {
   border-radius: 4px; padding: 8px; cursor: pointer; transition: all 0.2s;
 }
 #params-actions button:hover, #inner-layer-actions button:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
-#inner-layers-heading {
+#inner-layers-heading, #firefly-field-heading {
   font-size: 10px; letter-spacing: 3px; font-weight: 400;
   color: rgba(160,202,239,0.9); text-transform: uppercase;
   margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08);
@@ -262,6 +262,7 @@ body::after {
   <input type="color" id="glow-color" value="#ffffff" title="Glow colour">
   <input type="range" id="glow-opacity" min="0" max="1" step="0.01" value="1" title="Glow opacity">
   <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
+  <button class="vtoggle active" id="toggle-field" type="button" title="Show/hide the full-scene firefly field">Field</button>
 </div>
 <button id="params-toggle" type="button">Params</button>
 <aside id="params-panel" class="hidden">
@@ -277,6 +278,8 @@ body::after {
   <div id="inner-layer-actions"></div>
   <div id="inner-layer-tabs"></div>
   <div id="inner-layer-controls"></div>
+  <h3 id="firefly-field-heading">Firefly Field</h3>
+  <div id="firefly-field-controls"></div>
   <div id="anim-section">
     <div id="anim-heading"><span id="anim-chevron" style="transform:rotate(90deg)">▸</span> Animation</div>
     <div id="anim-body">
@@ -769,6 +772,12 @@ let innerLayers=[];
 let innerLayersReady=false;
 let innerSyncUI=null; // re-sync the panel when the emotion changes
 
+// ---- Full-scene firefly field (port of the official emotion pages) ----
+// Colours from official_anger / official_calm / official warm / official_sad.
+const FIREFLY_EMOTION_COLORS={ red:0xff3b30, purple:0xa070ff, yellow:0xffc24a, blue:0x5599ee };
+let fireflyField=null;
+let fireflyFieldSyncUI=null; // re-sync its sliders after animation lerps
+
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
 let glowUserColor='#ffffff';
 let glowUserOpacity=1.0;
@@ -838,6 +847,20 @@ function lerpLayersTo(snapA,snapB,frac){
     }
     setCoreParams(p);
   }
+  // lerp firefly field params between phases (count is just a draw range —
+  // no GPU rebuilds, so it can lerp per-frame freely)
+  const fA=snapA.fireflies, fB=snapB.fireflies;
+  if(fA&&fB&&fireflyField){
+    const p={};
+    for(const k of Object.keys(fA)){
+      if(typeof fA[k]==='number'&&typeof fB[k]==='number'){
+        const v=fA[k]+(fB[k]-fA[k])*frac;
+        p[k]=k==='count'?Math.round(v):v;
+      }
+    }
+    fireflyField.setParams(p);
+    if(fireflyFieldSyncUI) fireflyFieldSyncUI();
+  }
   // lerp glow opacity between phases
   const goA=snapA.glowOpacity, goB=snapB.glowOpacity;
   if(typeof goA==='number'&&typeof goB==='number'){
@@ -896,10 +919,24 @@ function updateInnerLayers(t,dt){
     L.field.draw(t);
     L.tex.needsUpdate=true;
   }
+  // Firefly field follows the active emotion with the official palette;
+  // in cycle mode it blends seg.a -> seg.b like the layers do.
+  if(fireflyField){
+    _ffTargetColor.setHex(FIREFLY_EMOTION_COLORS[cyc?segA:ae]??0xffc24a);
+    if(cyc){
+      _ffBlendColor.setHex(FIREFLY_EMOTION_COLORS[segB]??0xffc24a);
+      _ffTargetColor.lerp(_ffBlendColor,st);
+    }
+    fireflyField.color().lerp(_ffTargetColor,0.05);
+    fireflyField.update(t);
+  }
 }
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7')]).then(([fieldMod,ctrlMod])=>{
+const _ffTargetColor=new THREE.Color();
+const _ffBlendColor=new THREE.Color();
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=1')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
+  const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
 
   // Edge-only alpha mask: white in the centre, fades to black only in the
   // outermost 60px at each side. This prevents the canvas boundary from
@@ -934,6 +971,52 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7')]).the
     return { field, tex, sprite, overrides:{} };
   });
   innerLayersReady=true;
+
+  // Full-scene firefly environment: lives in the scene (not the drag-rotated
+  // group) so the world of light stays still while the sphere spins.
+  fireflyField=createFireflyField(THREE,{
+    color:FIREFLY_EMOTION_COLORS[activeEmotion]??0xffc24a,
+    dpr:renderer.getPixelRatio(),
+  });
+  scene.add(fireflyField.points);
+  document.getElementById('toggle-field')?.addEventListener('click',function(){
+    fireflyField.points.visible=this.classList.toggle('active');
+  });
+
+  // Firefly Field sliders (same row style as everything else in the panel)
+  const ffCtrlEl=document.getElementById('firefly-field-controls');
+  const FF_SLIDERS=[
+    ['count',0,FIREFLY_POOL,10],
+    ['intensity',0.2,6,0.05],
+    ['size',0.2,3,0.05],
+    ['blinkSpeed',0.1,3,0.05],
+    ['wander',0,3,0.05],
+    ['spawnSpan',0,40,0.5],
+  ];
+  const ffRows={};
+  for(const [key,min,max,step] of FF_SLIDERS){
+    const row=document.createElement('label'); row.className='row';
+    const span=document.createElement('span'); span.textContent=key;
+    const input=document.createElement('input');
+    input.type='range'; input.min=min; input.max=max; input.step=step;
+    const em=document.createElement('em');
+    row.append(span,input,em); ffCtrlEl.appendChild(row);
+    input.addEventListener('input',()=>{
+      const v=parseFloat(input.value);
+      em.textContent=v.toFixed(step<1?2:0);
+      fireflyField.setParams({ [key]:v });
+    });
+    ffRows[key]={input,em,step};
+  }
+  function ffSync(){
+    for(const [key,,,step] of FF_SLIDERS){
+      const { input,em }=ffRows[key];
+      input.value=fireflyField.params[key];
+      em.textContent=(+fireflyField.params[key]).toFixed(step<1?2:0);
+    }
+  }
+  fireflyFieldSyncUI=ffSync;
+  ffSync();
 
   // Params-panel UI: action row + "< Layer N >" stepper + the full Core-Particles slider set.
   const stepEl=document.getElementById('inner-layer-tabs');
@@ -1059,7 +1142,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7')]).the
     const coreSnap=sphereCore
       ? Object.fromEntries(Object.entries(sphereCore.field.params).filter(([,v])=>typeof v==='number'))
       : null;
-    animPhases.push({ duration:5.0, snapshot:{ layers:innerLayers.map(L=>({...L.field.params})), core:coreSnap, glowOpacity:glowUserOpacity } });
+    animPhases.push({ duration:5.0, snapshot:{ layers:innerLayers.map(L=>({...L.field.params})), core:coreSnap, glowOpacity:glowUserOpacity, fireflies:fireflyField?{...fireflyField.params}:null } });
     rebuildPhaseRows();
     flashLayer(capturePhaseBtn,'Added!');
     document.getElementById('anim-section')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -1092,7 +1175,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7')]).the
       const coreSnap=sphereCore
         ? Object.fromEntries(Object.entries(sphereCore.field.params).filter(([,v])=>typeof v==='number'))
         : null;
-      phase.snapshot={layers:innerLayers.map(L=>({...L.field.params})),core:coreSnap,glowOpacity:glowUserOpacity};
+      phase.snapshot={layers:innerLayers.map(L=>({...L.field.params})),core:coreSnap,glowOpacity:glowUserOpacity,fireflies:fireflyField?{...fireflyField.params}:null};
       dot.classList.add('set');
     });
     clearBtn.addEventListener('click',()=>{ phase.snapshot=null; dot.classList.remove('set'); });
@@ -1163,15 +1246,19 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7')]).the
   });
   document.getElementById('anim-zero-btn').addEventListener('click',()=>{
     for(const L of innerLayers) L.field.setParams({count:0});
+    fireflyField?.setParams({count:0});
     // also zero the outer sphere's count slider
     const coreCountInput=[...document.querySelectorAll('#params-controls .row')]
       .find(r=>r.querySelector('span')?.textContent==='count')?.querySelector('input');
     if(coreCountInput){ coreCountInput.value=0; coreCountInput.dispatchEvent(new Event('input')); }
     if(innerSyncUI) innerSyncUI();
+    if(fireflyFieldSyncUI) fireflyFieldSyncUI();
   });
   document.getElementById('anim-defaults-btn').addEventListener('click',()=>{
     innerLayers.forEach((L,i)=>{ L.field.setParams({...DEFAULTS,background:[0,0,0,0],glowOscAmp:0,breathAmp:0,breathSpeed:0,...INNER_LAYER_PRESETS[i]}); });
+    fireflyField?.setParams({...FIREFLY_DEFAULTS});
     if(innerSyncUI) innerSyncUI();
+    if(fireflyFieldSyncUI) fireflyFieldSyncUI();
   });
 
   // Collapse/expand toggle
@@ -1365,6 +1452,9 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   const innerSliderDefs=()=>[...document.querySelectorAll('#inner-layer-controls .row')]
     .map(row=>[row.querySelector('span')?.textContent.trim(), parseFloat(row.querySelector('input')?.step)||1])
     .filter(d=>d[0]&&d[0]!=='colour');
+  const ffSliderDefs=()=>[...document.querySelectorAll('#firefly-field-controls .row')]
+    .map(row=>[row.querySelector('span')?.textContent.trim(), parseFloat(row.querySelector('input')?.step)||1])
+    .filter(d=>d[0]);
 
   // Snapshot the WHOLE prototype as readable, re-loadable text: the core
   // sphere, every inner layer (params + per-emotion colour overrides as
@@ -1390,9 +1480,17 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         for(const [emo,c] of Object.entries(L.overrides)) lines.push('@'+emo+' '+rgbHex(c));
       });
     }
+    if(fireflyField){
+      lines.push('','Firefly Field');
+      for(const [key,step] of ffSliderDefs()){
+        const v=fireflyField.params[key];
+        if(typeof v==='number') lines.push(key+' '+fmt(v,step));
+      }
+    }
     lines.push('','View','emotion '+activeEmotion,
       'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
       'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
+      'field '+(document.getElementById('toggle-field')?.classList.contains('active')?1:0),
       'glowcolor '+glowUserColor,
       'glowopacity '+glowUserOpacity.toFixed(2));
     return lines.join('\n');
@@ -1418,6 +1516,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(/^core particles$/i.test(line)){ section='core'; continue; }
       let m=line.match(/^layer\s+(\d+)$/i);
       if(m){ section='layer'; li=parseInt(m[1],10)-1; continue; }
+      if(/^firefly field$/i.test(line)){ section='ffield'; continue; }
       if(/^(view|toggles)$/i.test(line)){ section='view'; continue; }
       m=line.match(/^@(\w+)\s+(#[0-9a-fA-F]{6})$/);
       if(m){ if(section==='layer'&&innerLayers[li]) innerLayers[li].overrides[m[1].toLowerCase()]=hexRgb(m[2]); continue; }
@@ -1433,13 +1532,17 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(inp){ inp.value=val; inp.dispatchEvent(new Event('input',{bubbles:true})); }
       }else if(section==='layer'){
         if(innerLayers[li]) innerLayers[li].field.setParams({ [key]: val });
+      }else if(section==='ffield'){
+        if(fireflyField) fireflyField.setParams({ [key]: val });
       }else if(section==='view'){
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
+        if(key==='field') setToggle('toggle-field',!!val,v=>{ if(fireflyField) fireflyField.points.visible=v; });
         if(key==='glowopacity'){ glowUserOpacity=val; const el=document.getElementById('glow-opacity'); if(el) el.value=val; cloudBg.setUserTint(null,val); }
       }
     }
     if(innerSyncUI) innerSyncUI();
+    if(fireflyFieldSyncUI) fireflyFieldSyncUI();
   }
 
   const flash=(btn,msg)=>{
