@@ -28,7 +28,7 @@ export const FIREFLY_DEFAULTS = {
   blinkSpeed: 1.0, // twinkle rate multiplier
   wander: 1.0, // in-place drift range multiplier
   spawnSpan: 26.0, // seconds over which the field populates (official value)
-  radius: 1.0, // sphere shape: cluster radius (live uniform, animatable)
+  radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
 };
 

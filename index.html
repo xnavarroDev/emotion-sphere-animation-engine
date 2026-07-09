@@ -239,6 +239,14 @@ body::after {
 #anim-progress-fill {
   height:100%; width:0%; background:#a0caef; border-radius:2px;
 }
+/* Circles-as-sphere branch: the firefly field is the only visual, so the
+   old core/layer particle-cloud controls and prototype switch are hidden
+   (still wired underneath, just not part of this editor). */
+#params-controls, #inner-layers-heading, #inner-layer-actions,
+#inner-layer-tabs, #inner-layer-controls, #reset-core-params, #proto-switch {
+  display: none;
+}
+#firefly-field-heading { margin-top: 0; padding-top: 0; border-top: none; }
 </style>
 </head>
 <body>
@@ -266,7 +274,7 @@ body::after {
 </div>
 <button id="params-toggle" type="button">Params</button>
 <aside id="params-panel" class="hidden">
-  <h2>Core Particles</h2>
+  <h2>Firefly Sphere</h2>
   <div id="params-actions">
     <button id="copy-params" type="button">Copy</button>
     <button id="save-params" type="button">Save</button>
@@ -977,13 +985,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // (whose sprites are hidden below).
   fireflyField=createFireflyField(THREE,{
     shape:'sphere',
-    radius:1.6,
     color:FIREFLY_EMOTION_COLORS[activeEmotion]??0xffc24a,
     dpr:renderer.getPixelRatio(),
   });
   group.add(fireflyField.points);
-  // Hide the old particle-cloud layers; the editor now drives the circles.
+  // The circles are the only sphere visual on this branch: hide the old
+  // particle-cloud layers and default the shell fireflies off (their toggle
+  // still works if someone wants them back).
   for(const L of innerLayers) L.sprite.visible=false;
+  shellPoints.visible=false;
+  document.getElementById('toggle-fireflies')?.classList.remove('active');
   document.getElementById('toggle-field')?.addEventListener('click',function(){
     fireflyField.points.visible=this.classList.toggle('active');
   });
@@ -1470,28 +1481,12 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   // sphere, every inner layer (params + per-emotion colour overrides as
   // "@emotion #hex"), the active emotion and the Glow/Fireflies toggles.
   function paramsToText(){
-    const lines=['Core Particles'];
-    document.querySelectorAll('#params-controls .row').forEach(row=>{
-      const key=row.querySelector('span')?.textContent.trim();
-      const input=row.querySelector('input');
-      if(!key||!input) return;
-      const step=parseFloat(input.step)||1;
-      const v=(sphereCore && key in sphereCore.field.params)?sphereCore.field.params[key]:parseFloat(input.value);
-      lines.push(key+' '+fmt(v,step));
-    });
-    if(innerLayersReady){
-      const defs=innerSliderDefs();
-      innerLayers.forEach((L,i)=>{
-        lines.push('','Layer '+(i+1));
-        for(const [key,step] of defs){
-          const v=L.field.params[key];
-          if(typeof v==='number') lines.push(key+' '+fmt(v,step));
-        }
-        for(const [emo,c] of Object.entries(L.overrides)) lines.push('@'+emo+' '+rgbHex(c));
-      });
-    }
+    // Circles-as-sphere branch: the firefly field is the whole editor, so
+    // snapshots carry only its params + the view state. applyParamsText
+    // still tolerates old full-prototype snapshots.
+    const lines=[];
     if(fireflyField){
-      lines.push('','Firefly Field');
+      lines.push('Firefly Field');
       for(const [key,step] of ffSliderDefs()){
         const v=fireflyField.params[key];
         if(typeof v==='number') lines.push(key+' '+fmt(v,step));
