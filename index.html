@@ -986,7 +986,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=2')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=3')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;

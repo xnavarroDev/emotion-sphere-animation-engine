@@ -94,6 +94,8 @@ export function createFireflyField(THREE, opts = {}) {
     fars[i] = Math.pow(Math.random(), 2.0);
     brights[i] = 0.35 + Math.pow(Math.random(), 1.6) * 1.85;
   }
+  const indices = new Float32Array(FIREFLY_POOL);
+  for (let i = 0; i < FIREFLY_POOL; i++) indices[i] = i;
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -106,6 +108,7 @@ export function createFireflyField(THREE, opts = {}) {
   geometry.setAttribute('aGlow', new THREE.BufferAttribute(glows, 1));
   geometry.setAttribute('aFar', new THREE.BufferAttribute(fars, 1));
   geometry.setAttribute('aBright', new THREE.BufferAttribute(brights, 1));
+  geometry.setAttribute('aIndex', new THREE.BufferAttribute(indices, 1));
 
   const uniforms = {
     uTime: { value: 0 },
@@ -117,6 +120,8 @@ export function createFireflyField(THREE, opts = {}) {
     uSpawnSpan: { value: params.spawnSpan },
     uRadius: { value: params.radius },
     uDpr: { value: opts.dpr != null ? opts.dpr : 1 },
+    uCount: { value: params.count }, // eased "soft count" — trails the target
+    uCountFade: { value: 8 }, // width (in particles) of the soft edge
   };
 
   const material = new THREE.ShaderMaterial({
@@ -131,6 +136,7 @@ export function createFireflyField(THREE, opts = {}) {
       attribute float aGlow;
       attribute float aFar;
       attribute float aBright;
+      attribute float aIndex;
       uniform float uTime;
       uniform float uSize;
       uniform float uBlinkSpeed;
@@ -138,6 +144,8 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uSpawnSpan;
       uniform float uRadius;
       uniform float uDpr;
+      uniform float uCount;
+      uniform float uCountFade;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
@@ -172,7 +180,13 @@ export function createFireflyField(THREE, opts = {}) {
         float glow = 0.12 + 0.95 * blink;
         vBlink = blink;
 
-        vAlpha = glow * fadeIn * born;
+        // soft count edge: as the eased count sweeps past this particle's
+        // index it fades with the same smoothstep as a birth, so animated
+        // count changes appear/disappear as gently as the field filling in
+        float countIn = clamp((uCount - aIndex) / max(uCountFade, 0.001), 0.0, 1.0);
+        countIn = countIn * countIn * (3.0 - 2.0 * countIn);
+
+        vAlpha = glow * fadeIn * born * countIn;
 
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
         gl_PointSize = aScale * 32.0 * uSize * uDpr * (1.0 + aGlow * 1.4) * (1.0 / -mvPosition.z);
@@ -221,7 +235,7 @@ export function createFireflyField(THREE, opts = {}) {
     for (const [k, v] of Object.entries(patch)) {
       if (k in params && typeof v === 'number') params[k] = v;
     }
-    geometry.setDrawRange(0, Math.max(0, Math.min(FIREFLY_POOL, Math.round(params.count))));
+    params.count = Math.max(0, Math.min(FIREFLY_POOL, params.count));
     uniforms.uIntensity.value = params.intensity;
     uniforms.uSize.value = params.size;
     uniforms.uBlinkSpeed.value = params.blinkSpeed;
@@ -244,7 +258,21 @@ export function createFireflyField(THREE, opts = {}) {
     setColor(c) { uniforms.uColor.value.set(c); },
     color() { return uniforms.uColor.value; },
     setDpr(d) { uniforms.uDpr.value = d; },
-    update(t) { uniforms.uTime.value = t; },
+    update(t) {
+      const dt = Math.min(Math.max(t - (this._lastT ?? t), 0), 0.1);
+      this._lastT = t;
+      // ease the visible count toward the target; the fade band is sized so
+      // each circle crosses the soft edge in ~1s (the birth fade duration)
+      const target = params.count;
+      const prev = uniforms.uCount.value;
+      const next = prev + (target - prev) * Math.min(1, dt * 4);
+      const rate = dt > 0 ? Math.abs(next - prev) / dt : 0;
+      uniforms.uCount.value = next;
+      uniforms.uCountFade.value = Math.max(6, rate * 1.0);
+      geometry.setDrawRange(0, Math.ceil(Math.min(FIREFLY_POOL,
+        Math.max(next, target) + uniforms.uCountFade.value + 1)));
+      uniforms.uTime.value = t;
+    },
     dispose() {
       geometry.dispose();
       material.dispose();
