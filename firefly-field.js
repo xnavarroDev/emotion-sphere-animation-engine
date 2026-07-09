@@ -22,7 +22,7 @@
  */
 
 export const FIREFLY_DEFAULTS = {
-  count: 900, // visible fireflies (official page count; pool allows up to FIREFLY_POOL)
+  count: 120, // visible circles — sparse by default; the slider sets the on-screen maximum
   intensity: 3.0, // additive colour intensity — hot centres over-saturate to white
   size: 1.0, // global point-size multiplier
   blinkSpeed: 1.0, // twinkle rate multiplier
