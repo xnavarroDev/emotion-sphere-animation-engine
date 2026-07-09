@@ -287,7 +287,6 @@ body::after {
   <input type="color" id="glow-color" value="#ffffff" title="Glow colour">
   <input type="range" id="glow-opacity" min="0" max="1" step="0.01" value="1" title="Glow opacity">
   <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
-  <button class="vtoggle active" id="toggle-field" type="button" title="Show/hide the full-scene firefly field">Field</button>
 </div>
 <button id="params-toggle" type="button">Params</button>
 <aside id="params-panel" class="hidden">
@@ -1040,9 +1039,6 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   for(const L of innerLayers) L.sprite.visible=false;
   shellPoints.visible=false;
   document.getElementById('toggle-fireflies')?.classList.remove('active');
-  document.getElementById('toggle-field')?.addEventListener('click',function(){
-    fireflyField.points.visible=this.classList.toggle('active');
-  });
 
   // Firefly Field sliders (same row style as everything else in the panel)
   const ffCtrlEl=document.getElementById('firefly-field-controls');
@@ -1126,7 +1122,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const ff=mode==='fireflies';
     document.getElementById('mode-circles')?.classList.toggle('active',!ff);
     document.getElementById('mode-fireflies')?.classList.toggle('active',ff);
-    if(fireflyField) fireflyField.points.visible=!ff&&(document.getElementById('toggle-field')?.classList.contains('active')??true);
+    if(fireflyField) fireflyField.points.visible=!ff;
     for(const o of [innerHalo3Pts,innerHalo2Pts,innerGlowPts,innerMatPts,trailPoints]) o.visible=ff;
     shellPoints.visible=ff;
     document.getElementById('toggle-fireflies')?.classList.toggle('active',ff);
@@ -1613,7 +1609,6 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       'mode '+sphereMode,
       'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
       'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
-      'field '+(document.getElementById('toggle-field')?.classList.contains('active')?1:0),
       'glowcolor '+glowUserColor,
       'glowopacity '+glowUserOpacity.toFixed(2));
     return lines.join('\n');
@@ -1665,7 +1660,6 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       }else if(section==='view'){
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
-        if(key==='field') setToggle('toggle-field',!!val,v=>{ if(fireflyField) fireflyField.points.visible=v; });
         if(key==='glowopacity'){ glowUserOpacity=val; const el=document.getElementById('glow-opacity'); if(el) el.value=val; cloudBg.setUserTint(null,val); }
       }
     }
