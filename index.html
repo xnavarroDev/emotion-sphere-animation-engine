@@ -1358,8 +1358,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     else animStop();
   });
   document.getElementById('anim-reset-btn').addEventListener('click',()=>{
-    animTime=0; animStop();
+    animTime=0;
+    const wasPlaying=animPlaying;
+    animStop();
     if(animFill) animFill.style.width='0%';
+    // snap the visuals back to the Starting Phase so Reset really returns
+    // to the beginning; if it was playing, restart playback from there
+    const seq=animPhases.filter(p=>p.snapshot);
+    if(seq.length) lerpLayersTo(seq[0].snapshot,seq[0].snapshot,0);
+    if(wasPlaying){ animPlaying=true; animPlayBtn?.classList.add('active'); }
   });
   document.getElementById('anim-zero-btn').addEventListener('click',()=>{
     for(const L of innerLayers) L.field.setParams({count:0});
