@@ -1131,11 +1131,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const F=fireflyLayers[ffActive];
     const ov=F.overrides[activeEmotion];
     ffTitle.textContent='Layer '+(ffActive+1)+' / '+fireflyLayers.length;
-    ffColorInput.value=ov||ffRgbHex(F.color());
+    if(document.activeElement!==ffColorInput) ffColorInput.value=ov||ffRgbHex(F.color());
     ffColorReset.classList.toggle('on',!ov); // lit = following this emotion
     for(const [key,,,step] of FF_SLIDERS){
       const { input,em }=ffRows[key];
-      input.value=F.params[key];
+      // never fight a slider the user is holding (animation lerps re-sync
+      // the panel every frame while playing)
+      if(document.activeElement!==input) input.value=F.params[key];
       em.textContent=(+F.params[key]).toFixed(step<1?2:0);
     }
   }
@@ -1176,8 +1178,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   classicSyncUI=function(){
     for(const key of Object.keys(classicRows)){
-      classicRows[key].input.value=CLASSIC[key];
-      classicRows[key].em.textContent=(+CLASSIC[key]).toFixed(2);
+      const { input,em }=classicRows[key];
+      if(document.activeElement!==input) input.value=CLASSIC[key];
+      em.textContent=(+CLASSIC[key]).toFixed(2);
     }
   };
 
