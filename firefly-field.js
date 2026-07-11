@@ -28,6 +28,7 @@ export const FIREFLY_DEFAULTS = {
   blinkSpeed: 1.0, // twinkle rate multiplier
   wander: 1.0, // in-place drift range multiplier
   spawnSpan: 26.0, // seconds over which the field populates (official value)
+  hot: 1.0, // 0 = colour-true circles (hue never clips to white), 1 = official white-hot centres
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
 };
@@ -122,6 +123,7 @@ export function createFireflyField(THREE, opts = {}) {
     uDpr: { value: opts.dpr != null ? opts.dpr : 1 },
     uCount: { value: params.count }, // eased "soft count" — trails the target
     uCountFade: { value: 8 }, // width (in particles) of the soft edge
+    uHot: { value: params.hot },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -196,6 +198,7 @@ export function createFireflyField(THREE, opts = {}) {
     fragmentShader: `
       uniform vec3 uColor;
       uniform float uIntensity;
+      uniform float uHot;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
@@ -218,7 +221,10 @@ export function createFireflyField(THREE, opts = {}) {
         float shape = core * coreAmt + aura * (auraAmt + vFar * 0.5);
         float alpha = vAlpha * shape * (1.0 - 0.6 * vFar) * vBright;
 
-        vec3 col = uColor * uIntensity * (1.0 + vGlow * 2.5) * vBright;
+        // uHot blends between colour-true circles (brightness variance only
+        // in alpha, hue stays at uColor) and the official over-saturated
+        // white-hot centres (channels clip toward white).
+        vec3 col = uColor * mix(min(uIntensity, 1.0), uIntensity * (1.0 + vGlow * 2.5) * vBright, uHot);
         gl_FragColor = vec4(col, alpha);
       }
     `,
@@ -242,6 +248,7 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uWander.value = params.wander;
     uniforms.uSpawnSpan.value = params.spawnSpan;
     uniforms.uRadius.value = params.radius;
+    uniforms.uHot.value = params.hot;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {

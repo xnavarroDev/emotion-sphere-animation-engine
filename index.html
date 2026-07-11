@@ -822,14 +822,20 @@ const FIREFLY_EMOTION_COLORS={ red:0xff3b30, purple:0xa070ff, yellow:0xffc24a, b
 let fireflyLayers=[];
 let fireflyFieldSyncUI=null; // re-sync the active layer's sliders after animation lerps
 const FIREFLY_LAYER_PRESETS=[
-  { count:120, intensity:3.0, size:1.0 },                                  // main body — follows the emotion colour
-  { count:40, intensity:4.5, size:1.5, blinkSpeed:1.4, radius:1.3 },       // hot accents — white by default
-  { count:220, intensity:1.6, size:0.45, radius:1.9, wander:1.4 },         // fine dust — follows the emotion colour
+  { count:120, intensity:3.0, size:1.0, hot:0.25 },                        // main body — colour-true emotion circles
+  { count:40, intensity:4.5, size:1.5, blinkSpeed:1.4, radius:1.3, hot:1 },// hot accents — white by default
+  { count:220, intensity:1.6, size:0.45, radius:1.9, wander:1.4, hot:0.15 }, // in-between tint dust
 ];
+// Layer 2 defaults to white; layer 3 defaults to the "in between" tint —
+// each emotion's official colour pulled 45% toward white — so out of the box
+// the three layers ARE the white / emotion / in-between bands, separately
+// controllable (and each still overridable per emotion from the picker).
 const FIREFLY_LAYER_OVERRIDES=[
   {},
   { red:'#ffffff', purple:'#ffffff', yellow:'#fff6e0', blue:'#ffffff' },
-  {},
+  (()=>{ const o={}, c=new THREE.Color(), w=new THREE.Color(0xffffff);
+    for(const [k,v] of Object.entries(FIREFLY_EMOTION_COLORS)){ c.set(v).lerp(w,0.45); o[k]='#'+c.getHexString(); }
+    return o; })(),
 ];
 // Sphere visual mode: 'circles' (official firefly circles) or 'fireflies'
 // (classic one-by-one emitter with trails, driven by the CLASSIC params).
@@ -1007,7 +1013,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=3')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=4')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1100,6 +1106,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['radius',0.2,4,0.05],
     ['coreBias',0.3,3,0.05],
     ['intensity',0.2,6,0.05],
+    ['hot',0,1,0.02],
     ['size',0.2,3,0.05],
     ['blinkSpeed',0.1,3,0.05],
     ['wander',0,3,0.05],
@@ -1149,7 +1156,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['dotSize',0.2,3,0.05],
     ['shellSize',0.2,3,0.05],
     ['glowSize',0.2,3,0.05],
-    ['trailLife',0.2,4,0.05],
+    ['trailLife',0,4,0.05],
   ];
   const classicRows={};
   for(const [key,min,max,step] of CLASSIC_SLIDERS){
@@ -2668,6 +2675,10 @@ function animate(){
     const dx=px-ox, dy=py-oy, dz=pz-oz;
     const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
     if(dist<TRAIL_EMIT_STEP) continue;
+    if(CLASSIC.trailLife<0.05){ // trails off: keep prev in sync, emit nothing
+      innerPrev[i3]=px; innerPrev[i3+1]=py; innerPrev[i3+2]=pz;
+      continue;
+    }
     const idx=trailHead++%TRAIL_POOL;
     const t3=idx*3;
     const jit=0.042;
