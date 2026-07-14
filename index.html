@@ -1411,7 +1411,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     else{ const F=fireflyLayers[trackActive]; F.anim=F.anim===false; }
     trackSync();
   });
-  animLayerSyncHook=()=>{ trackSync(); rebuildPhaseRows(); }; // layers added/removed
+  // Layers added/removed/split: refresh the selector, and only rebuild the
+  // phase rows when the layer count actually changed (this hook also fires
+  // from the per-frame slider sync during playback — rebuilding the DOM
+  // every frame would make the duration inputs uneditable).
+  let _lastTrackCount=fireflyLayers.length;
+  animLayerSyncHook=()=>{
+    trackSync();
+    if(_lastTrackCount!==fireflyLayers.length){
+      _lastTrackCount=fireflyLayers.length;
+      rebuildPhaseRows();
+    }
+  };
 
   // Capture the active track's current state into one phase snapshot
   function captureTrackSnapshot(){
