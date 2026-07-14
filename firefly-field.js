@@ -124,6 +124,7 @@ export function createFireflyField(THREE, opts = {}) {
     uCount: { value: params.count }, // eased "soft count" — trails the target
     uCountFade: { value: 8 }, // width (in particles) of the soft edge
     uHot: { value: params.hot },
+    uSpawnStart: { value: 0 }, // birth clock origin — respawn() resets it to "now"
   };
 
   const material = new THREE.ShaderMaterial({
@@ -144,6 +145,7 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uBlinkSpeed;
       uniform float uWander;
       uniform float uSpawnSpan;
+      uniform float uSpawnStart;
       uniform float uRadius;
       uniform float uDpr;
       uniform float uCount;
@@ -163,7 +165,7 @@ export function createFireflyField(THREE, opts = {}) {
         // staggered births: sqrt distribution starts sparse and fills quickly,
         // each firefly fades in over its first second then stays lit
         float birthT = uSpawnSpan * sqrt(aRand);
-        float age = uTime - birthT;
+        float age = (uTime - uSpawnStart) - birthT;
         float born = step(0.0, age);
         float fadeIn = smoothstep(0.0, 1.0, age);
 
@@ -265,6 +267,9 @@ export function createFireflyField(THREE, opts = {}) {
     setColor(c) { uniforms.uColor.value.set(c); },
     color() { return uniforms.uColor.value; },
     setDpr(d) { uniforms.uDpr.value = d; },
+    // Restart the staggered spawn-in from "now" — the same fill-in the field
+    // plays on load. Used by the animation engine when playback starts over.
+    respawn() { uniforms.uSpawnStart.value = uniforms.uTime.value; },
     update(t) {
       const dt = Math.min(Math.max(t - (this._lastT ?? t), 0), 0.1);
       this._lastT = t;

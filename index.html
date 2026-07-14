@@ -1015,7 +1015,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=4')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=5')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1096,13 +1096,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const ffCtrlEl=document.getElementById('firefly-field-controls');
   const ffTabsEl=document.getElementById('firefly-layer-tabs');
   let ffActive=0;
+  let animLayerSyncHook=null; // set by the Animation section's layer selector
   const ffPrev=document.createElement('button'); ffPrev.type='button'; ffPrev.className='ilayer-arrow'; ffPrev.textContent='\u2039';
   const ffTitle=document.createElement('span'); ffTitle.className='ilayer-title';
   const ffNext=document.createElement('button'); ffNext.type='button'; ffNext.className='ilayer-arrow'; ffNext.textContent='\u203a';
-  const ffAnimBtn=document.createElement('button'); ffAnimBtn.type='button';
-  ffAnimBtn.className='ilayer-reset'; ffAnimBtn.style.padding='3px 7px';
-  ffAnimBtn.textContent='Anim'; ffAnimBtn.title='Include this layer in animation playback';
-  ffTabsEl.append(ffPrev,ffTitle,ffNext,ffAnimBtn);
+  ffTabsEl.append(ffPrev,ffTitle,ffNext);
   const ffLayerActions=document.createElement('div');
   ffLayerActions.style.cssText='display:flex;gap:8px;margin-bottom:14px;';
   const mkLayerBtn=(label,title)=>{
@@ -1114,11 +1112,6 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const ffSplitBtn=mkLayerBtn('Split','Split this layer into two halves (params and colours copied)');
   const ffRemoveBtn=mkLayerBtn('\u00d7 Remove','Delete this layer');
   ffTabsEl.after(ffLayerActions);
-  ffAnimBtn.addEventListener('click',()=>{
-    const F=fireflyLayers[ffActive];
-    F.anim=F.anim===false; // toggle
-    ffSync();
-  });
   ffAddBtn.addEventListener('click',()=>{
     const F=addFireflyLayerFn&&addFireflyLayerFn();
     if(!F) return;
@@ -1192,7 +1185,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const F=fireflyLayers[ffActive];
     const ov=F.overrides[activeEmotion];
     ffTitle.textContent='Layer '+(ffActive+1)+' / '+fireflyLayers.length;
-    ffAnimBtn.classList.toggle('on',fireflyLayers[ffActive].anim!==false);
+    if(animLayerSyncHook) animLayerSyncHook();
     if(document.activeElement!==ffColorInput) ffColorInput.value=ov||ffRgbHex(F.color());
     ffColorReset.classList.toggle('on',!ov); // lit = following this emotion
     for(const [key,,,step] of FF_SLIDERS){
@@ -1456,6 +1449,38 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   rebuildPhaseRows();
 
+  // Which layers the animation drives: compact "< Layer N >" selector with an
+  // on/off toggle (lit = playback lerps this layer, off = it holds its values).
+  const alWrap=document.createElement('div');
+  alWrap.style.cssText='display:flex;gap:8px;align-items:center;margin-top:12px;';
+  const alLabel=document.createElement('span'); alLabel.className='anim-dur-s'; alLabel.textContent='animate';
+  const alPrev=document.createElement('button'); alPrev.type='button'; alPrev.className='ilayer-arrow'; alPrev.textContent='\u2039';
+  const alTitle=document.createElement('span'); alTitle.className='ilayer-title';
+  const alNext=document.createElement('button'); alNext.type='button'; alNext.className='ilayer-arrow'; alNext.textContent='\u203a';
+  const alToggle=document.createElement('button'); alToggle.type='button';
+  alToggle.className='ilayer-reset'; alToggle.style.padding='3px 8px';
+  alToggle.title='Whether animation playback drives this layer';
+  alWrap.append(alLabel,alPrev,alTitle,alNext,alToggle);
+  animPhasesEl.after(alWrap);
+  let alActive=0;
+  function animLayerSync(){
+    if(!fireflyLayers.length) return;
+    alActive=Math.min(alActive,fireflyLayers.length-1);
+    const on=fireflyLayers[alActive].anim!==false;
+    alTitle.textContent='Layer '+(alActive+1)+' / '+fireflyLayers.length;
+    alToggle.textContent=on?'On':'Off';
+    alToggle.classList.toggle('on',on);
+  }
+  alPrev.addEventListener('click',()=>{ alActive=(alActive-1+fireflyLayers.length)%fireflyLayers.length; animLayerSync(); });
+  alNext.addEventListener('click',()=>{ alActive=(alActive+1)%fireflyLayers.length; animLayerSync(); });
+  alToggle.addEventListener('click',()=>{
+    const F=fireflyLayers[alActive];
+    F.anim=F.anim===false;
+    animLayerSync();
+  });
+  animLayerSyncHook=animLayerSync;
+  animLayerSync();
+
   animStop=function(){
     animPlaying=false;
     if(animPlayBtn) animPlayBtn.classList.remove('active');
@@ -1486,6 +1511,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
           }
         }
       }
+      // starting from the top: replay the staggered spawn-in, exactly like
+      // the field's first appearance on load
+      if(animTime===0) fireflyLayers.forEach(F=>F.respawn&&F.respawn());
       animPlaying=true; animPlayBtn.classList.add('active');
     }
     else animStop();
@@ -1499,7 +1527,10 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // to the beginning; if it was playing, restart playback from there
     const seq=animPhases.filter(p=>p.snapshot);
     if(seq.length) lerpLayersTo(seq[0].snapshot,seq[0].snapshot,0);
-    if(wasPlaying){ animPlaying=true; animPlayBtn?.classList.add('active'); }
+    if(wasPlaying){
+      fireflyLayers.forEach(F=>F.respawn&&F.respawn());
+      animPlaying=true; animPlayBtn?.classList.add('active');
+    }
   });
   document.getElementById('anim-zero-btn').addEventListener('click',()=>{
     for(const L of innerLayers) L.field.setParams({count:0});
