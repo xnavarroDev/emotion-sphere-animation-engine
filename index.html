@@ -1030,12 +1030,12 @@ function updateInnerLayers(t,dt){
     }
     F.color().lerp(_ffTargetColor,0.05);
     F.update(t);
-    if(F.params.spin&&F.spinAxis) F.points.rotateOnAxis(F.spinAxis,F.params.spin*(dt||0));
+    if(F.params.spin&&F.spinAxis) F.points.rotateOnAxis(F.spinAxis,F.params.spin*F.params.speed*(dt||0));
   }
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=11')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=12')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1202,6 +1202,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['spawnSpan',0,40,0.5],
     ['orbit',0,2,0.02],
     ['spin',-0.4,0.4,0.01],
+    ['speed',0.05,2,0.02],
   ];
   const ffRows={};
   for(const [key,min,max,step] of FF_SLIDERS){

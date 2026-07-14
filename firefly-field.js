@@ -32,7 +32,10 @@ export const FIREFLY_DEFAULTS = {
   hot: 1.0, // 0 = colour-true circles (hue never clips to white), 1 = official white-hot centres
   orbit: 0.0, // per-particle independent tumble: each circle roams its OWN random
               // axis, speed and direction (0 = off). This is what makes particles
-              // within a layer diverge from each other, unlike the whole-layer `spin`.
+              // within a layer diverge from each other, unlike the whole-layer spin.
+  speed: 1.0, // global motion-rate multiplier: scales wander, orbit and blink together
+              // (below 1 = slower, above 1 = faster). Does NOT affect spawnSpan/birth
+              // pacing, so slowing motion doesn't also slow how fast the field fills in.
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
   spin: 0.0, // rad/s rigid rotation of this layer as a whole, about its own axis
@@ -138,6 +141,7 @@ export function createFireflyField(THREE, opts = {}) {
     uSpawnStart: { value: 0 }, // birth clock origin — respawn() resets it to "now"
     uSpawnWindow: { value: 0 }, // >0 overrides uSpawnSpan (used to fit the fill inside a loop)
     uOrbit: { value: params.orbit },
+    uSpeed: { value: params.speed },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -166,6 +170,7 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uCount;
       uniform float uCountFade;
       uniform float uOrbit;
+      uniform float uSpeed;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
@@ -192,6 +197,10 @@ export function createFireflyField(THREE, opts = {}) {
         vBright = aBright;
         vec3 pos = position * uRadius;
 
+        // uSpeed scales motion (wander, orbit, blink) without touching birth/
+        // count-reveal timing below, which stays on the real clock
+        float mt = uTime * uSpeed;
+
         // per-particle independent orbit: each circle tumbles about its OWN
         // random axis, at its own random speed and direction (unlike spin,
         // which turns the whole layer together) — this is the source of
@@ -203,7 +212,7 @@ export function createFireflyField(THREE, opts = {}) {
           vec3 orbitAxis = normalize(vec3(hx, hy, hz) * 2.0 - 1.0 + 1e-4);
           float dirSign = hash11(aRand * 9.17 + 2.0) > 0.5 ? 1.0 : -1.0;
           float orbitSpeed = (0.4 + hash11(aRand * 5.53 + 0.6) * 1.2) * dirSign;
-          pos = rotateAxis(pos, orbitAxis, uTime * uOrbit * orbitSpeed);
+          pos = rotateAxis(pos, orbitAxis, mt * uOrbit * orbitSpeed);
         }
 
         // staggered births: sqrt distribution starts sparse and fills quickly,
@@ -215,7 +224,7 @@ export function createFireflyField(THREE, opts = {}) {
         float fadeIn = smoothstep(0.0, 1.0, age);
 
         // in-place wander on three offset sines
-        float t = uTime * aTempo + aPhase;
+        float t = mt * aTempo + aPhase;
         vec3 wander = vec3(
           sin(t * 0.9),
           sin(t * 1.1 + 1.7),
@@ -224,7 +233,7 @@ export function createFireflyField(THREE, opts = {}) {
         pos += wander * aRange * uWander;
 
         // firefly blink: dim most of the cycle with brief bright flashes
-        float pulse = 0.5 + 0.5 * sin(uTime * aSpeed * uBlinkSpeed + aPhase);
+        float pulse = 0.5 + 0.5 * sin(mt * aSpeed * uBlinkSpeed + aPhase);
         float blink = pow(pulse, 3.0);
         // blinkDepth blends between a steady glow and the official full swing
         // (12% .. 100% brightness) so dense fields need not strobe
@@ -303,6 +312,7 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uRadius.value = params.radius;
     uniforms.uHot.value = params.hot;
     uniforms.uOrbit.value = params.orbit;
+    uniforms.uSpeed.value = params.speed;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {
