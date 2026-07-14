@@ -858,6 +858,7 @@ const ANIM_N=5;
 const makeTimeline=()=>Array.from({length:ANIM_N},()=>({duration:5.0,snapshot:null}));
 const sceneTimeline=makeTimeline();
 let sceneAnim=true;
+let animTimelineSyncHook=null; // set by the anim UI; called after Load rewrites timelines
 let animPlaying=false;
 let animTime=0;
 let animLoop=true;
@@ -1481,6 +1482,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   trackSync();
   rebuildPhaseRows();
+  animTimelineSyncHook=()=>{ trackSync(); rebuildPhaseRows(); };
   // used by the hidden "+ Phase" shortcut in the layer editor
   addPhaseToActiveTrack=function(){
     activeTimeline().push({duration:5.0,snapshot:captureTrackSnapshot()});
@@ -1787,8 +1789,29 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       const v=CLASSIC[key];
       if(typeof v==='number') lines.push(key+' '+fmt(v,step));
     }
+    fireflyLayers.forEach((F,i)=>{
+      lines.push('','Anim Layer '+(i+1),'animate '+(F.anim===false?0:1));
+      F.timeline.forEach((ph,pi)=>{
+        lines.push('Phase '+(pi+1)+' @ '+(+ph.duration).toFixed(2));
+        if(ph.snapshot&&ph.snapshot.params){
+          for(const [k,v] of Object.entries(ph.snapshot.params))
+            if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
+        }
+      });
+    });
+    lines.push('','Anim Scene','animate '+(sceneAnim===false?0:1));
+    sceneTimeline.forEach((ph,pi)=>{
+      lines.push('Phase '+(pi+1)+' @ '+(+ph.duration).toFixed(2));
+      if(ph.snapshot){
+        if(ph.snapshot.classic)
+          for(const [k,v] of Object.entries(ph.snapshot.classic))
+            if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
+        if(typeof ph.snapshot.glowOpacity==='number') lines.push('glowopacity '+ph.snapshot.glowOpacity.toFixed(2));
+      }
+    });
     lines.push('','View','emotion '+activeEmotion,
       'mode '+sphereMode,
+      'loop '+(animLoop?1:0),
       'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
       'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
       'glowcolor '+glowUserColor,
@@ -1810,6 +1833,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     if(/^layer\s+\d+/im.test(text) && innerLayersReady) innerLayers.forEach(L=>L.overrides={});
     if(/^firefly layer\s+\d+/im.test(text)) fireflyLayers.forEach(F=>F.overrides={});
     let fli=0;
+    let ani=-1, aphase=null;
     let section=null, li=-1;
     const setToggle=(id,on,apply)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('active',on); apply(on); };
     for(const raw of text.split(/\r?\n/)){
@@ -1823,6 +1847,21 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(m){
         section='ffield'; fli=parseInt(m[1],10)-1;
         while(fli>=fireflyLayers.length&&addFireflyLayerFn&&addFireflyLayerFn());
+        continue;
+      }
+      m=line.match(/^anim layer\s+(\d+)$/i);
+      if(m){
+        section='anim'; ani=parseInt(m[1],10)-1; aphase=null;
+        while(ani>=fireflyLayers.length&&addFireflyLayerFn&&addFireflyLayerFn());
+        if(fireflyLayers[ani]) fireflyLayers[ani].timeline.length=0;
+        continue;
+      }
+      if(/^anim scene$/i.test(line)){ section='anim'; ani=-2; aphase=null; sceneTimeline.length=0; continue; }
+      m=line.match(/^phase\s+\d+\s*@\s*(-?[\d.]+)$/i);
+      if(m&&section==='anim'){
+        aphase={duration:Math.max(0.1,parseFloat(m[1])||5),snapshot:null};
+        const tl=ani===-2?sceneTimeline:fireflyLayers[ani]?.timeline;
+        if(tl) tl.push(aphase);
         continue;
       }
       if(/^classic$/i.test(line)){ section='classic'; continue; }
@@ -1851,7 +1890,22 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(fireflyLayers[fli]) fireflyLayers[fli].setParams({ [key]: val });
       }else if(section==='classic'){
         if(key in CLASSIC) CLASSIC[key]=val;
+      }else if(section==='anim'){
+        if(key==='animate'){
+          if(ani===-2) sceneAnim=!!val;
+          else if(fireflyLayers[ani]) fireflyLayers[ani].anim=!!val;
+        }else if(aphase){
+          if(ani===-2){
+            if(!aphase.snapshot) aphase.snapshot={classic:{}};
+            if(key==='glowopacity') aphase.snapshot.glowOpacity=val;
+            else aphase.snapshot.classic[key]=val;
+          }else if(fireflyLayers[ani]){
+            if(!aphase.snapshot) aphase.snapshot={params:{}};
+            aphase.snapshot.params[key]=val;
+          }
+        }
       }else if(section==='view'){
+        if(key==='loop'){ animLoop=!!val; const chk=document.getElementById('anim-loop-chk'); if(chk) chk.checked=!!val; }
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
         if(key==='glowopacity'){ glowUserOpacity=val; const el=document.getElementById('glow-opacity'); if(el) el.value=val; cloudBg.setUserTint(null,val); }
@@ -1860,6 +1914,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     if(innerSyncUI) innerSyncUI();
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
     if(classicSyncUI) classicSyncUI();
+    if(animTimelineSyncHook) animTimelineSyncHook();
   }
 
   const flash=(btn,msg)=>{
