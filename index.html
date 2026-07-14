@@ -326,6 +326,7 @@ body::after {
         <button class="anim-btn" id="anim-reset-btn">↺ Reset</button>
         <button class="anim-btn" id="anim-zero-btn">Zero All</button>
         <button class="anim-btn" id="anim-defaults-btn">Defaults</button>
+        <button class="anim-btn" id="anim-bloom-btn" title="Replay the staggered spawn-in, exactly like a page load, without changing any current values">↺ Replay Bloom</button>
         <label id="anim-loop-lbl"><input type="checkbox" id="anim-loop-chk" checked> Loop</label>
       </div>
       <div id="anim-progress-wrap"><div id="anim-progress-fill"></div></div>
@@ -1608,6 +1609,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ffActive=Math.min(ffActive,fireflyLayers.length-1);
     if(innerSyncUI) innerSyncUI();
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
+  });
+  document.getElementById('anim-bloom-btn').addEventListener('click',()=>{
+    // Replays the staggered spawn-in fresh, exactly like a page load, without
+    // touching count/radius/colour/etc — just resets each layer's birth clock.
+    animStop();
+    fireflyLayers.forEach(F=>F.respawn&&F.respawn());
   });
 
   // Collapse/expand toggle
