@@ -30,12 +30,15 @@ export const FIREFLY_DEFAULTS = {
   wander: 1.0, // in-place drift range multiplier
   spawnSpan: 26.0, // seconds over which the field populates (official value)
   hot: 1.0, // 0 = colour-true circles (hue never clips to white), 1 = official white-hot centres
+  orbit: 0.0, // per-particle independent tumble: each circle roams its OWN random
+              // axis, speed and direction (0 = off). This is what makes particles
+              // within a layer diverge from each other, unlike the whole-layer `spin`.
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
   spin: 0.0, // rad/s rigid rotation of this layer as a whole, about its own axis
-             // (sign flips direction); read + applied externally by the caller
-             // (each layer's axis is independent, giving layers depth instead
-             // of spinning together) — not a shader uniform.
+             // (sign flips direction); read + applied externally by the caller.
+             // Keep this SMALL — it moves every particle in lockstep; `orbit`
+             // (above) is the per-particle independence control.
 };
 
 export const FIREFLY_POOL = 2200;
@@ -134,6 +137,7 @@ export function createFireflyField(THREE, opts = {}) {
     uHot: { value: params.hot },
     uSpawnStart: { value: 0 }, // birth clock origin — respawn() resets it to "now"
     uSpawnWindow: { value: 0 }, // >0 overrides uSpawnSpan (used to fit the fill inside a loop)
+    uOrbit: { value: params.orbit },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -161,17 +165,46 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uDpr;
       uniform float uCount;
       uniform float uCountFade;
+      uniform float uOrbit;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
       varying float vFar;
       varying float vBright;
 
+      // cheap 1D hash -> [0,1); several calls with different seeds give
+      // independent-looking pseudo-random numbers per particle
+      float hash11(float p){
+        p = fract(p * 0.1031);
+        p *= p + 33.33;
+        p *= p + p;
+        return fract(p);
+      }
+      // Rodrigues' rotation formula: rotate v about unit axis by angle
+      vec3 rotateAxis(vec3 v, vec3 axis, float angle){
+        float s = sin(angle), c = cos(angle);
+        return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
+      }
+
       void main() {
         vGlow = aGlow;
         vFar = aFar;
         vBright = aBright;
         vec3 pos = position * uRadius;
+
+        // per-particle independent orbit: each circle tumbles about its OWN
+        // random axis, at its own random speed and direction (unlike spin,
+        // which turns the whole layer together) — this is the source of
+        // genuine independence/randomness between particles in one layer
+        if (uOrbit > 0.0001) {
+          float hx = hash11(aRand * 12.9898 + 3.1);
+          float hy = hash11(aRand * 78.233 + 4.7);
+          float hz = hash11(aRand * 37.719 + 1.3);
+          vec3 orbitAxis = normalize(vec3(hx, hy, hz) * 2.0 - 1.0 + 1e-4);
+          float dirSign = hash11(aRand * 9.17 + 2.0) > 0.5 ? 1.0 : -1.0;
+          float orbitSpeed = (0.4 + hash11(aRand * 5.53 + 0.6) * 1.2) * dirSign;
+          pos = rotateAxis(pos, orbitAxis, uTime * uOrbit * orbitSpeed);
+        }
 
         // staggered births: sqrt distribution starts sparse and fills quickly,
         // each firefly fades in over its first second then stays lit
@@ -269,6 +302,7 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uSpawnSpan.value = params.spawnSpan;
     uniforms.uRadius.value = params.radius;
     uniforms.uHot.value = params.hot;
+    uniforms.uOrbit.value = params.orbit;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {
