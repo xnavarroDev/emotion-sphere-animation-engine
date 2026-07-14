@@ -944,9 +944,18 @@ function applyAnimFrame(dt){
     let t;
     if(animLoop){
       t=animTime%total;
-      // this track wrapped: re-open with the lone first circle, like on load,
-      // with the fill scaled to complete inside one loop
-      if(t<(F._animPrevT||0)&&F.respawn) F.respawn(Math.min(F.params.spawnSpan,total));
+      // this track wrapped: entrance-style sequences (ones that begin near
+      // empty) re-open with the lone first circle like on load; sequences
+      // that begin full loop seamlessly with no respawn
+      if(t<(F._animPrevT||0)&&F.respawn){
+        // only sequences that explicitly animate count from near-empty
+        // re-open; constant-count (idle) tracks wrap seamlessly
+        const firstC=seq[0].snapshot?.params?.count;
+        const counts=seq.map(p=>p.snapshot?.params?.count).filter(v=>typeof v==='number');
+        const maxC=counts.length?Math.max(...counts):0;
+        if(typeof firstC==='number'&&firstC<=Math.max(2,maxC*0.05))
+          F.respawn(Math.min(F.params.spawnSpan,total));
+      }
       F._animPrevT=t;
     }else t=Math.min(animTime,total);
     trackLerp(seq,t,(a,b,frac)=>lerpFireflySnap(F,a,b,frac));
