@@ -841,6 +841,7 @@ const FIREFLY_LAYER_OVERRIDES=[
 // (classic one-by-one emitter with trails, driven by the CLASSIC params).
 let sphereMode='circles';
 let applySphereModeFn=null; // set once the panel is built
+let addFireflyLayerFn=null; // set once the panel is built (used by Load)
 let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
 
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
@@ -918,6 +919,7 @@ function lerpLayersTo(snapA,snapB,frac){
   if(fA&&fB&&fireflyLayers.length){
     const arrA=Array.isArray(fA)?fA:[fA], arrB=Array.isArray(fB)?fB:[fB];
     for(let i=0;i<fireflyLayers.length;i++){
+      if(fireflyLayers[i].anim===false) continue; // layer opted out of animation
       const a=arrA[i], b=arrB[i];
       if(!a||!b) continue;
       const p={};
@@ -1055,17 +1057,32 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // The firefly circles ARE the sphere on this branch: spawned as a ball,
   // living in the drag-rotated group, replacing the old particle cloud
   // (whose sprites are hidden below).
-  fireflyLayers=FIREFLY_LAYER_PRESETS.map((preset,i)=>{
+  const FIREFLY_LAYER_MAX=8;
+  function makeFireflyLayer(preset={},overrides={}){
     const F=createFireflyField(THREE,{
       shape:'sphere',
       color:FIREFLY_EMOTION_COLORS[activeEmotion]??0xffc24a,
       dpr:renderer.getPixelRatio(),
       ...preset,
     });
-    F.overrides={...FIREFLY_LAYER_OVERRIDES[i]};
+    F.overrides={...overrides};
+    F.anim=true; // included in animation playback (per-layer Anim toggle)
+    F.points.visible=(sphereMode==='circles');
     group.add(F.points);
     return F;
-  });
+  }
+  function disposeFireflyLayer(F){
+    group.remove(F.points);
+    F.points.geometry.dispose();
+    F.points.material.dispose();
+  }
+  fireflyLayers=FIREFLY_LAYER_PRESETS.map((preset,i)=>makeFireflyLayer(preset,FIREFLY_LAYER_OVERRIDES[i]));
+  addFireflyLayerFn=()=>{
+    if(fireflyLayers.length>=FIREFLY_LAYER_MAX) return null;
+    const F=makeFireflyLayer();
+    fireflyLayers.push(F);
+    return F;
+  };
   // The circles are the only sphere visual on this branch: hide the old
   // particle-cloud layers and default the shell fireflies off (their toggle
   // still works if someone wants them back).
@@ -1082,7 +1099,51 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const ffPrev=document.createElement('button'); ffPrev.type='button'; ffPrev.className='ilayer-arrow'; ffPrev.textContent='\u2039';
   const ffTitle=document.createElement('span'); ffTitle.className='ilayer-title';
   const ffNext=document.createElement('button'); ffNext.type='button'; ffNext.className='ilayer-arrow'; ffNext.textContent='\u203a';
-  ffTabsEl.append(ffPrev,ffTitle,ffNext);
+  const ffAnimBtn=document.createElement('button'); ffAnimBtn.type='button';
+  ffAnimBtn.className='ilayer-reset'; ffAnimBtn.style.padding='3px 7px';
+  ffAnimBtn.textContent='Anim'; ffAnimBtn.title='Include this layer in animation playback';
+  ffTabsEl.append(ffPrev,ffTitle,ffNext,ffAnimBtn);
+  const ffLayerActions=document.createElement('div');
+  ffLayerActions.style.cssText='display:flex;gap:8px;margin-bottom:14px;';
+  const mkLayerBtn=(label,title)=>{
+    const b=document.createElement('button'); b.type='button'; b.className='anim-cap';
+    b.style.flex='1'; b.textContent=label; b.title=title;
+    ffLayerActions.appendChild(b); return b;
+  };
+  const ffAddBtn=mkLayerBtn('+ Add','New layer with default params');
+  const ffSplitBtn=mkLayerBtn('Split','Split this layer into two halves (params and colours copied)');
+  const ffRemoveBtn=mkLayerBtn('\u00d7 Remove','Delete this layer');
+  ffTabsEl.after(ffLayerActions);
+  ffAnimBtn.addEventListener('click',()=>{
+    const F=fireflyLayers[ffActive];
+    F.anim=F.anim===false; // toggle
+    ffSync();
+  });
+  ffAddBtn.addEventListener('click',()=>{
+    const F=addFireflyLayerFn&&addFireflyLayerFn();
+    if(!F) return;
+    ffActive=fireflyLayers.length-1;
+    ffSync();
+  });
+  ffSplitBtn.addEventListener('click',()=>{
+    if(fireflyLayers.length>=FIREFLY_LAYER_MAX) return;
+    const src=fireflyLayers[ffActive];
+    const half=Math.round(src.params.count/2);
+    const twin=makeFireflyLayer({...src.params,count:src.params.count-half},src.overrides);
+    twin.anim=src.anim;
+    twin.color().copy(src.color());
+    src.setParams({count:half});
+    fireflyLayers.splice(ffActive+1,0,twin);
+    ffActive++;
+    ffSync();
+  });
+  ffRemoveBtn.addEventListener('click',()=>{
+    if(fireflyLayers.length<=1) return;
+    disposeFireflyLayer(fireflyLayers[ffActive]);
+    fireflyLayers.splice(ffActive,1);
+    ffActive=Math.min(ffActive,fireflyLayers.length-1);
+    ffSync();
+  });
 
   const ffRgbHex=(c)=>'#'+c.getHexString();
   const ffColorRow=document.createElement('div'); ffColorRow.className='row';
@@ -1131,6 +1192,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const F=fireflyLayers[ffActive];
     const ov=F.overrides[activeEmotion];
     ffTitle.textContent='Layer '+(ffActive+1)+' / '+fireflyLayers.length;
+    ffAnimBtn.classList.toggle('on',fireflyLayers[ffActive].anim!==false);
     if(document.activeElement!==ffColorInput) ffColorInput.value=ov||ffRgbHex(F.color());
     ffColorReset.classList.toggle('on',!ov); // lit = following this emotion
     for(const [key,,,step] of FF_SLIDERS){
@@ -1451,10 +1513,14 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   });
   document.getElementById('anim-defaults-btn').addEventListener('click',()=>{
     innerLayers.forEach((L,i)=>{ L.field.setParams({...DEFAULTS,background:[0,0,0,0],glowOscAmp:0,breathAmp:0,breathSpeed:0,...INNER_LAYER_PRESETS[i]}); });
+    while(fireflyLayers.length>FIREFLY_LAYER_PRESETS.length) disposeFireflyLayer(fireflyLayers.pop());
+    while(fireflyLayers.length<FIREFLY_LAYER_PRESETS.length) fireflyLayers.push(makeFireflyLayer());
     fireflyLayers.forEach((F,i)=>{
       F.setParams({...FIREFLY_DEFAULTS,...FIREFLY_LAYER_PRESETS[i]});
       F.overrides={...FIREFLY_LAYER_OVERRIDES[i]};
+      F.anim=true;
     });
+    ffActive=Math.min(ffActive,fireflyLayers.length-1);
     if(innerSyncUI) innerSyncUI();
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
   });
@@ -1721,7 +1787,11 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(m){ section='layer'; li=parseInt(m[1],10)-1; continue; }
       if(/^firefly field$/i.test(line)){ section='ffield'; fli=0; continue; }
       m=line.match(/^firefly layer\s+(\d+)$/i);
-      if(m){ section='ffield'; fli=parseInt(m[1],10)-1; continue; }
+      if(m){
+        section='ffield'; fli=parseInt(m[1],10)-1;
+        while(fli>=fireflyLayers.length&&addFireflyLayerFn&&addFireflyLayerFn());
+        continue;
+      }
       if(/^classic$/i.test(line)){ section='classic'; continue; }
       if(/^(view|toggles)$/i.test(line)){ section='view'; continue; }
       m=line.match(/^mode\s+(circles|fireflies)$/i);
