@@ -26,6 +26,7 @@ export const FIREFLY_DEFAULTS = {
   intensity: 3.0, // additive colour intensity — hot centres over-saturate to white
   size: 1.0, // global point-size multiplier
   blinkSpeed: 1.0, // twinkle rate multiplier
+  blinkDepth: 1.0, // 0 = steady glow, 1 = official full-swing twinkle
   wander: 1.0, // in-place drift range multiplier
   spawnSpan: 26.0, // seconds over which the field populates (official value)
   hot: 1.0, // 0 = colour-true circles (hue never clips to white), 1 = official white-hot centres
@@ -119,6 +120,7 @@ export function createFireflyField(THREE, opts = {}) {
     uIntensity: { value: params.intensity },
     uSize: { value: params.size },
     uBlinkSpeed: { value: params.blinkSpeed },
+    uBlinkDepth: { value: params.blinkDepth },
     uWander: { value: params.wander },
     uSpawnSpan: { value: params.spawnSpan },
     uRadius: { value: params.radius },
@@ -146,6 +148,7 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uTime;
       uniform float uSize;
       uniform float uBlinkSpeed;
+      uniform float uBlinkDepth;
       uniform float uWander;
       uniform float uSpawnSpan;
       uniform float uSpawnStart;
@@ -186,8 +189,10 @@ export function createFireflyField(THREE, opts = {}) {
         // firefly blink: dim most of the cycle with brief bright flashes
         float pulse = 0.5 + 0.5 * sin(uTime * aSpeed * uBlinkSpeed + aPhase);
         float blink = pow(pulse, 3.0);
-        float glow = 0.12 + 0.95 * blink;
-        vBlink = blink;
+        // blinkDepth blends between a steady glow and the official full swing
+        // (12% .. 100% brightness) so dense fields need not strobe
+        float glow = mix(0.8, 0.12 + 0.95 * blink, uBlinkDepth);
+        vBlink = blink * uBlinkDepth;
 
         // soft count edge: as the eased count sweeps past this particle's
         // index it fades with the same smoothstep as a birth, so animated
@@ -252,6 +257,7 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uIntensity.value = params.intensity;
     uniforms.uSize.value = params.size;
     uniforms.uBlinkSpeed.value = params.blinkSpeed;
+    uniforms.uBlinkDepth.value = params.blinkDepth;
     uniforms.uWander.value = params.wander;
     uniforms.uSpawnSpan.value = params.spawnSpan;
     uniforms.uRadius.value = params.radius;
