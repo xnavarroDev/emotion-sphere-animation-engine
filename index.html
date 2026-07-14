@@ -55,6 +55,10 @@ body::after {
 #glow-opacity {
   width:52px; accent-color:#a0caef; cursor:pointer;
 }
+#bg-color {
+  width:22px; height:22px; border:1px solid rgba(255,255,255,0.12); border-radius:3px;
+  background:none; cursor:pointer; padding:0; flex-shrink:0;
+}
 .vtoggle {
   appearance:none; font:10px/1 'Courier New',monospace; letter-spacing:1px;
   text-transform:uppercase; color:rgba(255,255,255,0.32);
@@ -287,6 +291,7 @@ body::after {
   <button class="vtoggle active" id="toggle-glow" type="button" title="Show/hide the background glow">Glow</button>
   <input type="color" id="glow-color" value="#ffffff" title="Glow colour">
   <input type="range" id="glow-opacity" min="0" max="1" step="0.01" value="1" title="Glow opacity">
+  <input type="color" id="bg-color" value="#000000" title="Background colour">
   <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
 </div>
 <button id="params-toggle" type="button">Params</button>
@@ -791,6 +796,7 @@ group.add(shellPoints);
     shellPoints.visible=fireBtn.classList.toggle('active');
   });
   glowColor?.addEventListener('input',()=>{ glowUserColor=glowColor.value; cloudBg.setUserTint(glowColor.value, null); });
+  document.getElementById('bg-color')?.addEventListener('input',(e)=>{ setBgColor(e.target.value); });
   glowOpacity?.addEventListener('input',()=>{ glowUserOpacity=parseFloat(glowOpacity.value); cloudBg.setUserTint(null, glowUserOpacity); });
 })();
 
@@ -821,10 +827,13 @@ const FIREFLY_EMOTION_COLORS={ red:0xff3b30, purple:0xa070ff, yellow:0xffc24a, b
 // follow the official emotion palette).
 let fireflyLayers=[];
 let fireflyFieldSyncUI=null; // re-sync the active layer's sliders after animation lerps
+// Each layer also gets its own signed `spin` (rad/s) so, combined with the
+// distinct rotation axis assigned per layer in makeFireflyLayer, the three
+// bands tumble independently instead of all turning the same way with drag.
 const FIREFLY_LAYER_PRESETS=[
-  { count:120, intensity:3.0, size:1.0, hot:0 },                           // main body — strictly the emotion colour
-  { count:40, intensity:4.5, size:1.5, blinkSpeed:1.4, radius:1.3, hot:1 },// hot accents — the only white layer
-  { count:220, intensity:1.6, size:0.45, radius:1.9, wander:1.4, hot:0 },  // in-between tint dust — strictly its colour
+  { count:120, intensity:3.0, size:1.0, hot:0, spin:0.10 },                           // main body — strictly the emotion colour
+  { count:40, intensity:4.5, size:1.5, blinkSpeed:1.4, radius:1.3, hot:1, spin:-0.16 },// hot accents — the only white layer
+  { count:220, intensity:1.6, size:0.45, radius:1.9, wander:1.4, hot:0, spin:0.06 },  // in-between tint dust — strictly its colour
 ];
 // Layer 2 defaults to white; layer 3 defaults to the "in between" tint —
 // each emotion's official colour pulled 45% toward white — so out of the box
@@ -847,6 +856,13 @@ let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
 let glowUserColor='#ffffff';
 let glowUserOpacity=1.0;
+let bgColor='#000000';
+function setBgColor(hex){
+  bgColor=hex;
+  renderer.setClearColor(new THREE.Color(hex));
+  document.body.style.background=hex;
+  const el=document.getElementById('bg-color'); if(el) el.value=hex;
+}
 
 // ---- Animation editor state ----
 const ANIM_N=5;
@@ -1014,11 +1030,12 @@ function updateInnerLayers(t,dt){
     }
     F.color().lerp(_ffTargetColor,0.05);
     F.update(t);
+    if(F.params.spin&&F.spinAxis) F.points.rotateOnAxis(F.spinAxis,F.params.spin*(dt||0));
   }
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=9')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=10')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1061,6 +1078,17 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // living in the drag-rotated group, replacing the old particle cloud
   // (whose sprites are hidden below).
   const FIREFLY_LAYER_MAX=8;
+  // Deterministic, evenly-spread rotation axis per layer index (Fibonacci
+  // sphere lattice, exact fit for up to FIREFLY_LAYER_MAX layers) so each
+  // layer spins about its own distinct axis instead of sharing one.
+  let _fireflyAxisSeed=0;
+  function fireflyAxisFor(i){
+    const golden=Math.PI*(3-Math.sqrt(5));
+    let z=1-(i+0.5)*(2/FIREFLY_LAYER_MAX);
+    z=Math.max(-0.98,Math.min(0.98,z));
+    const r=Math.sqrt(1-z*z), theta=golden*i;
+    return new THREE.Vector3(r*Math.cos(theta),z,r*Math.sin(theta));
+  }
   function makeFireflyLayer(preset={},overrides={}){
     const F=createFireflyField(THREE,{
       shape:'sphere',
@@ -1072,6 +1100,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     F.anim=true; // included in animation playback (per-layer toggle)
     F.timeline=makeTimeline(); // this layer's own phases + durations
     F._animPrevT=0;
+    F.spinAxis=fireflyAxisFor(_fireflyAxisSeed++%FIREFLY_LAYER_MAX);
     F.points.visible=(sphereMode==='circles');
     group.add(F.points);
     return F;
@@ -1171,6 +1200,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['blinkDepth',0,1,0.02],
     ['wander',0,3,0.05],
     ['spawnSpan',0,40,0.5],
+    ['spin',-1.5,1.5,0.02],
   ];
   const ffRows={};
   for(const [key,min,max,step] of FF_SLIDERS){
@@ -1833,7 +1863,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       'glow '+(document.getElementById('toggle-glow')?.classList.contains('active')?1:0),
       'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
       'glowcolor '+glowUserColor,
-      'glowopacity '+glowUserOpacity.toFixed(2));
+      'glowopacity '+glowUserOpacity.toFixed(2),
+      'bgcolor '+bgColor);
     return lines.join('\n');
   }
 
@@ -1896,6 +1927,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
       m=line.match(/^glowcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ glowUserColor=m[1]; const el=document.getElementById('glow-color'); if(el) el.value=m[1]; cloudBg.setUserTint(m[1],null); continue; }
+      m=line.match(/^bgcolor\s+(#[0-9a-fA-F]{6})$/i);
+      if(m&&section==='view'){ setBgColor(m[1]); continue; }
       m=line.match(/^([a-zA-Z]\w*)\s+(-?[\d.]+)$/);
       if(!m) continue;
       const key=m[1], val=parseFloat(m[2]);

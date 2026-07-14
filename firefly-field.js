@@ -32,6 +32,10 @@ export const FIREFLY_DEFAULTS = {
   hot: 1.0, // 0 = colour-true circles (hue never clips to white), 1 = official white-hot centres
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
+  spin: 0.0, // rad/s rigid rotation of this layer as a whole, about its own axis
+             // (sign flips direction); read + applied externally by the caller
+             // (each layer's axis is independent, giving layers depth instead
+             // of spinning together) — not a shader uniform.
 };
 
 export const FIREFLY_POOL = 2200;
