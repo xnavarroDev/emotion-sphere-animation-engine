@@ -861,6 +861,7 @@ let sceneAnim=true;
 let animTimelineSyncHook=null; // set by the anim UI; called after Load rewrites timelines
 let animPlaying=false;
 let animTime=0;
+let animPrevGlobalT=0; // master-clock position last frame (loop wrap detection)
 let animLoop=true;
 let animPlayBtn=null, animFill=null, animStop=null;
 // The colour the core sphere is currently showing (mirrors sphere-core's
@@ -933,47 +934,51 @@ function lerpSceneSnap(a,b,frac){
 function applyAnimFrame(dt){
   if(!innerLayersReady||!animPlaying) return;
   animTime+=dt;
-  let active=0, maxTotal=0;
+  // One master clock: each track plays its own sequence, then HOLDS its final
+  // look — however short its timeline is — until the longest enabled track
+  // finishes; with Loop on, everything wraps together at that point.
+  const tracks=[];
   for(const F of fireflyLayers){
     if(F.anim===false) continue;
     const seq=trackSeq(F.timeline);
     if(seq.length<2) continue;
     const total=trackTotal(seq);
     if(total<=0) continue;
-    active++; maxTotal=Math.max(maxTotal,total);
-    let t;
-    if(animLoop){
-      t=animTime%total;
-      // this track wrapped: entrance-style sequences (ones that begin near
-      // empty) re-open with the lone first circle like on load; sequences
-      // that begin full loop seamlessly with no respawn
-      if(t<(F._animPrevT||0)&&F.respawn){
-        // only sequences that explicitly animate count from near-empty
-        // re-open; constant-count (idle) tracks wrap seamlessly
-        const firstC=seq[0].snapshot?.params?.count;
-        const counts=seq.map(p=>p.snapshot?.params?.count).filter(v=>typeof v==='number');
-        const maxC=counts.length?Math.max(...counts):0;
-        if(typeof firstC==='number'&&firstC<=Math.max(2,maxC*0.05))
-          F.respawn(Math.min(F.params.spawnSpan,total));
-      }
-      F._animPrevT=t;
-    }else t=Math.min(animTime,total);
-    trackLerp(seq,t,(a,b,frac)=>lerpFireflySnap(F,a,b,frac));
+    tracks.push({F,seq,total});
   }
+  let sceneSeq=null, sceneTotal=0;
   if(sceneAnim!==false){
     const seq=trackSeq(sceneTimeline);
     if(seq.length>=2){
       const total=trackTotal(seq);
-      if(total>0){
-        active++; maxTotal=Math.max(maxTotal,total);
-        const t=animLoop?animTime%total:Math.min(animTime,total);
-        trackLerp(seq,t,lerpSceneSnap);
-      }
+      if(total>0){ sceneSeq=seq; sceneTotal=total; }
     }
   }
-  if(!active){ if(animStop) animStop(); return; }
+  if(!tracks.length&&!sceneSeq){ if(animStop) animStop(); return; }
+  const maxTotal=Math.max(sceneTotal,...tracks.map(x=>x.total));
+  let t;
+  if(animLoop){
+    t=animTime%maxTotal;
+    if(t<animPrevGlobalT){
+      // the master cycle wrapped: entrance-style sequences (ones that begin
+      // near empty) re-open with the lone first circle like on load;
+      // constant-count (idle) tracks wrap seamlessly with no respawn
+      for(const {F,seq,total} of tracks){
+        const firstC=seq[0].snapshot?.params?.count;
+        const counts=seq.map(p=>p.snapshot?.params?.count).filter(v=>typeof v==='number');
+        const maxC=counts.length?Math.max(...counts):0;
+        if(typeof firstC==='number'&&firstC<=Math.max(2,maxC*0.05)&&F.respawn)
+          F.respawn(Math.min(F.params.spawnSpan,total));
+      }
+    }
+    animPrevGlobalT=t;
+  }else t=Math.min(animTime,maxTotal);
+  for(const {F,seq,total} of tracks){
+    trackLerp(seq,Math.min(t,total),(a,b,frac)=>lerpFireflySnap(F,a,b,frac));
+  }
+  if(sceneSeq) trackLerp(sceneSeq,Math.min(t,sceneTotal),lerpSceneSnap);
   if(fireflyFieldSyncUI) fireflyFieldSyncUI();
-  if(animFill) animFill.style.width=(Math.min(animTime/maxTotal,1)*100)+'%';
+  if(animFill) animFill.style.width=(Math.min(t/maxTotal,1)*100)+'%';
   if(!animLoop&&animTime>=maxTotal){ animTime=maxTotal; if(animStop) animStop(); }
 }
 
@@ -1515,8 +1520,8 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       // the field's first appearance on load. Only tracks that actually play
       // respawn (static layers keep their current population), and the fill
       // is scaled to complete within the track's own duration.
+      if(animTime===0) animPrevGlobalT=0;
       if(animTime===0) fireflyLayers.forEach(F=>{
-        F._animPrevT=0;
         const seq=trackSeq(F.timeline);
         if(F.anim===false||seq.length<2) return;
         F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
@@ -1535,8 +1540,8 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       if(F.anim===false) continue;
       const seq=trackSeq(F.timeline);
       if(seq.length) lerpFireflySnap(F,seq[0].snapshot,seq[0].snapshot,0);
-      F._animPrevT=0;
     }
+    animPrevGlobalT=0;
     const sseq=trackSeq(sceneTimeline);
     if(sceneAnim!==false&&sseq.length) lerpSceneSnap(sseq[0].snapshot,sseq[0].snapshot,0);
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
