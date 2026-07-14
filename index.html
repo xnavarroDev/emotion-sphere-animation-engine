@@ -884,7 +884,10 @@ function emotionCoreColor(name){
 }
 // ---- Per-track animation playback ----
 const trackSeq=(tl)=>tl.filter(p=>p.snapshot);
-const trackTotal=(seq)=>seq.slice(0,-1).reduce((s,p)=>s+p.duration,0);
+// Total = every set phase's duration. The final phase's duration is a HOLD:
+// the track sits on its last captured look for that long before it ends or
+// wraps (trackLerp clamps to the final snapshot past the last transition).
+const trackTotal=(seq)=>seq.reduce((s,p)=>s+p.duration,0);
 // Walk one track's segments and hand the surrounding snapshots + eased
 // fraction to `apply`.
 function trackLerp(seq,t,apply){
@@ -1455,16 +1458,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     });
     clearBtn.addEventListener('click',()=>{ phase.snapshot=null; dot.classList.remove('set'); });
 
-    // Duration row between this phase and the next (not on last phase)
-    if(i<timeline.length-1){
-      const durRow=document.createElement('div'); durRow.className='anim-dur-row';
-      const durInput=document.createElement('input'); durInput.type='number';
-      durInput.className='anim-dur'; durInput.value=phase.duration; durInput.min=0.1; durInput.step=0.5;
-      const durS=document.createElement('span'); durS.className='anim-dur-s'; durS.textContent='s';
-      durInput.addEventListener('change',()=>{ phase.duration=Math.max(0.1,parseFloat(durInput.value)||0.1); });
-      durRow.append(durInput,durS);
-      frag.appendChild(durRow);
-    }
+    // Duration row: seconds to the next set phase — on the last set phase it
+    // is how long the final look holds before the track ends or loops.
+    const durRow=document.createElement('div'); durRow.className='anim-dur-row';
+    const durInput=document.createElement('input'); durInput.type='number';
+    durInput.className='anim-dur'; durInput.value=phase.duration; durInput.min=0.1; durInput.step=0.5;
+    durInput.title='Seconds to the next phase; on the last set phase, how long to hold before looping/ending';
+    const durS=document.createElement('span'); durS.className='anim-dur-s'; durS.textContent='s';
+    durInput.addEventListener('change',()=>{ phase.duration=Math.max(0.1,parseFloat(durInput.value)||0.1); });
+    durRow.append(durInput,durS);
+    frag.appendChild(durRow);
     return frag;
   }
 
