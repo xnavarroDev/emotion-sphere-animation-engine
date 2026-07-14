@@ -195,9 +195,12 @@ export function createFireflyField(THREE, opts = {}) {
         vBlink = blink * uBlinkDepth;
 
         // soft count edge: as the eased count sweeps past this particle's
-        // index it fades with the same smoothstep as a birth, so animated
-        // count changes appear/disappear as gently as the field filling in
-        float countIn = clamp((uCount - aIndex) / max(uCountFade, 0.001), 0.0, 1.0);
+        // index it fades with the same smoothstep as a birth. The threshold
+        // is scattered per particle (up to ±15% of the current count) so
+        // arrivals clump and gap organically like the load-time births,
+        // instead of marching in index order at a uniform rate.
+        float scatter = (fract(aRand * 71.7) - 0.5) * 0.3 * uCount;
+        float countIn = clamp((uCount - (aIndex + scatter)) / max(uCountFade, 0.001), 0.0, 1.0);
         countIn = countIn * countIn * (3.0 - 2.0 * countIn);
 
         vAlpha = glow * fadeIn * born * countIn;
@@ -297,8 +300,9 @@ export function createFireflyField(THREE, opts = {}) {
       const rate = dt > 0 ? Math.abs(next - prev) / dt : 0;
       uniforms.uCount.value = next;
       uniforms.uCountFade.value = Math.max(6, rate * 1.0);
+      // draw range covers the scattered thresholds (+18%) and the fade band
       geometry.setDrawRange(0, Math.ceil(Math.min(FIREFLY_POOL,
-        Math.max(next, target) + uniforms.uCountFade.value + 1)));
+        Math.max(next, target) * 1.18 + uniforms.uCountFade.value + 1)));
       uniforms.uTime.value = t;
     },
     dispose() {
