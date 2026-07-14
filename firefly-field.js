@@ -88,7 +88,9 @@ export function createFireflyField(THREE, opts = {}) {
     scales[i] = (0.8 + Math.random() * 1.8) * 1.75;
     phases[i] = Math.random() * Math.PI * 2.0;
     speeds[i] = 0.5 + Math.random() * 1.5;
-    rands[i] = Math.random();
+    // the first circle always appears alone: index 0 is born at t=0 and
+    // everyone else waits at least ~8% of the spawn span before following
+    rands[i] = i === 0 ? 0 : 0.0064 + Math.random() * 0.9936;
     ranges[i] = (0.4 + Math.random() * 1.0) * wanderScale;
     tempos[i] = 0.12 + Math.random() * 0.22;
     glows[i] = Math.pow(Math.random(), 3.0);

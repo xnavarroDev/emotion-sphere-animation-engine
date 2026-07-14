@@ -963,7 +963,11 @@ function applyAnimFrame(dt){
   if(totalDur<=0) return;
   let t=animTime;
   if(t>=totalDur){
-    if(animLoop){ animTime=t%totalDur; t=animTime; }
+    if(animLoop){
+      animTime=t%totalDur; t=animTime;
+      // every loop iteration re-opens like the first: one circle, then the rest
+      fireflyLayers.forEach(F=>F.respawn&&F.respawn());
+    }
     else{ animTime=totalDur; t=totalDur; if(animStop) animStop(); }
   }
   if(animFill) animFill.style.width=(Math.min(t/totalDur,1)*100)+'%';
@@ -1015,7 +1019,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=5')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=6')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
