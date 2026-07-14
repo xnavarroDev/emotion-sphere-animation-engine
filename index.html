@@ -902,6 +902,7 @@ function lerpFireflySnap(F,a,b,frac){
   for(const k of Object.keys(a.params)){
     if(typeof a.params[k]==='number'&&typeof b.params[k]==='number'){
       if(k==='coreBias') continue; // rebuilds spawn positions — skip during lerp
+      if(k==='spawnSpan') continue; // birth times derive from it — lerping strobes births
       const v=a.params[k]+(b.params[k]-a.params[k])*frac;
       p[k]=k==='count'?Math.round(v):v;
     }
@@ -939,8 +940,9 @@ function applyAnimFrame(dt){
     let t;
     if(animLoop){
       t=animTime%total;
-      // this track wrapped: re-open with the lone first circle, like on load
-      if(t<(F._animPrevT||0)&&F.respawn) F.respawn();
+      // this track wrapped: re-open with the lone first circle, like on load,
+      // with the fill scaled to complete inside one loop
+      if(t<(F._animPrevT||0)&&F.respawn) F.respawn(Math.min(F.params.spawnSpan,total));
       F._animPrevT=t;
     }else t=Math.min(animTime,total);
     trackLerp(seq,t,(a,b,frac)=>lerpFireflySnap(F,a,b,frac));
@@ -998,7 +1000,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=6')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=7')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1495,8 +1497,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(!playable) return;
     if(!animPlaying){
       // starting from the top: replay the staggered spawn-in, exactly like
-      // the field's first appearance on load
-      if(animTime===0) fireflyLayers.forEach(F=>{ F._animPrevT=0; F.respawn&&F.respawn(); });
+      // the field's first appearance on load. Only tracks that actually play
+      // respawn (static layers keep their current population), and the fill
+      // is scaled to complete within the track's own duration.
+      if(animTime===0) fireflyLayers.forEach(F=>{
+        F._animPrevT=0;
+        const seq=trackSeq(F.timeline);
+        if(F.anim===false||seq.length<2) return;
+        F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
+      });
       animPlaying=true; animPlayBtn.classList.add('active');
     }
     else animStop();
@@ -1517,7 +1526,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(sceneAnim!==false&&sseq.length) lerpSceneSnap(sseq[0].snapshot,sseq[0].snapshot,0);
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
     if(wasPlaying){
-      fireflyLayers.forEach(F=>F.respawn&&F.respawn());
+      fireflyLayers.forEach(F=>{
+        const seq=trackSeq(F.timeline);
+        if(F.anim===false||seq.length<2) return;
+        F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
+      });
       animPlaying=true; animPlayBtn?.classList.add('active');
     }
   });
