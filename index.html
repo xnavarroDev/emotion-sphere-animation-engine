@@ -55,7 +55,7 @@ body::after {
 #glow-opacity {
   width:52px; accent-color:#a0caef; cursor:pointer;
 }
-#bg-color {
+#bg-color, #bg-color-2 {
   width:22px; height:22px; border:1px solid rgba(255,255,255,0.12); border-radius:3px;
   background:none; cursor:pointer; padding:0; flex-shrink:0;
 }
@@ -291,7 +291,9 @@ body::after {
   <button class="vtoggle active" id="toggle-glow" type="button" title="Show/hide the background glow">Glow</button>
   <input type="color" id="glow-color" value="#ffffff" title="Glow colour">
   <input type="range" id="glow-opacity" min="0" max="1" step="0.01" value="1" title="Glow opacity">
-  <input type="color" id="bg-color" value="#000000" title="Background colour">
+  <input type="color" id="bg-color" value="#000000" title="Background colour (top colour when Gradient is on)">
+  <button class="vtoggle" id="toggle-bg-gradient" type="button" title="Fade the background from one colour to another (top to bottom)">Gradient</button>
+  <input type="color" id="bg-color-2" value="#c9d0d6" title="Gradient bottom colour" style="display:none">
   <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
 </div>
 <button id="params-toggle" type="button">Params</button>
@@ -637,7 +639,7 @@ function tickCycle(){
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 120);
 camera.position.z = 5;
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 renderer.setClearColor(0x000000);
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -798,6 +800,8 @@ group.add(shellPoints);
   });
   glowColor?.addEventListener('input',()=>{ glowUserColor=glowColor.value; cloudBg.setUserTint(glowColor.value, null); });
   document.getElementById('bg-color')?.addEventListener('input',(e)=>{ setBgColor(e.target.value); });
+  document.getElementById('bg-color-2')?.addEventListener('input',(e)=>{ setBgColor2(e.target.value); });
+  document.getElementById('toggle-bg-gradient')?.addEventListener('click',()=>{ setBgGradient(!bgGradient); });
   glowOpacity?.addEventListener('input',()=>{ glowUserOpacity=parseFloat(glowOpacity.value); cloudBg.setUserTint(null, glowUserOpacity); });
 })();
 
@@ -858,11 +862,36 @@ let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
 let glowUserColor='#ffffff';
 let glowUserOpacity=1.0;
 let bgColor='#000000';
+let bgColor2='#c9d0d6';
+let bgGradient=false;
+// Solid: opaque WebGL clear in bgColor (canvas is the whole background).
+// Gradient: the canvas clears fully TRANSPARENT so a CSS linear-gradient on
+// <body> shows through underneath it — the additive circles/glow then sit
+// on top of that gradient exactly like a flat sky-with-bokeh backdrop.
+function applyBackground(){
+  if(bgGradient){
+    renderer.setClearColor(0x000000,0);
+    document.body.style.background='linear-gradient(to bottom, '+bgColor+', '+bgColor2+')';
+  }else{
+    renderer.setClearColor(new THREE.Color(bgColor),1);
+    document.body.style.background=bgColor;
+  }
+}
 function setBgColor(hex){
   bgColor=hex;
-  renderer.setClearColor(new THREE.Color(hex));
-  document.body.style.background=hex;
   const el=document.getElementById('bg-color'); if(el) el.value=hex;
+  applyBackground();
+}
+function setBgColor2(hex){
+  bgColor2=hex;
+  const el=document.getElementById('bg-color-2'); if(el) el.value=hex;
+  applyBackground();
+}
+function setBgGradient(on){
+  bgGradient=on;
+  document.getElementById('toggle-bg-gradient')?.classList.toggle('active',on);
+  const el=document.getElementById('bg-color-2'); if(el) el.style.display=on?'':'none';
+  applyBackground();
 }
 
 // ---- Animation editor state ----
@@ -1873,7 +1902,9 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       'fireflies '+(document.getElementById('toggle-fireflies')?.classList.contains('active')?1:0),
       'glowcolor '+glowUserColor,
       'glowopacity '+glowUserOpacity.toFixed(2),
-      'bgcolor '+bgColor);
+      'bgcolor '+bgColor,
+      'bgcolor2 '+bgColor2,
+      'bggradient '+(bgGradient?1:0));
     return lines.join('\n');
   }
 
@@ -1936,6 +1967,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
       m=line.match(/^glowcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ glowUserColor=m[1]; const el=document.getElementById('glow-color'); if(el) el.value=m[1]; cloudBg.setUserTint(m[1],null); continue; }
+      m=line.match(/^bgcolor2\s+(#[0-9a-fA-F]{6})$/i);
+      if(m&&section==='view'){ setBgColor2(m[1]); continue; }
       m=line.match(/^bgcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ setBgColor(m[1]); continue; }
       m=line.match(/^([a-zA-Z]\w*)\s+(-?[\d.]+)$/);
@@ -1969,6 +2002,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
         if(key==='glowopacity'){ glowUserOpacity=val; const el=document.getElementById('glow-opacity'); if(el) el.value=val; cloudBg.setUserTint(null,val); }
+        if(key==='bggradient') setBgGradient(!!val);
       }
     }
     if(innerSyncUI) innerSyncUI();
