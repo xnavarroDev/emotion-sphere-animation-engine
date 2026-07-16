@@ -872,9 +872,16 @@ function applyBackground(){
   if(bgGradient){
     renderer.setClearColor(0x000000,0);
     document.body.style.background='linear-gradient(to bottom, '+bgColor+', '+bgColor2+')';
+    // The scene is all-additive, but the browser composites the transparent
+    // canvas with normal source-over: where particle alpha builds up, the raw
+    // sprite colour REPLACES the light gradient instead of adding to it,
+    // leaving dark cores with pale fringes. plus-lighter makes the page
+    // compositor add the canvas to the gradient, matching in-canvas additive.
+    renderer.domElement.style.mixBlendMode='plus-lighter';
   }else{
     renderer.setClearColor(new THREE.Color(bgColor),1);
     document.body.style.background=bgColor;
+    renderer.domElement.style.mixBlendMode='';
   }
 }
 function setBgColor(hex){
