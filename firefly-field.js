@@ -36,6 +36,14 @@ export const FIREFLY_DEFAULTS = {
   speed: 1.0, // global motion-rate multiplier: scales wander, orbit and blink together
               // (below 1 = slower, above 1 = faster). Does NOT affect spawnSpan/birth
               // pacing, so slowing motion doesn't also slow how fast the field fills in.
+  breath: 0.0, // whole-layer breathing: the field swells outward then relaxes on a
+               // smooth pow-shaped wave (0 = off, 1 = swells ~40% past radius).
+               // Slow breathSpeed reads as calm breathing; fast reads as anger pulses.
+  breathSpeed: 1.0, // breathing rate multiplier (also scaled by `speed`)
+  pulse: 0.0, // per-particle size pulse: each circle grows past its base size then
+              // shrinks back, on its OWN phase and rate (0 = off, 1 = grows ~60%).
+              // Unlike breath (whole layer moves), this animates each dot in place.
+  pulseSpeed: 1.0, // size-pulse rate multiplier (also scaled by `speed`)
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
   spin: 0.0, // rad/s rigid rotation of this layer as a whole, about its own axis
@@ -142,6 +150,10 @@ export function createFireflyField(THREE, opts = {}) {
     uSpawnWindow: { value: 0 }, // >0 overrides uSpawnSpan (used to fit the fill inside a loop)
     uOrbit: { value: params.orbit },
     uSpeed: { value: params.speed },
+    uBreath: { value: params.breath },
+    uBreathSpeed: { value: params.breathSpeed },
+    uPulse: { value: params.pulse },
+    uPulseSpeed: { value: params.pulseSpeed },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -171,6 +183,10 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uCountFade;
       uniform float uOrbit;
       uniform float uSpeed;
+      uniform float uBreath;
+      uniform float uBreathSpeed;
+      uniform float uPulse;
+      uniform float uPulseSpeed;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
@@ -200,6 +216,14 @@ export function createFireflyField(THREE, opts = {}) {
         // uSpeed scales motion (wander, orbit, blink) without touching birth/
         // count-reveal timing below, which stays on the real clock
         float mt = uTime * uSpeed;
+
+        // breathing: the whole layer swells outward then relaxes together on
+        // a pow-shaped wave (longer rest, smooth swell) — slow = calm breath,
+        // fast = angry outward pulses. Scales positions about the origin.
+        if (uBreath > 0.0001) {
+          float bw = pow(0.5 + 0.5 * sin(mt * uBreathSpeed * 1.4), 2.0);
+          pos *= 1.0 + uBreath * 0.4 * bw;
+        }
 
         // per-particle independent orbit: each circle tumbles about its OWN
         // random axis, at its own random speed and direction (unlike spin,
@@ -251,8 +275,19 @@ export function createFireflyField(THREE, opts = {}) {
 
         vAlpha = glow * fadeIn * born * countIn;
 
+        // per-particle size pulse: grow past base size, shrink back to it.
+        // Each circle gets its own rate and phase so the field shimmers
+        // instead of throbbing in unison (base size is the floor: the
+        // pow-shaped wave only ever adds).
+        float sizePulse = 1.0;
+        if (uPulse > 0.0001) {
+          float prate = 0.6 + hash11(aRand * 23.71 + 7.9) * 1.1;
+          float pw = pow(0.5 + 0.5 * sin(mt * uPulseSpeed * prate * 1.6 + aPhase * 2.3), 2.0);
+          sizePulse = 1.0 + uPulse * 0.6 * pw;
+        }
+
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-        gl_PointSize = aScale * 32.0 * uSize * uDpr * (1.0 + aGlow * 1.4) * (1.0 / -mvPosition.z);
+        gl_PointSize = aScale * 32.0 * uSize * uDpr * (1.0 + aGlow * 1.4) * sizePulse * (1.0 / -mvPosition.z);
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
@@ -313,6 +348,10 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uHot.value = params.hot;
     uniforms.uOrbit.value = params.orbit;
     uniforms.uSpeed.value = params.speed;
+    uniforms.uBreath.value = params.breath;
+    uniforms.uBreathSpeed.value = params.breathSpeed;
+    uniforms.uPulse.value = params.pulse;
+    uniforms.uPulseSpeed.value = params.pulseSpeed;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {
