@@ -8,6 +8,10 @@ size 0.35
 blinkSpeed 0.90
 blinkDepth 0.85
 wander 1.20
+breath 0.00
+breathSpeed 1.00
+pulse 0.00
+pulseSpeed 1.00
 spawnSpan 24.0
 orbit 0.35
 spin 0.00
@@ -24,6 +28,10 @@ size 0.40
 blinkSpeed 1.15
 blinkDepth 0.75
 wander 1.20
+breath 0.00
+breathSpeed 1.00
+pulse 0.00
+pulseSpeed 1.00
 spawnSpan 24.0
 orbit 0.45
 spin 0.00
@@ -40,6 +48,10 @@ size 0.25
 blinkSpeed 0.80
 blinkDepth 0.90
 wander 1.40
+breath 0.00
+breathSpeed 1.00
+pulse 0.00
+pulseSpeed 1.00
 spawnSpan 26.0
 orbit 0.30
 spin 0.00
@@ -58,6 +70,10 @@ size 0.350
 blinkSpeed 0.900
 blinkDepth 0.850
 wander 1.200
+breath 0.000
+breathSpeed 1.000
+pulse 0.000
+pulseSpeed 1.000
 spawnSpan 24.000
 orbit 0.350
 spin 0.000
@@ -72,6 +88,10 @@ size 0.350
 blinkSpeed 0.900
 blinkDepth 0.850
 wander 1.200
+breath 0.000
+breathSpeed 1.000
+pulse 0.000
+pulseSpeed 1.000
 spawnSpan 24.000
 orbit 0.350
 spin 0.000
@@ -89,6 +109,10 @@ size 0.400
 blinkSpeed 1.150
 blinkDepth 0.750
 wander 1.200
+breath 0.000
+breathSpeed 1.000
+pulse 0.000
+pulseSpeed 1.000
 spawnSpan 24.000
 orbit 0.450
 spin 0.000
@@ -103,6 +127,10 @@ size 0.400
 blinkSpeed 1.150
 blinkDepth 0.750
 wander 1.200
+breath 0.000
+breathSpeed 1.000
+pulse 0.000
+pulseSpeed 1.000
 spawnSpan 24.000
 orbit 0.450
 spin 0.000
@@ -120,6 +148,10 @@ size 0.250
 blinkSpeed 0.800
 blinkDepth 0.900
 wander 1.400
+breath 0.000
+breathSpeed 1.000
+pulse 0.000
+pulseSpeed 1.000
 spawnSpan 26.000
 orbit 0.300
 spin 0.000
@@ -134,6 +166,10 @@ size 0.250
 blinkSpeed 0.800
 blinkDepth 0.900
 wander 1.400
+breath 0.000
+breathSpeed 1.000
+pulse 0.000
+pulseSpeed 1.000
 spawnSpan 26.000
 orbit 0.300
 spin 0.000
@@ -153,3 +189,5 @@ glowopacity 0.00
 bgcolor #000000
 bgcolor2 #c9d0d6
 bggradient 0
+rotate 0
+rotatespeed 0.10
