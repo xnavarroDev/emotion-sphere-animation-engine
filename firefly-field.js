@@ -137,7 +137,6 @@ export function createFireflyField(THREE, opts = {}) {
     uColor: { value: new THREE.Color(opts.color != null ? opts.color : 0xffc24a) },
     uIntensity: { value: params.intensity },
     uSize: { value: params.size },
-    uBlinkSpeed: { value: params.blinkSpeed },
     uBlinkDepth: { value: params.blinkDepth },
     uWander: { value: params.wander },
     uSpawnSpan: { value: params.spawnSpan },
@@ -148,12 +147,17 @@ export function createFireflyField(THREE, opts = {}) {
     uHot: { value: params.hot },
     uSpawnStart: { value: 0 }, // birth clock origin — respawn() resets it to "now"
     uSpawnWindow: { value: 0 }, // >0 overrides uSpawnSpan (used to fit the fill inside a loop)
-    uOrbit: { value: params.orbit },
-    uSpeed: { value: params.speed },
     uBreath: { value: params.breath },
-    uBreathSpeed: { value: params.breathSpeed },
     uPulse: { value: params.pulse },
-    uPulseSpeed: { value: params.pulseSpeed },
+    // accumulated motion clocks, integrated on the CPU each frame
+    // (dt * rate). Animating a rate param then only changes tempo from now
+    // on — computing phase as elapsedTime * rate instead would rescale the
+    // whole time axis and whip the field backward during animation lerps.
+    uMtWander: { value: 0 },
+    uMtOrbit: { value: 0 },
+    uMtBlink: { value: 0 },
+    uMtBreath: { value: 0 },
+    uMtPulse: { value: 0 },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -171,7 +175,6 @@ export function createFireflyField(THREE, opts = {}) {
       attribute float aIndex;
       uniform float uTime;
       uniform float uSize;
-      uniform float uBlinkSpeed;
       uniform float uBlinkDepth;
       uniform float uWander;
       uniform float uSpawnSpan;
@@ -181,12 +184,13 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uDpr;
       uniform float uCount;
       uniform float uCountFade;
-      uniform float uOrbit;
-      uniform float uSpeed;
       uniform float uBreath;
-      uniform float uBreathSpeed;
       uniform float uPulse;
-      uniform float uPulseSpeed;
+      uniform float uMtWander;
+      uniform float uMtOrbit;
+      uniform float uMtBlink;
+      uniform float uMtBreath;
+      uniform float uMtPulse;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
@@ -213,30 +217,29 @@ export function createFireflyField(THREE, opts = {}) {
         vBright = aBright;
         vec3 pos = position * uRadius;
 
-        // uSpeed scales motion (wander, orbit, blink) without touching birth/
-        // count-reveal timing below, which stays on the real clock
-        float mt = uTime * uSpeed;
-
-        // breathing: the whole layer swells outward then relaxes together on
-        // a pow-shaped wave (longer rest, smooth swell) — slow = calm breath,
-        // fast = angry outward pulses. Scales positions about the origin.
+        // breathing: the whole layer swells outward then relaxes together.
+        // Two incommensurate sines interfere, so surges arrive unevenly and
+        // vary in strength — when they align the swell overshoots (up to
+        // ~70% past radius at breath 1) — sporadic, not metronomic; the pow
+        // sharpens the rest-vs-swell contrast. Scales positions about origin.
         if (uBreath > 0.0001) {
-          float bw = pow(0.5 + 0.5 * sin(mt * uBreathSpeed * 1.4), 2.0);
-          pos *= 1.0 + uBreath * 0.4 * bw;
+          float bw = pow(max(0.0, 0.5 + 0.35 * sin(uMtBreath * 1.4) + 0.35 * sin(uMtBreath * 2.37 + 1.7)), 2.5);
+          pos *= 1.0 + uBreath * 0.45 * bw;
         }
 
         // per-particle independent orbit: each circle tumbles about its OWN
         // random axis, at its own random speed and direction (unlike spin,
         // which turns the whole layer together) — this is the source of
         // genuine independence/randomness between particles in one layer
-        if (uOrbit > 0.0001) {
+        // (uMtOrbit already integrates the orbit rate)
+        if (abs(uMtOrbit) > 0.0001) {
           float hx = hash11(aRand * 12.9898 + 3.1);
           float hy = hash11(aRand * 78.233 + 4.7);
           float hz = hash11(aRand * 37.719 + 1.3);
           vec3 orbitAxis = normalize(vec3(hx, hy, hz) * 2.0 - 1.0 + 1e-4);
           float dirSign = hash11(aRand * 9.17 + 2.0) > 0.5 ? 1.0 : -1.0;
           float orbitSpeed = (0.4 + hash11(aRand * 5.53 + 0.6) * 1.2) * dirSign;
-          pos = rotateAxis(pos, orbitAxis, mt * uOrbit * orbitSpeed);
+          pos = rotateAxis(pos, orbitAxis, uMtOrbit * orbitSpeed);
         }
 
         // staggered births: sqrt distribution starts sparse and fills quickly,
@@ -248,7 +251,7 @@ export function createFireflyField(THREE, opts = {}) {
         float fadeIn = smoothstep(0.0, 1.0, age);
 
         // in-place wander on three offset sines
-        float t = mt * aTempo + aPhase;
+        float t = uMtWander * aTempo + aPhase;
         vec3 wander = vec3(
           sin(t * 0.9),
           sin(t * 1.1 + 1.7),
@@ -257,7 +260,7 @@ export function createFireflyField(THREE, opts = {}) {
         pos += wander * aRange * uWander;
 
         // firefly blink: dim most of the cycle with brief bright flashes
-        float pulse = 0.5 + 0.5 * sin(mt * aSpeed * uBlinkSpeed + aPhase);
+        float pulse = 0.5 + 0.5 * sin(uMtBlink * aSpeed + aPhase);
         float blink = pow(pulse, 3.0);
         // blinkDepth blends between a steady glow and the official full swing
         // (12% .. 100% brightness) so dense fields need not strobe
@@ -282,8 +285,11 @@ export function createFireflyField(THREE, opts = {}) {
         float sizePulse = 1.0;
         if (uPulse > 0.0001) {
           float prate = 0.6 + hash11(aRand * 23.71 + 7.9) * 1.1;
-          float pw = pow(0.5 + 0.5 * sin(mt * uPulseSpeed * prate * 1.6 + aPhase * 2.3), 2.0);
-          sizePulse = 1.0 + uPulse * 0.6 * pw;
+          float pw = pow(0.5 + 0.5 * sin(uMtPulse * prate * 1.6 + aPhase * 2.3), 2.0);
+          // the core bubbles hardest: amplitude runs ~1.6x at the centre down
+          // to ~0.6x at the rim (position is the unit ball in sphere mode)
+          float coreW = mix(1.6, 0.6, clamp(length(position), 0.0, 1.0));
+          sizePulse = 1.0 + uPulse * 0.6 * pw * coreW;
         }
 
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -340,18 +346,13 @@ export function createFireflyField(THREE, opts = {}) {
     params.count = Math.max(0, Math.min(FIREFLY_POOL, params.count));
     uniforms.uIntensity.value = params.intensity;
     uniforms.uSize.value = params.size;
-    uniforms.uBlinkSpeed.value = params.blinkSpeed;
     uniforms.uBlinkDepth.value = params.blinkDepth;
     uniforms.uWander.value = params.wander;
     uniforms.uSpawnSpan.value = params.spawnSpan;
     uniforms.uRadius.value = params.radius;
     uniforms.uHot.value = params.hot;
-    uniforms.uOrbit.value = params.orbit;
-    uniforms.uSpeed.value = params.speed;
     uniforms.uBreath.value = params.breath;
-    uniforms.uBreathSpeed.value = params.breathSpeed;
     uniforms.uPulse.value = params.pulse;
-    uniforms.uPulseSpeed.value = params.pulseSpeed;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {
@@ -379,14 +380,22 @@ export function createFireflyField(THREE, opts = {}) {
     update(t) {
       const dt = Math.min(Math.max(t - (this._lastT ?? t), 0), 0.1);
       this._lastT = t;
+      // integrate the motion clocks (see uniform comment): rate params take
+      // effect from now on instead of rescaling all elapsed phase
+      uniforms.uMtWander.value += dt * params.speed;
+      uniforms.uMtOrbit.value += dt * params.speed * params.orbit;
+      uniforms.uMtBlink.value += dt * params.speed * params.blinkSpeed;
+      uniforms.uMtBreath.value += dt * params.speed * params.breathSpeed;
+      uniforms.uMtPulse.value += dt * params.speed * params.pulseSpeed;
       // ease the visible count toward the target; the fade band is sized so
-      // each circle crosses the soft edge in ~1s (the birth fade duration)
+      // each circle crosses the soft edge in ~2.5s — a gentle materialise
+      // rather than a pop (births themselves still fade over their first 1s)
       const target = params.count;
       const prev = uniforms.uCount.value;
       const next = prev + (target - prev) * Math.min(1, dt * 4);
       const rate = dt > 0 ? Math.abs(next - prev) / dt : 0;
       uniforms.uCount.value = next;
-      uniforms.uCountFade.value = Math.max(6, rate * 1.0);
+      uniforms.uCountFade.value = Math.max(6, rate * 2.5);
       // draw range covers the scattered thresholds (+18%) and the fade band
       geometry.setDrawRange(0, Math.ceil(Math.min(FIREFLY_POOL,
         Math.max(next, target) * 1.18 + uniforms.uCountFade.value + 1)));
