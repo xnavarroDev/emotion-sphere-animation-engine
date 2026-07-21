@@ -242,13 +242,20 @@ export function createFireflyField(THREE, opts = {}) {
           pos = rotateAxis(pos, orbitAxis, uMtOrbit * orbitSpeed);
         }
 
-        // staggered births: sqrt distribution starts sparse and fills quickly,
-        // each firefly fades in over its first second then stays lit
+        // staggered births: averaging two independent-ish uniforms gives a
+        // triangular distribution — sparse at both ends, busiest in the
+        // middle — so the tail of the bloom-in isn't the moment the most
+        // particles are turning on at once (a plain sqrt distribution's
+        // birth rate keeps accelerating right up to the end, piling new
+        // pop-ins right when the fill finishes). Each firefly then fades in
+        // gently over ~2.2s (long enough that the fixed blink cycle doesn't
+        // read as a "flash" on arrival) before settling into its steady loop.
         float spawnSpan = uSpawnWindow > 0.0 ? uSpawnWindow : uSpawnSpan;
-        float birthT = spawnSpan * sqrt(aRand);
+        float birthFrac = (aRand + hash11(aRand * 53.17 + 9.3)) * 0.5;
+        float birthT = spawnSpan * birthFrac;
         float age = (uTime - uSpawnStart) - birthT;
         float born = step(0.0, age);
-        float fadeIn = smoothstep(0.0, 1.0, age);
+        float fadeIn = smoothstep(0.0, 3.5, age);
 
         // in-place wander on three offset sines
         float t = uMtWander * aTempo + aPhase;
@@ -395,7 +402,13 @@ export function createFireflyField(THREE, opts = {}) {
       const next = prev + (target - prev) * Math.min(1, dt * 4);
       const rate = dt > 0 ? Math.abs(next - prev) / dt : 0;
       uniforms.uCount.value = next;
-      uniforms.uCountFade.value = Math.max(6, rate * 2.5);
+      // The animated count target arrives ROUNDED to whole particles, so the
+      // raw rate spikes on the frame it ticks over and decays between ticks.
+      // uCountFade is the divisor of the reveal ramp, so feeding it that
+      // jitter made every half-faded circle flicker frame-to-frame while a
+      // track was playing. Smooth it so the band width drifts instead.
+      this._fadeRate = this._fadeRate == null ? rate : this._fadeRate + (rate - this._fadeRate) * Math.min(1, dt * 1.5);
+      uniforms.uCountFade.value = Math.max(6, this._fadeRate * 2.5);
       // draw range covers the scattered thresholds (+18%) and the fade band
       geometry.setDrawRange(0, Math.ceil(Math.min(FIREFLY_POOL,
         Math.max(next, target) * 1.18 + uniforms.uCountFade.value + 1)));

@@ -1,0 +1,193 @@
+Firefly Layer 1
+count 110
+radius 3.20
+coreBias 0.90
+intensity 2.20
+hot 0.05
+size 0.35
+blinkSpeed 0.20
+blinkDepth 0.00
+wander 0.45
+breath 0.22
+breathSpeed 0.35
+pulse 0.10
+pulseSpeed 0.40
+spawnSpan 28.00
+orbit 0.10
+spin 0.02
+speed 0.28
+@blue #5b93b5
+
+Firefly Layer 2
+count 8
+radius 2.80
+coreBias 1.00
+intensity 2.00
+hot 0.50
+size 0.40
+blinkSpeed 0.22
+blinkDepth 0.00
+wander 0.50
+breath 0.25
+breathSpeed 0.32
+pulse 0.08
+pulseSpeed 0.35
+spawnSpan 26.00
+orbit 0.12
+spin -0.02
+speed 0.28
+@blue #d9e8ee
+
+Firefly Layer 3
+count 130
+radius 3.70
+coreBias 0.80
+intensity 1.30
+hot 0.00
+size 0.22
+blinkSpeed 0.18
+blinkDepth 0.00
+wander 0.55
+breath 0.18
+breathSpeed 0.28
+pulse 0.08
+pulseSpeed 0.35
+spawnSpan 32.00
+orbit 0.08
+spin 0.01
+speed 0.28
+@blue #3f6a85
+
+Anim Layer 1
+animate 1
+Phase 1 @ 28.00
+count 0.000
+radius 3.200
+coreBias 0.900
+intensity 2.200
+hot 0.050
+size 0.350
+blinkSpeed 0.200
+blinkDepth 0.000
+wander 0.450
+breath 0.220
+breathSpeed 0.350
+pulse 0.100
+pulseSpeed 0.400
+spawnSpan 28.000
+orbit 0.100
+spin 0.020
+speed 0.280
+Phase 2 @ 10.00
+count 110.000
+radius 3.200
+coreBias 0.900
+intensity 2.200
+hot 0.050
+size 0.350
+blinkSpeed 0.200
+blinkDepth 0.000
+wander 0.450
+breath 0.220
+breathSpeed 0.350
+pulse 0.100
+pulseSpeed 0.400
+spawnSpan 28.000
+orbit 0.100
+spin 0.020
+speed 0.280
+
+Anim Layer 2
+animate 1
+Phase 1 @ 26.00
+count 0.000
+radius 2.800
+coreBias 1.000
+intensity 2.000
+hot 0.500
+size 0.400
+blinkSpeed 0.220
+blinkDepth 0.000
+wander 0.500
+breath 0.250
+breathSpeed 0.320
+pulse 0.080
+pulseSpeed 0.350
+spawnSpan 26.000
+orbit 0.120
+spin -0.020
+speed 0.280
+Phase 2 @ 10.00
+count 8.000
+radius 2.800
+coreBias 1.000
+intensity 2.000
+hot 0.500
+size 0.400
+blinkSpeed 0.220
+blinkDepth 0.000
+wander 0.500
+breath 0.250
+breathSpeed 0.320
+pulse 0.080
+pulseSpeed 0.350
+spawnSpan 26.000
+orbit 0.120
+spin -0.020
+speed 0.280
+
+Anim Layer 3
+animate 1
+Phase 1 @ 32.00
+count 0.000
+radius 3.700
+coreBias 0.800
+intensity 1.300
+hot 0.000
+size 0.220
+blinkSpeed 0.180
+blinkDepth 0.000
+wander 0.550
+breath 0.180
+breathSpeed 0.280
+pulse 0.080
+pulseSpeed 0.350
+spawnSpan 32.000
+orbit 0.080
+spin 0.015
+speed 0.280
+Phase 2 @ 10.00
+count 130.000
+radius 3.700
+coreBias 0.800
+intensity 1.300
+hot 0.000
+size 0.220
+blinkSpeed 0.180
+blinkDepth 0.000
+wander 0.550
+breath 0.180
+breathSpeed 0.280
+pulse 0.080
+pulseSpeed 0.350
+spawnSpan 32.000
+orbit 0.080
+spin 0.015
+speed 0.280
+
+Anim Scene
+animate 0
+
+View
+emotion blue
+mode circles
+loop 1
+glow 0
+fireflies 0
+glowcolor #ffffff
+glowopacity 0.00
+bgcolor #020814
+bgcolor2 #b9cbdf
+bggradient 1
+rotate 0
+rotatespeed 0.00
