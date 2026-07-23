@@ -200,6 +200,8 @@ body::after {
   transition:background 0.25s,box-shadow 0.25s;
 }
 .anim-dot.set { background:#a0caef; box-shadow:0 0 6px rgba(160,202,239,0.55); }
+.anim-phase-row.editing .anim-phase-label { color:#ffd27a; }
+.anim-phase-row.editing .anim-dot { background:#ffd27a; box-shadow:0 0 6px rgba(255,210,122,0.6); }
 .anim-cap {
   appearance:none; font:9px/1 'Courier New',monospace; letter-spacing:1px;
   color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.06);
@@ -296,7 +298,7 @@ body::after {
   <input type="color" id="bg-color-2" value="#c9d0d6" title="Gradient bottom colour" style="display:none">
   <button class="vtoggle active" id="toggle-fireflies" type="button" title="Show/hide the firefly particles">Fireflies</button>
   <button class="vtoggle" id="toggle-rotate" type="button" title="Auto-rotate the whole sphere">Rotate</button>
-  <input type="range" id="rotate-speed" min="-1" max="1" step="0.01" value="0.10" title="Rotation speed (rad/s; negative reverses)" style="display:none">
+  <input type="range" id="rotate-speed" min="-0.5" max="0.5" step="0.005" value="0.10" title="Rotation speed (rad/s about the diagonal axis; negative reverses)" style="display:none">
 </div>
 <button id="params-toggle" type="button">Params</button>
 <aside id="params-panel" class="hidden">
@@ -836,6 +838,7 @@ const FIREFLY_EMOTION_COLORS={ red:0xff3b30, purple:0xa070ff, yellow:0xffc24a, b
 // follow the official emotion palette).
 let fireflyLayers=[];
 let fireflyFieldSyncUI=null; // re-sync the active layer's sliders after animation lerps
+let fireflyFieldSelect=null; // switch the FIREFLY FIELD sliders to a given layer index
 // Each layer also gets its own signed `spin` (rad/s) so, combined with the
 // distinct rotation axis assigned per layer in makeFireflyLayer, the three
 // bands tumble independently instead of all turning the same way with drag.
@@ -870,7 +873,12 @@ let bgColor2='#c9d0d6';
 let bgGradient=false;
 // ---- Whole-sphere auto-rotation (the group all layers live in) ----
 let sphereRotate=false;
-let sphereRotateSpeed=0.10; // rad/s about Y; negative reverses
+let sphereRotateSpeed=0.10; // rad/s about SPHERE_SPIN_AXIS; negative reverses
+let sphereRotateAngle=0;    // accumulated auto-rotation, so rate changes don't jump
+// Diagonal tumble axis (lower-left to upper-right in screen space), not the
+// vertical Y — a diagonal reads as drifting/adrift rather than a turntable.
+const SPHERE_SPIN_AXIS=new THREE.Vector3(1,1,0).normalize();
+const _spinQuat=new THREE.Quaternion();
 function setSphereRotate(on){
   sphereRotate=on;
   document.getElementById('toggle-rotate')?.classList.toggle('active',on);
@@ -929,6 +937,9 @@ const sceneTimeline=makeTimeline();
 let sceneAnim=true;
 let animTimelineSyncHook=null; // set by the anim UI; called after Load rewrites timelines
 let animPlaying=false;
+let editingPhase=false; // a phase snapshot is loaded on the sliders for editing:
+                        // while true, slider edits target that phase (via Capture),
+                        // not the resting/idle look
 let animTime=0;
 let animPrevGlobalT=0; // master-clock position last frame (loop wrap detection)
 let animLoop=true;
@@ -1151,6 +1162,8 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     });
     F.overrides={...overrides};
     F.anim=true; // included in animation playback (per-layer toggle)
+    F.idle={...F.params}; // the resting/static look; Reset restores this (kept
+                          // current by manual slider edits + preset load)
     F.timeline=makeTimeline(); // this layer's own phases + durations
     F._animPrevT=0;
     F.spinAxis=fireflyAxisFor(_fireflyAxisSeed++%FIREFLY_LAYER_MAX);
@@ -1272,7 +1285,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     input.addEventListener('input',()=>{
       const v=parseFloat(input.value);
       em.textContent=v.toFixed(step<1?2:0);
-      fireflyLayers[ffActive].setParams({ [key]:v });
+      const F=fireflyLayers[ffActive];
+      F.setParams({ [key]:v });
+      // a hand edit redefines the resting look — but not while the timeline is
+      // driving the sliders, nor while editing a phase (those edits belong to
+      // the phase you Capture, not the idle look)
+      if(!animPlaying&&!editingPhase) F.idle={...F.params};
     });
     ffRows[key]={input,em,step};
   }
@@ -1294,6 +1312,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   ffPrev.addEventListener('click',()=>{ ffActive=(ffActive-1+fireflyLayers.length)%fireflyLayers.length; ffSync(); });
   ffNext.addEventListener('click',()=>{ ffActive=(ffActive+1)%fireflyLayers.length; ffSync(); });
   fireflyFieldSyncUI=ffSync;
+  fireflyFieldSelect=(i)=>{ ffActive=Math.max(0,Math.min(fireflyLayers.length-1,i)); ffSync(); };
   ffSync();
 
   // ---- Fireflies mode: classic emitter sliders ----
@@ -1541,6 +1560,30 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       : { params:{...fireflyLayers[trackActive].params} };
   }
 
+  // Load a phase's stored snapshot back onto the live controls so it can be
+  // seen and edited (the inverse of Capture). Stops playback and flags the
+  // phase-editing mode so slider tweaks stay out of the idle look.
+  function applyTrackSnapshot(snapshot){
+    if(!snapshot) return;
+    if(animStop) animStop();
+    if(isSceneTrack()){
+      if(snapshot.classic) for(const [k,v] of Object.entries(snapshot.classic))
+        if(k in CLASSIC) CLASSIC[k]=v;
+      if(typeof snapshot.glowOpacity==='number'){
+        glowUserOpacity=snapshot.glowOpacity; cloudBg.setUserTint(null,glowUserOpacity);
+        const el=document.getElementById('glow-opacity'); if(el) el.value=glowUserOpacity;
+      }
+      if(classicSyncUI) classicSyncUI();
+    }else if(snapshot.params){
+      fireflyLayers[trackActive].setParams({...snapshot.params});
+      // switch the FIREFLY FIELD sliders to the layer being edited, so the
+      // controls you see and drag are the ones this phase belongs to
+      if(fireflyFieldSelect) fireflyFieldSelect(trackActive);
+    }
+    editingPhase=true;
+    if(fireflyFieldSyncUI) fireflyFieldSyncUI();
+  }
+
   function makePhaseBlock(phase,i,timeline){
     const frag=document.createDocumentFragment();
     // Phase row: ● Phase N  [Capture] [×]
@@ -1549,13 +1592,23 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(phase.snapshot) dot.classList.add('set');
     const label=document.createElement('span'); label.className='anim-phase-label';
     label.textContent=i===0?'Starting Phase':'Phase '+(i+1);
+    const editBtn=document.createElement('button'); editBtn.className='anim-cap';
+    editBtn.textContent='Edit'; editBtn.title='Load this phase onto the sliders to see & change it';
     const capBtn=document.createElement('button'); capBtn.className='anim-cap'; capBtn.textContent='Capture';
     const clearBtn=document.createElement('button'); clearBtn.className='anim-cap';
     clearBtn.textContent='×'; clearBtn.title='Clear this phase';
     clearBtn.style.color='rgba(255,100,100,0.6)';
-    row.append(dot,label,capBtn,clearBtn);
+    row.append(dot,label,editBtn,capBtn,clearBtn);
     frag.appendChild(row);
 
+    // Edit: pull this phase's stored look onto the controls so you can see and
+    // adjust it, then Capture to write your changes back into the same phase.
+    editBtn.addEventListener('click',()=>{
+      if(!phase.snapshot){ editBtn.textContent='empty'; setTimeout(()=>editBtn.textContent='Edit',700); return; }
+      applyTrackSnapshot(phase.snapshot);
+      animPhasesEl.querySelectorAll('.anim-phase-row').forEach(r=>r.classList.remove('editing'));
+      row.classList.add('editing');
+    });
     capBtn.addEventListener('click',()=>{
       phase.snapshot=captureTrackSnapshot();
       dot.classList.add('set');
@@ -1615,33 +1668,25 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         if(F.anim===false||seq.length<2) return;
         F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
       });
-      animPlaying=true; animPlayBtn.classList.add('active');
+      animPlaying=true; animPlayBtn.classList.add('active'); editingPhase=false;
     }
     else animStop();
   });
   document.getElementById('anim-reset-btn').addEventListener('click',()=>{
+    // Reset stops playback and returns every layer to its RESTING look (the
+    // static slider values), not to Phase 1 — so you can see the idle state
+    // the preset defines. Pressing Play afterwards restarts the arc from the
+    // top (Play respawns whenever animTime===0).
     animTime=0;
-    const wasPlaying=animPlaying;
     animStop();
+    editingPhase=false;
     if(animFill) animFill.style.width='0%';
-    // snap every enabled track back to its own Starting Phase
+    if(animPhasesEl) animPhasesEl.querySelectorAll('.anim-phase-row').forEach(r=>r.classList.remove('editing'));
     for(const F of fireflyLayers){
-      if(F.anim===false) continue;
-      const seq=trackSeq(F.timeline);
-      if(seq.length) lerpFireflySnap(F,seq[0].snapshot,seq[0].snapshot,0);
+      if(F.idle) F.setParams({...F.idle});
     }
     animPrevGlobalT=0;
-    const sseq=trackSeq(sceneTimeline);
-    if(sceneAnim!==false&&sseq.length) lerpSceneSnap(sseq[0].snapshot,sseq[0].snapshot,0);
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
-    if(wasPlaying){
-      fireflyLayers.forEach(F=>{
-        const seq=trackSeq(F.timeline);
-        if(F.anim===false||seq.length<2) return;
-        F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
-      });
-      animPlaying=true; animPlayBtn?.classList.add('active');
-    }
   });
   document.getElementById('anim-zero-btn').addEventListener('click',()=>{
     for(const L of innerLayers) L.field.setParams({count:0});
@@ -1933,7 +1978,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       'bgcolor2 '+bgColor2,
       'bggradient '+(bgGradient?1:0),
       'rotate '+(sphereRotate?1:0),
-      'rotatespeed '+sphereRotateSpeed.toFixed(2));
+      'rotatespeed '+sphereRotateSpeed.toFixed(3));
     return lines.join('\n');
   }
 
@@ -2036,6 +2081,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(key==='rotatespeed') setSphereRotateSpeed(val);
       }
     }
+    // the freshly-loaded layer values are the new resting look
+    fireflyLayers.forEach(F=>{ if(F.idle) F.idle={...F.params}; });
     if(innerSyncUI) innerSyncUI();
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
     if(classicSyncUI) classicSyncUI();
@@ -3019,11 +3066,24 @@ function animate(){
 
   if(!isDragging){
     velX*=0.92; velY*=0.92;
-    rotX+=velX; rotY+=velY+params.autoSpeed;
+    // The emotion palette's own autoSpeed is a per-FRAME nudge (~0.1 rad/s at
+    // 60fps). When the Rotate control is driving, it owns the motion outright
+    // — otherwise that baseline swamps any slow speed set on the slider.
+    rotX+=velX; rotY+=velY+(sphereRotate?0:params.autoSpeed);
   }
-  if(sphereRotate) rotY+=sphereRotateSpeed*(dt||0);
-  group.rotation.x=rotX;
-  group.rotation.y=rotY;
+  // Auto-rotation turns the whole group about a fixed DIAGONAL world axis, so
+  // the sphere tumbles corner-to-corner rather than spinning about vertical.
+  // Applied as a quaternion on top of the drag Euler (premultiply = world
+  // space), with the angle accumulated so drag and auto-spin coexist.
+  // rotation.set() must write all THREE components: premultiply writes the
+  // combined orientation back into .rotation, so leaving .z from last frame
+  // would feed the spin back into itself and race away.
+  group.rotation.set(rotX,rotY,0);
+  if(sphereRotate) sphereRotateAngle+=sphereRotateSpeed*(dt||0);
+  if(sphereRotateAngle){
+    group.quaternion.premultiply(
+      _spinQuat.setFromAxisAngle(SPHERE_SPIN_AXIS,sphereRotateAngle));
+  }
 
   const cwCloud=cycleOn?cycleStyleWeights():null;
   const worldR=radius*sphere.scale;
