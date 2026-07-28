@@ -8,16 +8,6 @@
 body { background:#000; min-height:100vh; overflow:hidden; font-family:'Courier New',monospace; cursor:grab; }
 body.dragging { cursor:grabbing; }
 canvas { position:fixed; top:0; left:0; z-index:1; }
-/* Subtle holographic scanlines */
-body::after {
-  content:'';
-  position:fixed; inset:0; z-index:2; pointer-events:none;
-  background:repeating-linear-gradient(
-    0deg,
-    transparent, transparent 2px,
-    rgba(255,255,255,0.018) 2px, rgba(255,255,255,0.028) 3px
-  );
-}
 #label { display:none; }
 #dots { position:fixed; top:24px; right:24px; z-index:100; display:flex; gap:10px; }
 .dot { width:10px; height:10px; border-radius:50%; cursor:pointer; opacity:0.35; transition:all 0.3s; }
@@ -302,7 +292,7 @@ body::after {
 </div>
 <button id="params-toggle" type="button">Params</button>
 <aside id="params-panel" class="hidden">
-  <h2>Firefly Sphere</h2>
+  <h2>Emotion Sphere</h2>
   <div id="params-actions">
     <button id="copy-params" type="button">Copy</button>
     <button id="save-params" type="button">Save</button>
@@ -318,7 +308,7 @@ body::after {
     <button id="mode-circles" class="mode-btn active" type="button" title="Sphere made of official firefly circles">Circles</button>
     <button id="mode-fireflies" class="mode-btn" type="button" title="Classic one-by-one firefly emitter with trails">Fireflies</button>
   </div>
-  <h3 id="firefly-field-heading">Firefly Field</h3>
+  <h3 id="firefly-field-heading">Particle Field</h3>
   <div id="firefly-layer-tabs"></div>
   <div id="firefly-field-controls"></div>
   <h3 id="classic-heading" style="display:none">Fireflies</h3>
@@ -341,7 +331,7 @@ body::after {
 </aside>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="cloud-background.js?v=3"></script>
+<script src="cloud-background.js?v=5"></script>
 <script>
 // Show runtime errors on-screen (helps when the canvas is blank)
 (function(){
@@ -844,7 +834,7 @@ let fireflyFieldSelect=null; // switch the FIREFLY FIELD sliders to a given laye
 // bands tumble independently instead of all turning the same way with drag.
 const FIREFLY_LAYER_PRESETS=[
   { count:120, intensity:3.0, size:1.0, hot:0, spin:0.025, orbit:0.5 },                            // main body — strictly the emotion colour
-  { count:40, intensity:4.5, size:1.5, blinkSpeed:1.4, radius:1.3, hot:1, spin:-0.04, orbit:0.7 },  // hot accents — the only white layer
+  { count:40, intensity:4.5, size:1.5, blinkSpeed:1.4, radius:1.3, hot:0.5, spin:-0.04, orbit:0.7 },  // hot accents — bright tinted, no longer white-hot
   { count:220, intensity:1.6, size:0.45, radius:1.9, wander:1.4, hot:0, spin:0.015, orbit:0.4 },    // in-between tint dust — strictly its colour
 ];
 // Layer 2 defaults to white; layer 3 defaults to the "in between" tint —
@@ -853,9 +843,15 @@ const FIREFLY_LAYER_PRESETS=[
 // controllable (and each still overridable per emotion from the picker).
 const FIREFLY_LAYER_OVERRIDES=[
   {},
-  { red:'#ffffff', purple:'#ffffff', yellow:'#fff6e0', blue:'#ffffff' },
+  // hot-accent layer: a bright LIGHT TINT of each emotion colour (pulled 55%
+  // toward white) rather than pure white — keeps the accents luminous but
+  // coloured, so the field reads less washed-out
   (()=>{ const o={}, c=new THREE.Color(), w=new THREE.Color(0xffffff);
-    for(const [k,v] of Object.entries(FIREFLY_EMOTION_COLORS)){ c.set(v).lerp(w,0.45); o[k]='#'+c.getHexString(); }
+    for(const [k,v] of Object.entries(FIREFLY_EMOTION_COLORS)){ c.set(v).lerp(w,0.55); o[k]='#'+c.getHexString(); }
+    return o; })(),
+  // in-between tint dust: pulled only 28% toward white (was 45%) for less wash
+  (()=>{ const o={}, c=new THREE.Color(), w=new THREE.Color(0xffffff);
+    for(const [k,v] of Object.entries(FIREFLY_EMOTION_COLORS)){ c.set(v).lerp(w,0.28); o[k]='#'+c.getHexString(); }
     return o; })(),
 ];
 // Sphere visual mode: 'circles' (official firefly circles) or 'fireflies'
@@ -1009,6 +1005,13 @@ function lerpSceneSnap(a,b,frac){
     const goEl=document.getElementById('glow-opacity');
     if(goEl&&document.activeElement!==goEl) goEl.value=op;
   }
+  // animate the background colour (full-frame warm wash, etc.) between phases
+  if(a.bgColor&&b.bgColor){
+    const ca=hexRgb(a.bgColor), cb=hexRgb(b.bgColor);
+    const mix=ca.map((v,i)=>v+(cb[i]-v)*frac);
+    const hx='#'+mix.map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join('');
+    setBgColor(hx);
+  }
 }
 
 function applyAnimFrame(dt){
@@ -1099,7 +1102,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=21')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=27')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1269,6 +1272,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['breathSpeed',0.1,3,0.05],
     ['pulse',0,1,0.02],
     ['pulseSpeed',0.1,3,0.05],
+    ['ripple',0,1,0.02],
+    ['rippleSpeed',0.1,3,0.05],
+    ['rectFill',0,1,0.02],
     ['spawnSpan',0,40,0.5],
     ['orbit',0,2,0.02],
     ['spin',-0.4,0.4,0.01],
@@ -1965,6 +1971,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
           for(const [k,v] of Object.entries(ph.snapshot.classic))
             if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
         if(typeof ph.snapshot.glowOpacity==='number') lines.push('glowopacity '+ph.snapshot.glowOpacity.toFixed(2));
+        if(ph.snapshot.bgColor) lines.push('bgcolor '+ph.snapshot.bgColor);
       }
     });
     lines.push('','View','emotion '+activeEmotion,
@@ -2045,6 +2052,12 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(m&&section==='view'){ setBgColor2(m[1]); continue; }
       m=line.match(/^bgcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ setBgColor(m[1]); continue; }
+      // a bgcolor inside an Anim Scene phase animates the background colour
+      // (a full-frame warm wash for a climax, etc.)
+      if(m&&section==='anim'&&ani===-2&&aphase){
+        if(!aphase.snapshot) aphase.snapshot={classic:{}};
+        aphase.snapshot.bgColor=m[1]; continue;
+      }
       m=line.match(/^([a-zA-Z]\w*)\s+(-?[\d.]+)$/);
       if(!m) continue;
       const key=m[1], val=parseFloat(m[2]);
