@@ -44,6 +44,14 @@ export const FIREFLY_DEFAULTS = {
               // shrinks back, on its OWN phase and rate (0 = off, 1 = grows ~60%).
               // Unlike breath (whole layer moves), this animates each dot in place.
   pulseSpeed: 1.0, // size-pulse rate multiplier (also scaled by `speed`)
+  ripple: 0.0, // radial travelling wave: particles are pushed out/in along their
+               // radius by a wave that depends on distance-from-centre, so a
+               // swell propagates from the core outward (0 = off). Unlike breath
+               // (whole layer swells in unison), this is a ring travelling out.
+  rippleSpeed: 1.0, // ripple travel-rate multiplier (also scaled by `speed`)
+  rectFill: 0.0, // morph the sphere toward a screen-shaped RECTANGLE (0 = sphere,
+                 // 1 = fills the frame corner-to-corner). Animate it up at a
+                 // climax to "fill the whole screen" instead of a round cluster.
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
   spin: 0.0, // rad/s rigid rotation of this layer as a whole, about its own axis
@@ -149,6 +157,8 @@ export function createFireflyField(THREE, opts = {}) {
     uSpawnWindow: { value: 0 }, // >0 overrides uSpawnSpan (used to fit the fill inside a loop)
     uBreath: { value: params.breath },
     uPulse: { value: params.pulse },
+    uRipple: { value: params.ripple },
+    uRectFill: { value: params.rectFill },
     // accumulated motion clocks, integrated on the CPU each frame
     // (dt * rate). Animating a rate param then only changes tempo from now
     // on — computing phase as elapsedTime * rate instead would rescale the
@@ -158,6 +168,7 @@ export function createFireflyField(THREE, opts = {}) {
     uMtBlink: { value: 0 },
     uMtBreath: { value: 0 },
     uMtPulse: { value: 0 },
+    uMtRipple: { value: 0 },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -186,11 +197,14 @@ export function createFireflyField(THREE, opts = {}) {
       uniform float uCountFade;
       uniform float uBreath;
       uniform float uPulse;
+      uniform float uRipple;
+      uniform float uRectFill;
       uniform float uMtWander;
       uniform float uMtOrbit;
       uniform float uMtBlink;
       uniform float uMtBreath;
       uniform float uMtPulse;
+      uniform float uMtRipple;
       varying float vAlpha;
       varying float vGlow;
       varying float vBlink;
@@ -225,6 +239,19 @@ export function createFireflyField(THREE, opts = {}) {
         if (uBreath > 0.0001) {
           float bw = pow(max(0.0, 0.5 + 0.35 * sin(uMtBreath * 1.4) + 0.35 * sin(uMtBreath * 2.37 + 1.7)), 2.5);
           pos *= 1.0 + uBreath * 0.45 * bw;
+        }
+
+        // radial ripple: a swell that travels from the centre outward. The
+        // wave phase depends on each particle's distance from centre, so inner
+        // circles crest first and the ring propagates out (uMtRipple advancing
+        // makes a given crest move to larger radius over time). Pushes each
+        // particle along its own radial direction.
+        if (uRipple > 0.0001) {
+          float rr = length(position);                 // 0..1 within the unit ball
+          // low spatial frequency -> one broad swell across the radius (a
+          // single smooth ring travelling out) instead of a busy accordion
+          float rw = sin(rr * 3.2 - uMtRipple * 6.2831853);
+          pos *= 1.0 + uRipple * 0.22 * rw;
         }
 
         // per-particle independent orbit: each circle tumbles about its OWN
@@ -265,6 +292,18 @@ export function createFireflyField(THREE, opts = {}) {
           sin(t * 0.7 + 3.1)
         );
         pos += wander * aRange * uWander;
+
+        // rectFill: expand the sphere straight outward into a wide, screen-
+        // shaped form. This is a pure per-axis stretch of the CURRENT position
+        // (a diagonal linear map), so it is bijective and order-preserving —
+        // every particle just slides radially outward along its own line and
+        // no two ever cross or rearrange. Wider in x than y, flatter in z, so
+        // the ball opens into a screen-filling rectangle (corners stay a touch
+        // soft — sharp corners would require particles to overtake each other).
+        if (uRectFill > 0.0001) {
+          vec3 stretched = pos * vec3(1.9, 1.6, 0.85);
+          pos = mix(pos, stretched, uRectFill);
+        }
 
         // firefly blink: dim most of the cycle with brief bright flashes
         float pulse = 0.5 + 0.5 * sin(uMtBlink * aSpeed + aPhase);
@@ -360,6 +399,8 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uHot.value = params.hot;
     uniforms.uBreath.value = params.breath;
     uniforms.uPulse.value = params.pulse;
+    uniforms.uRipple.value = params.ripple;
+    uniforms.uRectFill.value = params.rectFill;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {
@@ -394,6 +435,7 @@ export function createFireflyField(THREE, opts = {}) {
       uniforms.uMtBlink.value += dt * params.speed * params.blinkSpeed;
       uniforms.uMtBreath.value += dt * params.speed * params.breathSpeed;
       uniforms.uMtPulse.value += dt * params.speed * params.pulseSpeed;
+      uniforms.uMtRipple.value += dt * params.speed * params.rippleSpeed;
       // ease the visible count toward the target; the fade band is sized so
       // each circle crosses the soft edge in ~2.5s — a gentle materialise
       // rather than a pop (births themselves still fade over their first 1s)
