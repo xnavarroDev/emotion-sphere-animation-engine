@@ -1,62 +1,62 @@
 Firefly Layer 1
-count 190
+count 130
 radius 3.60
 coreBias 0.55
-intensity 2.64
-hot 0.10
+intensity 2.20
+hot 0.00
 size 0.35
 blinkSpeed 0.90
 blinkDepth 0.85
 wander 1.20
-breath 0.38
+breath 0.00
 breathSpeed 0.60
-pulse 0.28
+pulse 0.00
 pulseSpeed 0.60
 spawnSpan 24.00
 orbit 0.35
 spin 0.00
-speed 0.48
-@yellow #d8e35c
+speed 0.35
+@yellow #f0c44f
 
 Firefly Layer 2
-count 55
+count 38
 radius 3.20
 coreBias 0.55
-intensity 3.84
-hot 1.00
+intensity 2.80
+hot 0.25
 size 0.40
 blinkSpeed 1.15
 blinkDepth 0.75
 wander 1.20
-breath 0.38
+breath 0.00
 breathSpeed 0.60
-pulse 0.28
+pulse 0.00
 pulseSpeed 0.60
 spawnSpan 24.00
 orbit 0.45
 spin 0.00
-speed 0.48
-@yellow #ffffff
+speed 0.35
+@yellow #ffe08a
 
 Firefly Layer 3
-count 190
+count 130
 radius 3.90
 coreBias 0.65
-intensity 1.44
+intensity 1.20
 hot 0.00
 size 0.25
 blinkSpeed 0.80
 blinkDepth 0.90
 wander 1.40
-breath 0.38
+breath 0.00
 breathSpeed 0.60
-pulse 0.28
+pulse 0.00
 pulseSpeed 0.60
 spawnSpan 26.00
 orbit 0.30
 spin 0.00
-speed 0.48
-@yellow #aab554
+speed 0.35
+@yellow #c9a542
 
 Classic
 scale 1.00
@@ -72,12 +72,12 @@ trailLife 1.55
 
 Anim Layer 1
 animate 1
-Phase 1 @ 10.00
-count 28.000
+Phase 1 @ 8.00
+count 23.000
 radius 3.600
 coreBias 0.550
-intensity 1.430
-hot 0.100
+intensity 1.540
+hot 0.000
 size 0.350
 blinkSpeed 0.900
 blinkDepth 0.850
@@ -91,17 +91,17 @@ orbit 0.350
 spin 0.000
 speed 0.300
 Phase 2 @ 10.00
-count 110.000
-radius 3.600
+count 78.000
+radius 3.780
 coreBias 0.550
-intensity 1.980
-hot 0.100
-size 0.350
+intensity 2.090
+hot 0.050
+size 0.402
 blinkSpeed 0.900
 blinkDepth 0.850
 wander 1.200
-breath 0.150
-breathSpeed 0.600
+breath 0.220
+breathSpeed 0.550
 pulse 0.100
 pulseSpeed 0.600
 spawnSpan 24.000
@@ -109,47 +109,47 @@ orbit 0.350
 spin 0.000
 speed 0.380
 Phase 3 @ 8.00
-count 190.000
-radius 3.600
+count 130.000
+radius 4.860
 coreBias 0.550
-intensity 2.640
-hot 0.100
-size 0.350
+intensity 2.750
+hot 0.120
+size 0.612
 blinkSpeed 0.900
 blinkDepth 0.850
 wander 1.200
-breath 0.380
-breathSpeed 0.600
-pulse 0.280
+breath 0.900
+breathSpeed 0.450
+pulse 0.550
 pulseSpeed 0.600
 spawnSpan 24.000
 orbit 0.350
 spin 0.000
-speed 0.480
+speed 0.520
 Phase 4 @ 8.00
-count 190.000
-radius 3.600
+count 130.000
+radius 3.780
 coreBias 0.550
-intensity 1.870
-hot 0.100
-size 0.350
+intensity 1.980
+hot 0.050
+size 0.367
 blinkSpeed 0.900
 blinkDepth 0.850
 wander 1.200
-breath 0.120
-breathSpeed 0.600
+breath 0.140
+breathSpeed 0.550
 pulse 0.080
 pulseSpeed 0.600
 spawnSpan 24.000
 orbit 0.350
 spin 0.000
 speed 0.360
-Phase 5 @ 4.00
-count 28.000
+Phase 5 @ 6.00
+count 23.000
 radius 3.600
 coreBias 0.550
-intensity 1.430
-hot 0.100
+intensity 1.540
+hot 0.000
 size 0.350
 blinkSpeed 0.900
 blinkDepth 0.850
@@ -165,12 +165,12 @@ speed 0.300
 
 Anim Layer 2
 animate 1
-Phase 1 @ 10.00
-count 8.000
+Phase 1 @ 8.00
+count 7.000
 radius 3.200
 coreBias 0.550
-intensity 2.080
-hot 1.000
+intensity 1.960
+hot 0.250
 size 0.400
 blinkSpeed 1.150
 blinkDepth 0.750
@@ -184,17 +184,17 @@ orbit 0.450
 spin 0.000
 speed 0.300
 Phase 2 @ 10.00
-count 32.000
-radius 3.200
+count 23.000
+radius 3.360
 coreBias 0.550
-intensity 2.880
-hot 1.000
-size 0.400
+intensity 2.660
+hot 0.300
+size 0.460
 blinkSpeed 1.150
 blinkDepth 0.750
 wander 1.200
-breath 0.150
-breathSpeed 0.600
+breath 0.220
+breathSpeed 0.550
 pulse 0.100
 pulseSpeed 0.600
 spawnSpan 24.000
@@ -202,47 +202,47 @@ orbit 0.450
 spin 0.000
 speed 0.380
 Phase 3 @ 8.00
-count 55.000
-radius 3.200
+count 38.000
+radius 4.320
 coreBias 0.550
-intensity 3.840
-hot 1.000
-size 0.400
+intensity 3.500
+hot 0.370
+size 0.700
 blinkSpeed 1.150
 blinkDepth 0.750
 wander 1.200
-breath 0.380
-breathSpeed 0.600
-pulse 0.280
+breath 0.900
+breathSpeed 0.450
+pulse 0.550
 pulseSpeed 0.600
 spawnSpan 24.000
 orbit 0.450
 spin 0.000
-speed 0.480
+speed 0.520
 Phase 4 @ 8.00
-count 55.000
-radius 3.200
+count 38.000
+radius 3.360
 coreBias 0.550
-intensity 2.720
-hot 1.000
-size 0.400
+intensity 2.520
+hot 0.300
+size 0.420
 blinkSpeed 1.150
 blinkDepth 0.750
 wander 1.200
-breath 0.120
-breathSpeed 0.600
+breath 0.140
+breathSpeed 0.550
 pulse 0.080
 pulseSpeed 0.600
 spawnSpan 24.000
 orbit 0.450
 spin 0.000
 speed 0.360
-Phase 5 @ 4.00
-count 8.000
+Phase 5 @ 6.00
+count 7.000
 radius 3.200
 coreBias 0.550
-intensity 2.080
-hot 1.000
+intensity 1.960
+hot 0.250
 size 0.400
 blinkSpeed 1.150
 blinkDepth 0.750
@@ -258,11 +258,11 @@ speed 0.300
 
 Anim Layer 3
 animate 1
-Phase 1 @ 10.00
-count 28.000
+Phase 1 @ 8.00
+count 23.000
 radius 3.900
 coreBias 0.650
-intensity 0.780
+intensity 0.840
 hot 0.000
 size 0.250
 blinkSpeed 0.800
@@ -277,17 +277,17 @@ orbit 0.300
 spin 0.000
 speed 0.300
 Phase 2 @ 10.00
-count 110.000
-radius 3.900
+count 78.000
+radius 4.095
 coreBias 0.650
-intensity 1.080
-hot 0.000
-size 0.250
+intensity 1.140
+hot 0.050
+size 0.287
 blinkSpeed 0.800
 blinkDepth 0.900
 wander 1.400
-breath 0.150
-breathSpeed 0.600
+breath 0.220
+breathSpeed 0.550
 pulse 0.100
 pulseSpeed 0.600
 spawnSpan 26.000
@@ -295,46 +295,46 @@ orbit 0.300
 spin 0.000
 speed 0.380
 Phase 3 @ 8.00
-count 190.000
-radius 3.900
+count 130.000
+radius 5.265
 coreBias 0.650
-intensity 1.440
-hot 0.000
-size 0.250
+intensity 1.500
+hot 0.120
+size 0.438
 blinkSpeed 0.800
 blinkDepth 0.900
 wander 1.400
-breath 0.380
-breathSpeed 0.600
-pulse 0.280
+breath 0.900
+breathSpeed 0.450
+pulse 0.550
 pulseSpeed 0.600
 spawnSpan 26.000
 orbit 0.300
 spin 0.000
-speed 0.480
+speed 0.520
 Phase 4 @ 8.00
-count 190.000
-radius 3.900
+count 130.000
+radius 4.095
 coreBias 0.650
-intensity 1.020
-hot 0.000
-size 0.250
+intensity 1.080
+hot 0.050
+size 0.263
 blinkSpeed 0.800
 blinkDepth 0.900
 wander 1.400
-breath 0.120
-breathSpeed 0.600
+breath 0.140
+breathSpeed 0.550
 pulse 0.080
 pulseSpeed 0.600
 spawnSpan 26.000
 orbit 0.300
 spin 0.000
 speed 0.360
-Phase 5 @ 4.00
-count 28.000
+Phase 5 @ 6.00
+count 23.000
 radius 3.900
 coreBias 0.650
-intensity 0.780
+intensity 0.840
 hot 0.000
 size 0.250
 blinkSpeed 0.800
@@ -350,16 +350,31 @@ spin 0.000
 speed 0.300
 
 Anim Scene
-animate 0
+animate 1
+Phase 1 @ 8.00
+glowopacity 0.000
+bgcolor #000000
+Phase 2 @ 10.00
+glowopacity 0.100
+bgcolor #0d0a04
+Phase 3 @ 8.00
+glowopacity 0.400
+bgcolor #241a0a
+Phase 4 @ 8.00
+glowopacity 0.160
+bgcolor #100b04
+Phase 5 @ 6.00
+glowopacity 0.000
+bgcolor #000000
 
 View
 emotion yellow
 mode circles
 loop 1
-glow 0
+glow 1
 fireflies 0
-glowcolor #ffffff
-glowopacity 0.00
+glowcolor #ffe6c0
+glowopacity 0.000
 bgcolor #000000
 bgcolor2 #c9d0d6
 bggradient 0
