@@ -30,6 +30,25 @@
   const CLOUD_PT_CYAN = CLOUD_POINT_CYAN.map((h) => new THREE.Color(h));
   const CLOUD_PT_YELLOW = CLOUD_POINT_YELLOW.map((h) => new THREE.Color(h));
 
+  // Procedural soft radial blob (white, alpha falloff) drawn on a canvas —
+  // replaces the 403'd external cloud PNG so the glow needs no network.
+  function makeCloudTexture() {
+    const size = 256;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0.0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.7, 'rgba(255,255,255,0.12)');
+    g.addColorStop(1.0, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
   function patchCloudInsideSphere(mat, uniforms) {
     mat.fog = false;
     mat.customProgramCacheKey = () => 'cloudInsideSphere4';
@@ -80,25 +99,27 @@ gl_FragColor.a*=vis*0.9;`
       scaleY: scaleY / baseScale,
       ph,
       ph2,
-      drift: (Math.random() - 0.5) * 0.0022,
-      spin: (Math.random() - 0.5) * 0.001,
-      sx: 0.1 + Math.random() * 0.22,
-      sy: 0.09 + Math.random() * 0.2,
-      sz: 0.08 + Math.random() * 0.18,
-      ax: 0.07 + Math.random() * 0.18,
-      ay: 0.06 + Math.random() * 0.16,
-      az: 0.05 + Math.random() * 0.14,
-      stirSp: 0.12 + Math.random() * 0.28,
-      sx2: 0.17 + Math.random() * 0.35,
-      sy2: 0.14 + Math.random() * 0.3,
-      pulseSp: 0.35 + Math.random() * 0.9,
-      pulseAmp: 0.06 + Math.random() * 0.14,
-      orbitSp: 0.04 + Math.random() * 0.12,
-      orbitR: 0.04 + Math.random() * 0.14,
-      tiltX: (Math.random() - 0.5) * 0.35,
-      tiltY: (Math.random() - 0.5) * 0.35,
+      // motion/pulse amplitudes damped ~60-70% so the 18 blobs read as one
+      // smooth, slowly-breathing halo instead of a churning, flickering mass
+      drift: (Math.random() - 0.5) * 0.0009,
+      spin: (Math.random() - 0.5) * 0.0004,
+      sx: 0.06 + Math.random() * 0.12,
+      sy: 0.055 + Math.random() * 0.11,
+      sz: 0.05 + Math.random() * 0.1,
+      ax: 0.03 + Math.random() * 0.07,
+      ay: 0.026 + Math.random() * 0.06,
+      az: 0.022 + Math.random() * 0.055,
+      stirSp: 0.06 + Math.random() * 0.14,
+      sx2: 0.1 + Math.random() * 0.2,
+      sy2: 0.085 + Math.random() * 0.17,
+      pulseSp: 0.2 + Math.random() * 0.45,
+      pulseAmp: 0.025 + Math.random() * 0.055,
+      orbitSp: 0.025 + Math.random() * 0.07,
+      orbitR: 0.02 + Math.random() * 0.06,
+      tiltX: (Math.random() - 0.5) * 0.18,
+      tiltY: (Math.random() - 0.5) * 0.18,
       opacityBase: cloud.material.opacity,
-      opacityPulse: 0.015 + Math.random() * 0.035,
+      opacityPulse: 0.005 + Math.random() * 0.012,
       stirX: 0,
       stirY: 0,
       stirZ: 0,
@@ -167,45 +188,45 @@ gl_FragColor.a*=vis*0.9;`
       }
     }
 
-    const loader = new THREE.TextureLoader();
-    loader.load(TEXTURE_URL, (texture) => {
-      texture.minFilter = THREE.LinearFilter;
-      const geo = new THREE.PlaneGeometry(1, 1);
-      for (let i = 0; i < 18; i++) {
-        const mat = new THREE.MeshLambertMaterial({
-          map: texture,
-          transparent: true,
-          opacity: 0.05 + Math.random() * 0.07,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          depthTest: false,
-        });
-        patchCloudInsideSphere(mat, uniforms);
-        const cloud = new THREE.Mesh(geo, mat);
-        const rad = Math.pow(Math.random(), 0.42) * 0.94;
-        const th = Math.random() * Math.PI * 2;
-        const ph = Math.acos(2 * Math.random() - 1);
-        cloud.position.set(
-          rad * Math.sin(ph) * Math.cos(th),
-          rad * Math.sin(ph) * Math.sin(th),
-          rad * Math.cos(ph)
-        );
-        const s = 1.2 + Math.random() * 2.6;
-        const sy = s * (0.65 + Math.random() * 0.55);
-        cloud.scale.set(s, sy, 1);
-        cloud.rotation.set(
-          (Math.random() - 0.5) * 0.4,
-          (Math.random() - 0.5) * 0.4,
-          Math.random() * Math.PI * 2
-        );
-        cloud.renderOrder = 5;
-        seedCloudMotion(cloud, s, sy);
-        cloudMeshes.push(cloud);
-        cloudGroup.add(cloud);
-      }
-      sphereGroup.remove(cloudGroup);
-      sphereGroup.add(cloudGroup);
-    });
+    // Soft radial cloud texture generated locally — the old external CodePen
+    // asset (TEXTURE_URL) 403s on hotlink, so the load callback never fired
+    // and NO cloud meshes were ever created (the whole glow was dead). A
+    // procedural blob keeps the glow self-contained (no network dependency).
+    const texture = makeCloudTexture();
+    texture.minFilter = THREE.LinearFilter;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    for (let i = 0; i < 18; i++) {
+      const mat = new THREE.MeshLambertMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.14 + Math.random() * 0.14,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      });
+      patchCloudInsideSphere(mat, uniforms);
+      const cloud = new THREE.Mesh(geo, mat);
+      const rad = Math.pow(Math.random(), 0.42) * 0.94;
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(2 * Math.random() - 1);
+      cloud.position.set(
+        rad * Math.sin(ph) * Math.cos(th),
+        rad * Math.sin(ph) * Math.sin(th),
+        rad * Math.cos(ph)
+      );
+      const s = 1.2 + Math.random() * 2.6;
+      const sy = s * (0.65 + Math.random() * 0.55);
+      cloud.scale.set(s, sy, 1);
+      cloud.rotation.set(
+        (Math.random() - 0.5) * 0.4,
+        (Math.random() - 0.5) * 0.4,
+        Math.random() * Math.PI * 2
+      );
+      cloud.renderOrder = 5;
+      seedCloudMotion(cloud, s, sy);
+      cloudMeshes.push(cloud);
+      cloudGroup.add(cloud);
+    }
 
     sphereGroup.add(cloudGroup);
     applyCloudPalette(1, 0, 0);
