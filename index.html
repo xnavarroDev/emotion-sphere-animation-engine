@@ -1102,7 +1102,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=27')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=29')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1165,6 +1165,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     });
     F.overrides={...overrides};
     F.anim=true; // included in animation playback (per-layer toggle)
+    F.tintColor='#'+F.tintColor().getHexString(); // the `tint` blend target (default silver)
     F.idle={...F.params}; // the resting/static look; Reset restores this (kept
                           // current by manual slider edits + preset load)
     F.timeline=makeTimeline(); // this layer's own phases + durations
@@ -1258,6 +1259,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ffSync();
   });
 
+  // Tint colour: the target the `tint` slider blends toward (per layer). Lets a
+  // climax shift the particles to any colour, not just the default silver.
+  const ffTintRow=document.createElement('div'); ffTintRow.className='row';
+  const ffTintSpan=document.createElement('span'); ffTintSpan.textContent='tint col';
+  const ffTintInput=document.createElement('input'); ffTintInput.type='color';
+  ffTintRow.append(ffTintSpan,ffTintInput); ffCtrlEl.appendChild(ffTintRow);
+  ffTintInput.addEventListener('input',()=>{
+    const F=fireflyLayers[ffActive];
+    F.tintColor='#'+ffTintInput.value.replace('#','');
+    F.setTintColor(F.tintColor);
+  });
+
   const FF_SLIDERS=[
     ['count',0,600,5],
     ['radius',0.2,4,0.05],
@@ -1275,6 +1288,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['ripple',0,1,0.02],
     ['rippleSpeed',0.1,3,0.05],
     ['rectFill',0,1,0.02],
+    ['tint',0,1,0.02],
     ['spawnSpan',0,40,0.5],
     ['orbit',0,2,0.02],
     ['spin',-0.4,0.4,0.01],
@@ -1307,6 +1321,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(animLayerSyncHook) animLayerSyncHook();
     if(document.activeElement!==ffColorInput) ffColorInput.value=ov||ffRgbHex(F.color());
     ffColorReset.classList.toggle('on',!ov); // lit = following this emotion
+    if(document.activeElement!==ffTintInput) ffTintInput.value=F.tintColor||ffRgbHex(F.tintColor());
     for(const [key,,,step] of FF_SLIDERS){
       const { input,em }=ffRows[key];
       // never fight a slider the user is holding (animation lerps re-sync
@@ -1945,6 +1960,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(typeof v==='number') lines.push(key+' '+fmt(v,step));
       }
       for(const [emo,c] of Object.entries(F.overrides)) lines.push('@'+emo+' '+c);
+      if(F.tintColor) lines.push('tintcolor '+F.tintColor);
     });
     lines.push('','Classic');
     for(const [key,step] of [...document.querySelectorAll('#classic-controls .row')]
@@ -2044,6 +2060,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(section==='ffield'&&fireflyLayers[fli]) fireflyLayers[fli].overrides[m[1].toLowerCase()]=m[2];
         continue;
       }
+      m=line.match(/^tintcolor\s+(#[0-9a-fA-F]{6})$/i);
+      if(m&&section==='ffield'&&fireflyLayers[fli]){ fireflyLayers[fli].tintColor=m[1]; fireflyLayers[fli].setTintColor(m[1]); continue; }
       m=line.match(/^emotion\s+(\w+)$/i);
       if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
       m=line.match(/^glowcolor\s+(#[0-9a-fA-F]{6})$/i);
