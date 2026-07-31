@@ -15,11 +15,13 @@ pulseSpeed 0.40
 ripple 0.60
 rippleSpeed 0.40
 rectFill 0.00
+tint 0.00
 spawnSpan 16.00
 orbit 0.12
 spin 0.01
 speed 0.35
 @purple #a86fbf
+tintcolor #b8c0d1
 
 Firefly Layer 2
 count 9
@@ -38,11 +40,13 @@ pulseSpeed 0.40
 ripple 0.55
 rippleSpeed 0.40
 rectFill 0.00
+tint 0.00
 spawnSpan 15.00
 orbit 0.14
 spin -0.01
 speed 0.35
 @purple #d8b8e8
+tintcolor #b8c0d1
 
 Firefly Layer 3
 count 46
@@ -61,11 +65,13 @@ pulseSpeed 0.40
 ripple 0.65
 rippleSpeed 0.40
 rectFill 0.00
+tint 0.00
 spawnSpan 18.00
 orbit 0.10
 spin 0.01
 speed 0.35
 @purple #7a5090
+tintcolor #b8c0d1
 
 Classic
 scale 1.00
@@ -81,7 +87,7 @@ trailLife 1.55
 
 Anim Layer 1
 animate 1
-Phase 1 @ 11.00
+Phase 1 @ 15.00
 count 38.000
 radius 4.000
 coreBias 1.000
@@ -98,11 +104,12 @@ pulseSpeed 0.400
 ripple 0.600
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.000
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
 speed 0.350
-Phase 2 @ 3.00
+Phase 2 @ 4.50
 count 152.000
 radius 10.800
 coreBias 1.000
@@ -119,11 +126,12 @@ pulseSpeed 0.400
 ripple 0.768
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.850
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
 speed 0.350
-Phase 3 @ 11.00
+Phase 3 @ 6.00
 count 152.000
 radius 10.800
 coreBias 1.000
@@ -140,32 +148,34 @@ pulseSpeed 0.400
 ripple 0.768
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.850
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
 speed 0.350
 Phase 4 @ 6.00
-count 38.000
-radius 4.000
+count 91.000
+radius 6.600
 coreBias 1.000
-intensity 1.350
+intensity 1.418
 hot 0.100
 size 0.380
 blinkSpeed 0.400
 blinkDepth 0.220
-wander 0.450
+wander 1.035
 breath 0.000
 breathSpeed 0.600
 pulse 0.060
 pulseSpeed 0.400
-ripple 0.600
+ripple 0.660
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.350
 spawnSpan 16.000
-orbit 0.120
+orbit 0.312
 spin 0.008
-speed 0.350
-Phase 5 @ 6.00
+speed 0.480
+Phase 5 @ 8.50
 count 38.000
 radius 4.000
 coreBias 1.000
@@ -182,6 +192,7 @@ pulseSpeed 0.400
 ripple 0.600
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.000
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
@@ -189,7 +200,7 @@ speed 0.350
 
 Anim Layer 2
 animate 1
-Phase 1 @ 11.00
+Phase 1 @ 15.00
 count 9.000
 radius 3.600
 coreBias 1.100
@@ -206,11 +217,12 @@ pulseSpeed 0.400
 ripple 0.550
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.000
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
 speed 0.350
-Phase 2 @ 3.00
+Phase 2 @ 4.50
 count 36.000
 radius 9.720
 coreBias 1.100
@@ -227,11 +239,12 @@ pulseSpeed 0.400
 ripple 0.704
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.850
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
 speed 0.350
-Phase 3 @ 11.00
+Phase 3 @ 6.00
 count 36.000
 radius 9.720
 coreBias 1.100
@@ -248,32 +261,34 @@ pulseSpeed 0.400
 ripple 0.704
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.850
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
 speed 0.350
 Phase 4 @ 6.00
-count 9.000
-radius 3.600
+count 22.000
+radius 5.940
 coreBias 1.100
-intensity 1.650
+intensity 1.732
 hot 0.350
 size 0.420
 blinkSpeed 0.450
 blinkDepth 0.200
-wander 0.400
+wander 0.920
 breath 0.000
 breathSpeed 0.600
 pulse 0.050
 pulseSpeed 0.400
-ripple 0.550
+ripple 0.605
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.350
 spawnSpan 15.000
-orbit 0.140
+orbit 0.364
 spin -0.008
-speed 0.350
-Phase 5 @ 6.00
+speed 0.480
+Phase 5 @ 8.50
 count 9.000
 radius 3.600
 coreBias 1.100
@@ -290,6 +305,7 @@ pulseSpeed 0.400
 ripple 0.550
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.000
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
@@ -297,7 +313,7 @@ speed 0.350
 
 Anim Layer 3
 animate 1
-Phase 1 @ 11.00
+Phase 1 @ 15.00
 count 46.000
 radius 4.200
 coreBias 0.950
@@ -314,11 +330,12 @@ pulseSpeed 0.400
 ripple 0.650
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.000
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
 speed 0.350
-Phase 2 @ 3.00
+Phase 2 @ 4.50
 count 184.000
 radius 11.340
 coreBias 0.950
@@ -335,11 +352,12 @@ pulseSpeed 0.400
 ripple 0.832
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.850
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
 speed 0.350
-Phase 3 @ 11.00
+Phase 3 @ 6.00
 count 184.000
 radius 11.340
 coreBias 0.950
@@ -356,32 +374,34 @@ pulseSpeed 0.400
 ripple 0.832
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.850
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
 speed 0.350
 Phase 4 @ 6.00
-count 46.000
-radius 4.200
+count 110.000
+radius 6.930
 coreBias 0.950
-intensity 0.900
+intensity 0.945
 hot 0.000
 size 0.240
 blinkSpeed 0.350
 blinkDepth 0.240
-wander 0.550
+wander 1.265
 breath 0.000
 breathSpeed 0.600
 pulse 0.050
 pulseSpeed 0.400
-ripple 0.650
+ripple 0.715
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.350
 spawnSpan 18.000
-orbit 0.100
+orbit 0.260
 spin 0.006
-speed 0.350
-Phase 5 @ 6.00
+speed 0.480
+Phase 5 @ 8.50
 count 46.000
 radius 4.200
 coreBias 0.950
@@ -398,13 +418,24 @@ pulseSpeed 0.400
 ripple 0.650
 rippleSpeed 0.400
 rectFill 0.000
+tint 0.000
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
 speed 0.350
 
 Anim Scene
-animate 0
+animate 1
+Phase 1 @ 15.00
+bgcolor #1f1c21
+Phase 2 @ 4.50
+bgcolor #9a94a6
+Phase 3 @ 6.00
+bgcolor #9a94a6
+Phase 4 @ 6.00
+bgcolor #46424e
+Phase 5 @ 8.50
+bgcolor #1f1c21
 
 View
 emotion purple
