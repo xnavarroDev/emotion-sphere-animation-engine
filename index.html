@@ -9,6 +9,17 @@ body { background:#000; min-height:100vh; overflow:hidden; font-family:'Courier 
 body.dragging { cursor:grabbing; }
 canvas { position:fixed; top:0; left:0; z-index:1; }
 #label { display:none; }
+/* Kiosk / embed mode: hide all authoring UI, leaving only the sphere. Enabled
+   with ?mode=kiosk (or ?embed=1); everything still exists in the DOM (just
+   hidden) so the playback engine keeps working. */
+body.kiosk #hint,
+body.kiosk #proto-switch,
+body.kiosk #view-toggles,
+body.kiosk #params-toggle,
+body.kiosk #params-panel { display:none !important; }
+/* keep the emotion dots in kiosk mode — they're the emotion selector;
+   hide the cycle dot (auto-cycle isn't used) */
+body.kiosk #d-cycle { display:none; }
 #dots { position:fixed; top:24px; right:24px; z-index:100; display:flex; gap:10px; }
 .dot { width:10px; height:10px; border-radius:50%; cursor:pointer; opacity:0.35; transition:all 0.3s; }
 .dot:hover,.dot.active { opacity:1; transform:scale(1.5); }
@@ -2149,6 +2160,70 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       try{ applyParamsText(txt); flash(e.target,'Loaded'); }
       catch(err){ console.error('load failed',err); flash(e.target,'Failed'); }
     }).catch(()=>flash(e.target,'Failed'));
+  });
+
+  // ---- Embed / runtime API ----------------------------------------------
+  // The "final product": play a preset by emotion name, no authoring UI.
+  // Each emotion maps to its preset .txt (the editable source of truth), so
+  // updating a default is just editing/replacing that file.
+  const PRESET_FILES = {
+    calm:   'presets/firefly-purple.txt',
+    sad:    'presets/firefly-sad.txt',
+    warm:   'presets/firefly-warm.txt',
+    happy:  'presets/firefly-warm.txt',
+    anger:  'presets/firefly-anger.txt',
+    angry:  'presets/firefly-anger.txt',
+  };
+  function startPlayback(){
+    animTime=0; animPrevGlobalT=0;
+    fireflyLayers.forEach(F=>{
+      const seq=trackSeq(F.timeline);
+      if(F.anim!==false&&seq.length>=2) F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
+    });
+    animPlaying=true;
+  }
+  window.emotionSphere = {
+    emotions: Object.keys(PRESET_FILES),
+    // play('sad') -> loads that preset and starts its animation from the top.
+    // Returns a promise that resolves once the preset is applied.
+    play(name){
+      const file = PRESET_FILES[String(name||'').toLowerCase()];
+      if(!file) return Promise.reject(new Error('unknown emotion: '+name));
+      return fetch(file).then(r=>{ if(!r.ok) throw new Error('preset fetch failed: '+file); return r.text(); })
+        .then(txt=>{ applyParamsText(txt); startPlayback(); });
+    },
+  };
+
+  // Kiosk boot: ?mode=kiosk (or ?embed=1) hides the UI; ?emotion=sad picks the
+  // starting preset; postMessage {type:'emotion', value:'sad'} switches live.
+  const _q = new URLSearchParams(location.search);
+  const _kiosk = _q.get('mode')==='kiosk' || _q.get('embed')==='1';
+  if(_kiosk) document.body.classList.add('kiosk');
+  // The colour dots map to presets by emotion colour; in kiosk mode a click
+  // plays that preset (not just recolour). d-blue=sad, d-yellow=warm,
+  // d-red=anger, d-purple=calm.
+  const DOT_EMO = { 'd-blue':'sad', 'd-yellow':'warm', 'd-red':'anger', 'd-purple':'calm' };
+  const EMO_DOT = { sad:'d-blue', warm:'d-yellow', anger:'d-red', calm:'d-purple' };
+  function markDot(emo){
+    const id=EMO_DOT[String(emo||'').toLowerCase()];
+    document.querySelectorAll('#dots .dot').forEach(d=>d.classList.remove('active'));
+    if(id) document.getElementById(id)?.classList.add('active');
+  }
+  function playAndMark(emo){ markDot(emo); return window.emotionSphere.play(emo).catch(err=>console.warn(err.message)); }
+
+  if(_kiosk){
+    // colour dot: play that preset
+    for(const [id,emo] of Object.entries(DOT_EMO)){
+      const el=document.getElementById(id);
+      if(el) el.onclick=()=>playAndMark(emo);
+    }
+  }
+
+  const _startEmotion = _q.get('emotion');
+  if(_startEmotion) playAndMark(_startEmotion);
+  window.addEventListener('message',(ev)=>{
+    const d=ev.data;
+    if(d && d.type==='emotion' && d.value) playAndMark(d.value);
   });
 }).catch(err=>console.error('sphere-core failed',err));
 
