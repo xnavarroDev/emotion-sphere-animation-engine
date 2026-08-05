@@ -81,7 +81,7 @@ trailLife 1.55
 
 Anim Layer 1
 animate 1
-Phase 1 @ 8.00
+Phase 1 @ 14.00
 count 45.000
 radius 4.000
 coreBias 0.450
@@ -102,7 +102,7 @@ spawnSpan 10.000
 orbit 0.140
 spin 0.010
 speed 0.300
-Phase 2 @ 4.00
+Phase 2 @ 6.00
 count 108.000
 radius 4.000
 coreBias 0.450
@@ -165,7 +165,7 @@ spawnSpan 10.000
 orbit 0.140
 spin 0.010
 speed 0.350
-Phase 5 @ 8.00
+Phase 5 @ 9.00
 count 0.000
 radius 6.800
 coreBias 0.450
@@ -186,7 +186,7 @@ spawnSpan 10.000
 orbit 0.140
 spin 0.010
 speed 0.350
-Phase 6 @ 5.00
+Phase 6 @ 6.00
 count 45.000
 radius 4.000
 coreBias 0.450
@@ -210,7 +210,7 @@ speed 0.300
 
 Anim Layer 2
 animate 1
-Phase 1 @ 8.00
+Phase 1 @ 14.00
 count 5.000
 radius 4.000
 coreBias 1.000
@@ -231,7 +231,7 @@ spawnSpan 9.000
 orbit 0.120
 spin -0.010
 speed 0.300
-Phase 2 @ 4.00
+Phase 2 @ 6.00
 count 12.000
 radius 4.000
 coreBias 1.000
@@ -294,7 +294,7 @@ spawnSpan 9.000
 orbit 0.120
 spin -0.010
 speed 0.350
-Phase 5 @ 8.00
+Phase 5 @ 9.00
 count 0.000
 radius 6.800
 coreBias 1.000
@@ -315,7 +315,7 @@ spawnSpan 9.000
 orbit 0.120
 spin -0.010
 speed 0.350
-Phase 6 @ 5.00
+Phase 6 @ 6.00
 count 5.000
 radius 4.000
 coreBias 1.000
@@ -339,7 +339,7 @@ speed 0.300
 
 Anim Layer 3
 animate 1
-Phase 1 @ 8.00
+Phase 1 @ 14.00
 count 40.000
 radius 4.000
 coreBias 0.320
@@ -360,7 +360,7 @@ spawnSpan 11.000
 orbit 0.100
 spin 0.008
 speed 0.300
-Phase 2 @ 4.00
+Phase 2 @ 6.00
 count 96.000
 radius 4.000
 coreBias 0.320
@@ -423,7 +423,7 @@ spawnSpan 11.000
 orbit 0.100
 spin 0.008
 speed 0.350
-Phase 5 @ 8.00
+Phase 5 @ 9.00
 count 0.000
 radius 6.800
 coreBias 0.320
@@ -444,7 +444,7 @@ spawnSpan 11.000
 orbit 0.100
 spin 0.008
 speed 0.350
-Phase 6 @ 5.00
+Phase 6 @ 6.00
 count 40.000
 radius 4.000
 coreBias 0.320
