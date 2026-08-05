@@ -466,6 +466,16 @@ function emotionPreset(name){
 
 const smoothstep=t=>t*t*(3-2*t);
 const smootherstep=t=>t*t*t*(t*(t*6-15)+10);
+// Per-phase easing curves for animation transitions (default: smootherstep).
+// expoout = fast burst then decelerate (an explosion reaching out).
+const EASINGS={
+  smootherstep,
+  linear:t=>t,
+  expoout:t=>t>=1?1:1-Math.pow(2,-10*t),
+  expoin:t=>t<=0?0:Math.pow(2,10*(t-1)),
+  easeout:t=>1-(1-t)*(1-t),
+  easein:t=>t*t,
+};
 const HARD_CYCLE_SEGMENTS={'purple-red':true,'yellow-blue':true};
 const logLerp=(a,b,t)=>Math.exp(Math.log(Math.max(a,1e-6))*(1-t)+Math.log(Math.max(b,1e-6))*t);
 
@@ -983,7 +993,9 @@ function trackLerp(seq,t,apply){
   for(let i=0;i<seq.length-1;i++){
     const dur=seq[i].duration;
     if(t<acc+dur||i===seq.length-2){
-      apply(seq[i].snapshot,seq[i+1].snapshot,smootherstep(Math.min(1,(t-acc)/dur)));
+      // the source phase's `ease` shapes its outgoing transition
+      const ease=(seq[i].ease&&EASINGS[seq[i].ease])||smootherstep;
+      apply(seq[i].snapshot,seq[i+1].snapshot,ease(Math.min(1,(t-acc)/dur)));
       return;
     }
     acc+=dur;
@@ -1984,6 +1996,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       lines.push('','Anim Layer '+(i+1),'animate '+(F.anim===false?0:1));
       F.timeline.forEach((ph,pi)=>{
         lines.push('Phase '+(pi+1)+' @ '+(+ph.duration).toFixed(2));
+        if(ph.ease) lines.push('ease '+ph.ease);
         if(ph.snapshot&&ph.snapshot.params){
           for(const [k,v] of Object.entries(ph.snapshot.params))
             if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
@@ -1993,6 +2006,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     lines.push('','Anim Scene','animate '+(sceneAnim===false?0:1));
     sceneTimeline.forEach((ph,pi)=>{
       lines.push('Phase '+(pi+1)+' @ '+(+ph.duration).toFixed(2));
+      if(ph.ease) lines.push('ease '+ph.ease);
       if(ph.snapshot){
         if(ph.snapshot.classic)
           for(const [k,v] of Object.entries(ph.snapshot.classic))
@@ -2061,6 +2075,8 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(tl) tl.push(aphase);
         continue;
       }
+      m=line.match(/^ease\s+(\w+)$/i);
+      if(m&&section==='anim'&&aphase){ aphase.ease=m[1].toLowerCase(); continue; }
       if(/^classic$/i.test(line)){ section='classic'; continue; }
       if(/^(view|toggles)$/i.test(line)){ section='view'; continue; }
       m=line.match(/^mode\s+(circles|fireflies)$/i);
