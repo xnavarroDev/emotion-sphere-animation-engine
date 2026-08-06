@@ -72,7 +72,7 @@ trailLife 1.55
 
 Anim Layer 1
 animate 1
-Phase 1 @ 9.00
+Phase 1 @ 14.00
 ease easein
 count 100.000
 radius 4.000
@@ -91,7 +91,7 @@ spawnSpan 18.000
 orbit 0.500
 spin 0.100
 speed 0.600
-Phase 2 @ 19.00
+Phase 2 @ 14.00
 count 660.000
 radius 4.000
 coreBias 1.200
@@ -148,7 +148,7 @@ speed 0.600
 
 Anim Layer 2
 animate 1
-Phase 1 @ 9.00
+Phase 1 @ 14.00
 ease easein
 count 25.000
 radius 3.600
@@ -167,7 +167,7 @@ spawnSpan 16.000
 orbit 0.600
 spin -0.100
 speed 0.600
-Phase 2 @ 19.00
+Phase 2 @ 14.00
 count 140.000
 radius 3.600
 coreBias 1.300
@@ -224,7 +224,7 @@ speed 0.600
 
 Anim Layer 3
 animate 1
-Phase 1 @ 9.00
+Phase 1 @ 14.00
 ease easein
 count 110.000
 radius 4.300
@@ -243,7 +243,7 @@ spawnSpan 20.000
 orbit 0.500
 spin 0.060
 speed 0.600
-Phase 2 @ 19.00
+Phase 2 @ 14.00
 count 760.000
 radius 4.300
 coreBias 1.100
@@ -300,9 +300,9 @@ speed 0.600
 
 Anim Scene
 animate 1
-Phase 1 @ 9.00
+Phase 1 @ 14.00
 glowopacity 0.000
-Phase 2 @ 19.00
+Phase 2 @ 14.00
 glowopacity 0.240
 Phase 3 @ 8.00
 glowopacity 0.240
