@@ -87,14 +87,14 @@ change), then redeploying.
 
 | Emotion | Preset file | Character |
 |---|---|---|
-| **calm** | `firefly-purple.txt` | Purple field, ripples out from center, a slow 40s "deep breath" that expands and contracts; silver flush at the peak |
+| **calm** | `firefly-calm.txt` | Purple field, ripples out from center, a slow 40s "deep breath" that expands and contracts; silver flush at the peak |
 | **sad** | `firefly-sad.txt` | Cool blue; builds to fullness, then suddenly disperses into an empty void, then slowly returns |
 | **warm** | `firefly-warm.txt` | Gold/amber; a 40s arc that blooms, glows, and breathes at the climax with a warm background wash |
 | **anger** | `firefly-anger.txt` | Red; erupts from calm into a fast, churning, tightly-packed storm |
 
 The runtime maps an emotion name → preset file in `index.html` (the
-`PRESET_FILES` object). Other files in `presets/` (`firefly-calm.txt`,
-`firefly-bloom-reference.txt`, `firefly-anger-calm.txt`) are earlier drafts /
+`PRESET_FILES` object). Other files in `presets/`
+(`firefly-bloom-reference.txt`, `firefly-anger-calm.txt`) are earlier drafts /
 references, not wired into the runtime.
 
 ### Editing a preset
@@ -156,7 +156,7 @@ firefly-field.js      The particle renderer (createFireflyField)
 cloud-background.js   Background glow (procedural, self-contained)
 sphere-core.js        Core sphere helpers
 presets/              Emotion presets (editable source of truth)
-  firefly-purple.txt    calm
+  firefly-calm.txt      calm
   firefly-sad.txt       sad
   firefly-warm.txt      warm
   firefly-anger.txt     anger
