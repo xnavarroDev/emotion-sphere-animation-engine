@@ -20,6 +20,9 @@ body.kiosk #params-panel { display:none !important; }
 /* keep the emotion dots in kiosk mode — they're the emotion selector;
    hide the cycle dot (auto-cycle isn't used) */
 body.kiosk #d-cycle { display:none; }
+/* watch link (a shared ?preset in kiosk): one fixed look, so hide the emotion
+   selector too — nothing to pick */
+body.watch #dots { display:none !important; }
 #dots { position:fixed; top:24px; right:24px; z-index:100; display:flex; gap:10px; }
 .dot { width:10px; height:10px; border-radius:50%; cursor:pointer; opacity:0.35; transition:all 0.3s; }
 .dot:hover,.dot.active { opacity:1; transform:scale(1.5); }
@@ -308,6 +311,7 @@ body.kiosk #d-cycle { display:none; }
     <button id="copy-params" type="button">Copy</button>
     <button id="save-params" type="button">Save</button>
     <button id="load-params" type="button" title="Paste a copied snapshot and apply it">Load</button>
+    <button id="share-link" type="button" title="Copy a shareable link that plays this exact look">Link</button>
     <button id="reset-core-params" type="button" title="Reset core to prototype defaults">↺</button>
   </div>
   <div id="params-controls"></div>
@@ -2159,6 +2163,15 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       .catch(()=>flash(e.target,'Failed'));
   });
 
+  // Copy a shareable link that plays THIS exact look live: the whole preset is
+  // encoded (url-safe base64) into a kiosk URL, so the recipient sees the real
+  // animation looping — no file, no server. Decoded by the kiosk boot below.
+  document.getElementById('share-link')?.addEventListener('click',(e)=>{
+    const b64=btoa(unescape(encodeURIComponent(paramsToText()))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    const url=location.origin+location.pathname+'?mode=kiosk&preset='+b64;
+    navigator.clipboard?.writeText(url).then(()=>flash(e.target,'Link copied')).catch(()=>flash(e.target,'Failed'));
+  });
+
   document.getElementById('save-params')?.addEventListener('click',(e)=>{
     const blob=new Blob([paramsToText()],{type:'text/plain'});
     const a=document.createElement('a');
@@ -2235,7 +2248,19 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     }
   }
 
-  const _startEmotion = _q.get('emotion');
+  // ?preset=<base64> — a full look encoded in the URL (from the Link button).
+  // Takes precedence over ?emotion.
+  const _presetParam = _q.get('preset');
+  if(_presetParam){
+    try{
+      let b64=_presetParam.replace(/-/g,'+').replace(/_/g,'/');
+      b64+='='.repeat((4-b64.length%4)%4); // restore stripped padding (atob needs it)
+      const txt=decodeURIComponent(escape(atob(b64)));
+      applyParamsText(txt); startPlayback();
+    }catch(err){ console.warn('bad preset param',err); }
+    if(_kiosk) document.body.classList.add('watch'); // fixed shared look: hide the dots
+  }
+  const _startEmotion = _presetParam ? null : _q.get('emotion');
   if(_startEmotion) playAndMark(_startEmotion);
   window.addEventListener('message',(ev)=>{
     const d=ev.data;
