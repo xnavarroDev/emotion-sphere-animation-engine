@@ -72,7 +72,7 @@ trailLife 1.55
 
 Anim Layer 1
 animate 1
-Phase 1 @ 14.00
+Phase 1 @ 8.00
 ease easein
 count 100.000
 radius 4.000
@@ -94,37 +94,37 @@ speed 0.600
 Phase 2 @ 14.00
 count 660.000
 radius 4.000
-coreBias 1.200
+coreBias 2.500
 intensity 5.500
-hot 0.220
+hot 0.350
 size 0.350
 blinkSpeed 3.000
 blinkDepth 1.000
-wander 3.000
-breath 4.200
+wander 5.500
+breath 2.000
 breathSpeed 1.400
 pulse 2.200
 pulseSpeed 2.000
 spawnSpan 18.000
-orbit 2.000
+orbit 0.800
 spin 0.400
 speed 2.000
 Phase 3 @ 8.00
 count 660.000
 radius 4.000
-coreBias 1.200
+coreBias 2.500
 intensity 5.500
-hot 0.220
+hot 0.350
 size 0.350
 blinkSpeed 3.000
 blinkDepth 1.000
-wander 3.000
-breath 4.200
+wander 5.500
+breath 2.000
 breathSpeed 1.400
 pulse 2.200
 pulseSpeed 2.000
 spawnSpan 18.000
-orbit 2.000
+orbit 0.800
 spin 0.400
 speed 2.000
 Phase 4 @ 4.00
@@ -148,7 +148,7 @@ speed 0.600
 
 Anim Layer 2
 animate 1
-Phase 1 @ 14.00
+Phase 1 @ 8.00
 ease easein
 count 25.000
 radius 3.600
@@ -168,13 +168,13 @@ orbit 0.600
 spin -0.100
 speed 0.600
 Phase 2 @ 14.00
-count 140.000
-radius 3.600
+count 280.000
+radius 2.200
 coreBias 1.300
 intensity 6.000
-hot 0.450
+hot 0.550
 size 0.380
-blinkSpeed 3.000
+blinkSpeed 6.000
 blinkDepth 1.000
 wander 3.000
 breath 4.200
@@ -183,16 +183,16 @@ pulse 2.200
 pulseSpeed 2.100
 spawnSpan 16.000
 orbit 2.000
-spin -0.400
+spin -1.800
 speed 2.000
 Phase 3 @ 8.00
-count 140.000
-radius 3.600
+count 280.000
+radius 2.200
 coreBias 1.300
 intensity 6.000
-hot 0.450
+hot 0.550
 size 0.380
-blinkSpeed 3.000
+blinkSpeed 6.000
 blinkDepth 1.000
 wander 3.000
 breath 4.200
@@ -201,7 +201,7 @@ pulse 2.200
 pulseSpeed 2.100
 spawnSpan 16.000
 orbit 2.000
-spin -0.400
+spin -1.800
 speed 2.000
 Phase 4 @ 4.00
 count 25.000
@@ -224,7 +224,7 @@ speed 0.600
 
 Anim Layer 3
 animate 1
-Phase 1 @ 14.00
+Phase 1 @ 8.00
 ease easein
 count 110.000
 radius 4.300
@@ -245,16 +245,16 @@ spin 0.060
 speed 0.600
 Phase 2 @ 14.00
 count 760.000
-radius 4.300
-coreBias 1.100
+radius 5.200
+coreBias 0.600
 intensity 4.500
 hot 0.080
 size 0.250
 blinkSpeed 3.000
 blinkDepth 1.000
 wander 3.000
-breath 4.800
-breathSpeed 1.300
+breath 6.000
+breathSpeed 2.800
 pulse 2.200
 pulseSpeed 1.900
 spawnSpan 20.000
@@ -263,16 +263,16 @@ spin 0.400
 speed 2.000
 Phase 3 @ 8.00
 count 760.000
-radius 4.300
-coreBias 1.100
+radius 5.200
+coreBias 0.600
 intensity 4.500
 hot 0.080
 size 0.250
 blinkSpeed 3.000
 blinkDepth 1.000
 wander 3.000
-breath 4.800
-breathSpeed 1.300
+breath 6.000
+breathSpeed 2.800
 pulse 2.200
 pulseSpeed 1.900
 spawnSpan 20.000
@@ -300,12 +300,12 @@ speed 0.600
 
 Anim Scene
 animate 1
-Phase 1 @ 14.00
+Phase 1 @ 8.00
 glowopacity 0.000
 Phase 2 @ 14.00
-glowopacity 0.240
+glowopacity 0.450
 Phase 3 @ 8.00
-glowopacity 0.240
+glowopacity 0.450
 Phase 4 @ 4.00
 glowopacity 0.000
 
