@@ -2850,6 +2850,14 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       return fetch(file).then(r=>{ if(!r.ok) throw new Error('preset fetch failed: '+file); return r.text(); })
         .then(txt=>{ applyParamsText(txt); startPlayback(); });
     },
+    // applyPreset(text) -> apply a preset in the same plain-text format the
+    // save/share-link buttons already produce (see any file in /presets for
+    // examples), and start it playing. The hook external code (e.g. the
+    // Gemini "describe a feeling" integration) calls instead of reaching
+    // into the panel's internals directly.
+    applyPreset(text){
+      applyParamsText(text); startPlayback();
+    },
   };
 
   // Kiosk boot: ?mode=kiosk (or ?embed=1) hides the UI; ?emotion=sad picks the
