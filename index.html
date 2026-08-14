@@ -32,6 +32,7 @@
     <div class="rp-header-row">
       <div class="rp-logo">ipmd</div>
       <div class="rp-title">Emotion Sphere<br>Particle Engine</div>
+      <button class="rp-icon-btn rp-icon-btn-plain" id="rp-undo-btn" type="button" title="Undo (Ctrl+Z)" disabled><img class="rp-ico" src="icons/undo-2.svg" alt=""></button>
       <button class="rp-collapse-btn" id="rp-collapse-btn" title="Collapse panel"><img class="rp-ico" src="icons/chevron-left.svg" alt=""></button>
     </div>
     <div class="rp-caption">Create and tune emotion presets for<br>IPMD's Emotion Sphere</div>
@@ -1727,20 +1728,25 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // Not the "saved presets library" (rp-browse-btn stays disabled — that
   // needs real storage for custom presets). This just quick-loads the 4
   // shipped emotion presets, which already exist as static files.
+  // Thumbnails are pre-rendered climax-frame screenshots (see
+  // presets/thumbs/) — calm/sad's actual climax washes to near-white by
+  // design (see GEMINI_PRESET_CONTEXT.md), so those two use a slightly
+  // earlier, more color-legible frame instead of the literal peak.
   const RP_BUILTIN_PRESETS=[
-    {emo:'calm',  label:'Calm',  bg:'#c890b0', fg:'#ffffff'},
-    {emo:'sad',   label:'Sad',   bg:'#22b8e8', fg:'#ffffff'},
-    {emo:'warm',  label:'Warm',  bg:'#FFE066', fg:'#3a2f00'},
-    {emo:'anger', label:'Anger', bg:'#E83040', fg:'#ffffff'},
+    {emo:'calm',  label:'Calm'},
+    {emo:'sad',   label:'Sad'},
+    {emo:'warm',  label:'Warm'},
+    {emo:'anger', label:'Anger'},
   ];
   let rpCardsOffset=0;
   const rpCardEls=[...document.querySelectorAll('.rp-cards-row .rp-card-stub')];
   function rpRenderCards(){
     rpCardEls.forEach((el,i)=>{
       const p=RP_BUILTIN_PRESETS[(rpCardsOffset+i)%RP_BUILTIN_PRESETS.length];
-      el.textContent=p.label;
-      el.style.background=p.bg;
-      el.style.color=p.fg;
+      el.innerHTML='';
+      const label=document.createElement('span'); label.textContent=p.label;
+      el.appendChild(label);
+      el.style.backgroundImage="url('presets/thumbs/preset-"+p.emo+".png')";
       el.title='Load the '+p.label+' preset';
       el.onclick=()=>window.emotionSphere.play(p.emo).catch(err=>console.warn(err.message));
     });
