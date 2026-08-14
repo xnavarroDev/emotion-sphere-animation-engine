@@ -583,6 +583,13 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-segment:last-child { border-radius: 0 10px 10px 0; }
 .rp-segment:last-child .swatch { box-shadow: none; }
 .rp-segment .swatch { position: absolute; inset: 0; }
+/* real per-second thumbnails, layered over the swatch — transparent (swatch
+   shows through) until a captured frame lands on top of them */
+.rp-thumb-slots { position: absolute; inset: 0; }
+.rp-thumb-slot {
+  position: absolute; top: 0; bottom: 0; background-size: cover; background-position: center;
+  border-right: 1px solid rgba(0,0,0,0.08);
+}
 .rp-segment.editing { outline: 2px solid var(--rp-ink); outline-offset: -2px; }
 .rp-segment .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .rp-segment .resize-handle.left { left: 0; }

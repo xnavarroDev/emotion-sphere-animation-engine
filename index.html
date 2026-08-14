@@ -32,7 +32,6 @@
     <div class="rp-header-row">
       <div class="rp-logo">ipmd</div>
       <div class="rp-title">Emotion Sphere<br>Particle Engine</div>
-      <button class="rp-icon-btn rp-icon-btn-plain" id="rp-undo-btn" type="button" title="Undo (Ctrl+Z)" disabled><img class="rp-ico" src="icons/undo-2.svg" alt=""></button>
       <button class="rp-collapse-btn" id="rp-collapse-btn" title="Collapse panel"><img class="rp-ico" src="icons/chevron-left.svg" alt=""></button>
     </div>
     <div class="rp-caption">Create and tune emotion presets for<br>IPMD's Emotion Sphere</div>
@@ -748,12 +747,95 @@ const FIREFLY_LAYER_OVERRIDES=[
 let sphereMode='circles';
 let applySphereModeFn=null; // set once the panel is built
 let addFireflyLayerFn=null; // set once the panel is built (used by Load)
+let removeLastFireflyLayerFn=null; // set once the panel is built (used by Undo, to shrink back down)
 let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
 let backgroundCardSyncUI=null; // re-sync the Background card's controls after animation lerps
 let rpLoopSyncUI=null; // re-sync the redesigned loop toggle after a preset load
 let rpRenderTracksHook=null; // rebuild the redesigned timeline after a preset load
 let rpPanelReady=false; // true once the redesigned panel's own elements/consts exist —
                           // ffSync() can fire during early setup, before that's true
+
+// ---- Undo (Ctrl+Z; wire a button to #rp-undo-btn's click + disabled state
+// whenever one exists — none is placed in the layout yet) ----
+// paramsToText()/applyParamsText() (defined once sphere-core attaches) already
+// serialize and restore the whole editable state — every layer, phase and
+// view setting — for Save/Load/Share. Reusing that as an undo snapshot gives
+// full coverage of the Parameters panel and the Animation editor without
+// threading bespoke history through every individual control.
+let paramsToTextHook=null;    // == paramsToText, once sphere-core attaches
+let applyParamsTextHook=null; // == applyParamsText, once sphere-core attaches
+const UNDO_MAX=100;
+const undoStack=[];
+let undoBaseline=null;     // full-state snapshot as of the last settled edit
+let undoBurstActive=false; // true while a drag/typing burst is still coalescing
+let undoBurstTimer=null;
+let undoRestoring=false;   // true while an undo is being applied, so it isn't re-captured
+let rpUndoBtn=null;
+function undoSyncBtn(){ if(rpUndoBtn) rpUndoBtn.disabled=undoStack.length===0; }
+// The editable state is assembled by two INDEPENDENT async module loads
+// (the field/particle-controls/firefly-field Promise.all, and sphere-core's
+// own import) that can resolve in either order. Grabbing a baseline snapshot
+// the instant either one finishes risks capturing it before the other has
+// populated its half of the state (e.g. before fireflyLayers exists) — so
+// both sides call this, and it only takes effect once both are ready.
+function tryInitUndoBaseline(){
+  if(undoBaseline===null&&paramsToTextHook&&rpPanelReady) undoBaseline=paramsToTextHook();
+}
+// Called from markDirty() on every state-changing action. A burst of rapid
+// changes (a slider drag, a fast run of clicks) coalesces into one undo step:
+// only the FIRST change of a burst records what things looked like just
+// before it; nothing more is recorded until the burst goes quiet.
+function pushUndoBoundary(){
+  if(undoRestoring||!paramsToTextHook) return;
+  if(!undoBurstActive){
+    undoBurstActive=true;
+    if(undoBaseline!==null){
+      undoStack.push(undoBaseline);
+      if(undoStack.length>UNDO_MAX) undoStack.shift();
+      undoSyncBtn();
+    }
+  }
+  clearTimeout(undoBurstTimer);
+  undoBurstTimer=setTimeout(()=>{
+    undoBurstActive=false;
+    undoBaseline=paramsToTextHook();
+  },500);
+}
+function performUndo(){
+  if(!undoStack.length||!applyParamsTextHook) return;
+  clearTimeout(undoBurstTimer);
+  undoBurstActive=false;
+  // A just-dragged slider keeps keyboard focus, and the panel's sync
+  // functions deliberately skip repainting whatever input still has focus
+  // (so they don't fight an active drag) — blur it so undo's restore
+  // actually shows up, not just the underlying value.
+  if(document.activeElement&&document.activeElement!==document.body) document.activeElement.blur();
+  const snap=undoStack.pop();
+  undoRestoring=true;
+  applyParamsTextHook(snap);
+  undoRestoring=false;
+  undoBaseline=snap;
+  undoSyncBtn();
+}
+rpUndoBtn=document.getElementById('rp-undo-btn');
+if(rpUndoBtn) rpUndoBtn.addEventListener('click',performUndo);
+document.addEventListener('keydown',(e)=>{
+  if(e.key.toLowerCase()!=='z'||(!e.metaKey&&!e.ctrlKey)||e.shiftKey) return;
+  // Text fields (layer/preset name, phase rename) keep the browser's native
+  // per-keystroke undo instead of jumping back a whole editor state. Sliders,
+  // colour pickers etc. are <input> too but hold no text to undo, so they
+  // don't count — otherwise Ctrl+Z would silently no-op right after a drag,
+  // since a slider keeps keyboard focus once released.
+  const ae=document.activeElement;
+  const TEXT_INPUT_TYPES=new Set(['text','search','email','url','tel','password','number']);
+  const isTextEditable=ae&&(
+    (ae.tagName==='INPUT'&&TEXT_INPUT_TYPES.has((ae.type||'text').toLowerCase()))||
+    ae.tagName==='TEXTAREA'||ae.isContentEditable
+  );
+  if(isTextEditable) return;
+  e.preventDefault();
+  performUndo();
+});
 
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
 let glowUserColor='#ffffff';
@@ -1117,6 +1199,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     fireflyLayers.push(F);
     return F;
   };
+  removeLastFireflyLayerFn=()=>{
+    if(fireflyLayers.length<=1) return false;
+    disposeFireflyLayer(fireflyLayers.pop());
+    return true;
+  };
   // The circles are the only sphere visual on this branch: hide the old
   // particle-cloud layers and default the shell fireflies off (their toggle
   // still works if someone wants them back).
@@ -1241,6 +1328,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ffRows[key]={input,em,step};
   }
   function ffSync(){
+    ffActive=Math.max(0,Math.min(ffActive,fireflyLayers.length-1));
     const F=fireflyLayers[ffActive];
     const ov=F.overrides[activeEmotion];
     ffTitle.textContent=(ffActive+1)+' / '+fireflyLayers.length;
@@ -1778,13 +1866,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   let rpDirty=false;
   const rpUnsavedEl=document.getElementById('rp-unsaved');
   const rpPresetNameInput=document.getElementById('rp-preset-name');
-  function markDirty(){ rpDirty=true; rpUnsavedEl.classList.add('show'); }
+  function markDirty(){ rpDirty=true; rpUnsavedEl.classList.add('show'); pushUndoBoundary(); }
   rpPresetNameInput.addEventListener('input',()=>{
     rpPresetName=rpPresetNameInput.value.trim()||null;
     markDirty();
   });
   document.getElementById('rp-save-btn').addEventListener('click',(e)=>{
-    navigator.clipboard?.writeText(paramsToText()).catch(()=>{});
+    navigator.clipboard?.writeText(paramsToTextHook?paramsToTextHook():'').catch(()=>{});
     rpDirty=false;
     rpUnsavedEl.classList.remove('show');
     const btn=e.currentTarget;
@@ -1941,6 +2029,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // ---- Live phase editing: whichever phase is currently loaded (if any)
   // gets overwritten with the live state on every edit — no separate Capture.
   let rpEditingPhase=null; // the {duration,snapshot,ease} object being live-edited, or null
+  let thumbLiveEditTimer=null;
   function rpLiveEditCommit(){
     if(!rpEditingPhase) return;
     rpEditingPhase.snapshot=captureTrackSnapshot();
@@ -1951,6 +2040,14 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       const s=rpEditingPhase.snapshot;
       el.swatch.style.background=rpSegmentTint(rpEditingPhase,el.isScene,el.pi);
     }
+    // the phase's timing didn't move, so its thumbnail cache keys wouldn't
+    // naturally miss — drop them, then refresh once the drag settles rather
+    // than re-rendering the filmstrip on every pixel of the drag too
+    thumbInvalidateTrack(trackActive);
+    clearTimeout(thumbLiveEditTimer);
+    thumbLiveEditTimer=setTimeout(()=>{
+      if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
+    },600);
   }
   function rpStopEditingPhase(){
     rpEditingPhase=null;
@@ -2162,6 +2259,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     rpTracksEl.innerHTML='';
     rpSegmentEls.clear();
     rpPhaseGroups.clear();
+    // Track indices are cache keys for thumbnails (see thumbRequest) — a
+    // layer add/remove reshuffles what every index means, so a stale cache
+    // would show the wrong layer's filmstrip under a track's new identity.
+    if(rpTrackCount()!==thumbLastTrackCount){ thumbCache.clear(); thumbLastTrackCount=rpTrackCount(); }
+    const thumbsOn=rpTracksContainer.classList.contains('open'); // don't burn GPU time building filmstrips nobody can see
     const maxTotal=getAnimMaxTotal()||1;
     let refLane=null; // the first track's lane — defines the shared x-axis every track's segments align to
     for(let ti=0; ti<rpTrackCount(); ti++){
@@ -2194,15 +2296,36 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         const leftPct=(acc/total)*100;
         acc+=phase.duration;
 
+        const phaseStartSec=acc-phase.duration; // 'acc' was just advanced past this phase, above
+
         const seg=document.createElement('div'); seg.className='rp-segment';
         seg.style.left=leftPct+'%'; seg.style.width=w+'%';
         const swatch=document.createElement('div'); swatch.className='swatch';
         swatch.style.background=rpSegmentTint(phase,isScene,pi);
         seg.appendChild(swatch);
+        if(thumbsOn){
+          // one slot per second of the SHARED timeline (not phase-relative),
+          // so slot boundaries land on the same absolute seconds across every
+          // track and a phase that starts mid-second gets a partial first slot
+          const slotsWrap=document.createElement('div'); slotsWrap.className='rp-thumb-slots';
+          const phaseEndSec=phaseStartSec+phase.duration;
+          let cursor=phaseStartSec, si=0;
+          while(cursor<phaseEndSec-1e-6){
+            const sliceEnd=Math.min(Math.floor(cursor+1e-6)+1,phaseEndSec);
+            const slot=document.createElement('div');
+            slot.style.left=(((cursor-phaseStartSec)/phase.duration)*100)+'%';
+            slot.style.width=(((sliceEnd-cursor)/phase.duration)*100)+'%';
+            slot.className='rp-thumb-slot';
+            slotsWrap.appendChild(slot);
+            thumbRequest(ti,(cursor+sliceEnd)/2,slot);
+            cursor=sliceEnd; si++;
+          }
+          seg.appendChild(slotsWrap);
+        }
         rpSegmentEls.set(phase,{swatch,isScene,pi}); // so a live edit can recolour just this one
         if(rpEditingPhase===phase) seg.classList.add('editing');
         seg.addEventListener('click',(e)=>{
-          if(e.target.closest('.resize-handle')) return;
+          if(e.target.closest('.resize-handle')||e.target.closest('.rp-segment-del')) return;
           trackActive=ti; // reuse the shared track-selector state
           applyTrackSnapshot(phase.snapshot||captureTrackSnapshot());
           rpEditingPhase=phase;
@@ -2214,6 +2337,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         seg.append(rL,rR);
         wireSegmentResize(rL,phase,lane,'left');
         wireSegmentResize(rR,phase,lane,'right');
+        const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='rp-segment-del';
+        delBtn.textContent='×'; delBtn.title='Delete this phase';
+        delBtn.addEventListener('click',(e)=>{
+          e.stopPropagation();
+          if(rpEditingPhase===phase){ rpEditingPhase=null; editingPhase=false; }
+          timeline.splice(pi,1);
+          markDirty();
+          rpRenderTracks();
+        });
+        seg.appendChild(delBtn);
         segsRow.appendChild(seg);
 
         const nameEl=document.createElement('div'); nameEl.className='rp-phase-name';
@@ -2380,7 +2513,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
 
   // ---- Share Link (regression: the kiosk share URL was unreachable) ----
   document.getElementById('rp-share-link').addEventListener('click',(e)=>{
-    const b64=btoa(unescape(encodeURIComponent(paramsToText())))
+    const b64=btoa(unescape(encodeURIComponent(paramsToTextHook?paramsToTextHook():'')))
       .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     const url=location.origin+location.pathname+'?mode=kiosk&preset='+b64;
     const btn=e.currentTarget; // icon-only — flash the button, don't overwrite its contents
@@ -2412,6 +2545,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
 
   rpPanelReady=true;
   rpSyncParams();
+  tryInitUndoBaseline();
 }).catch(err=>console.error('inner layers failed',err));
 
 // Inner core + glow halo
@@ -2688,9 +2822,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     });
     // A full snapshot resets layer overrides so it reproduces exactly; an old
     // core-only file leaves the current layers untouched.
+    const hasFFSection=/^firefly layer\s+\d+/im.test(text);
     if(/^layer\s+\d+/im.test(text) && innerLayersReady) innerLayers.forEach(L=>L.overrides={});
-    if(/^firefly layer\s+\d+/im.test(text)) fireflyLayers.forEach(F=>{ F.overrides={}; F.name=null; });
-    let fli=0;
+    if(hasFFSection) fireflyLayers.forEach(F=>{ F.overrides={}; F.name=null; });
+    let fli=0, maxFli=-1;
     let ani=-1, aphase=null;
     let section=null, li=-1;
     const setToggle=(id,on,apply)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('active',on); apply(on); };
@@ -2705,6 +2840,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       if(m){
         section='ffield'; fli=parseInt(m[1],10)-1;
         while(fli>=fireflyLayers.length&&addFireflyLayerFn&&addFireflyLayerFn());
+        maxFli=Math.max(maxFli,fli);
         continue;
       }
       m=line.match(/^anim layer\s+(\d+)$/i);
@@ -2802,6 +2938,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(key==='rotatespeed') setSphereRotateSpeed(val);
       }
     }
+    // A snapshot taken with fewer layers than currently exist (e.g. undoing
+    // past an "add layer") must shrink back down, not just leave the extra
+    // layer stale — growth is handled above as each header is parsed.
+    if(hasFFSection) while(fireflyLayers.length>maxFli+1 && removeLastFireflyLayerFn && removeLastFireflyLayerFn());
     // the freshly-loaded layer values are the new resting look
     fireflyLayers.forEach(F=>{ if(F.idle) F.idle={...F.params}; });
     if(innerSyncUI) innerSyncUI();
@@ -2813,6 +2953,15 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     if(backgroundCardSyncUI) backgroundCardSyncUI();
     if(typeof rpRenderTracksHook==='function') rpRenderTracksHook();
   }
+
+  // Undo (top-level, see the UNDO_MAX block near the other cross-closure
+  // hooks): paramsToText/applyParamsText live in this closure, not theirs.
+  // sphere-core and the Promise.all UI setup are two independent async loads
+  // that can finish in either order, so the baseline is only captured once
+  // both have — see tryInitUndoBaseline.
+  paramsToTextHook=paramsToText;
+  applyParamsTextHook=applyParamsText;
+  tryInitUndoBaseline();
 
   const flash=(btn,msg)=>{
     const orig=btn.textContent;
@@ -3502,6 +3651,123 @@ switchEmotion('red');
 const clock = new THREE.Clock();
 const shellPosAttr=shellGeo.getAttribute('position');
 const innerPosAttr=innerGeo.getAttribute('position');
+
+// ---- Animation-timeline thumbnails: a real per-second render of the
+// sphere, captured off an offscreen WebGLRenderTarget — never the on-screen
+// canvas — so seeking through time to generate them never disturbs what's
+// actually on screen. Each track's row previews just THAT track's own
+// contribution (its firefly layer isolated, or nothing but the backdrop for
+// the Background/Scene row), so the filmstrips differ between tracks
+// instead of every row showing the same composed frame.
+const THUMB_W=72, THUMB_H=44, THUMB_CACHE_MAX=600;
+let thumbTarget=null, thumbPixelBuf=null, thumbGlCanvas=null, thumbGlCtx=null, thumbGlImgData=null, thumbCanvas=null, thumbCtx=null;
+function thumbInit(){
+  if(thumbTarget) return;
+  thumbTarget=new THREE.WebGLRenderTarget(THUMB_W,THUMB_H);
+  thumbPixelBuf=new Uint8Array(THUMB_W*THUMB_H*4);
+  thumbGlCanvas=document.createElement('canvas'); thumbGlCanvas.width=THUMB_W; thumbGlCanvas.height=THUMB_H;
+  thumbGlCtx=thumbGlCanvas.getContext('2d');
+  thumbGlImgData=thumbGlCtx.createImageData(THUMB_W,THUMB_H);
+  thumbCanvas=document.createElement('canvas'); thumbCanvas.width=THUMB_W; thumbCanvas.height=THUMB_H;
+  thumbCtx=thumbCanvas.getContext('2d');
+}
+// Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer
+// (or none, for the Background/Scene track), renders one offscreen frame,
+// reads it back into a small canvas, then restores everything exactly as it
+// was — all synchronous, so nothing else ever observes the disturbed state.
+function captureThumbnailAt(sec,trackIndex){
+  thumbInit();
+  const savedTime=animTime;
+  const savedLoop=animLoop;
+  const savedVis=fireflyLayers.map(F=>F.points.visible);
+  const isSceneTrack=trackIndex>=fireflyLayers.length;
+  fireflyLayers.forEach((F,i)=>{ F.points.visible=!isSceneTrack&&i===trackIndex; });
+
+  // Thumbnails are sampled out of order (per phase, per track — not a
+  // monotonic sweep of the clock), which would otherwise trip applyAnimFrame's
+  // "the loop wrapped" detection on every backward jump and respawn tracks
+  // mid-capture, rendering them near-empty. Loop-off skips that branch
+  // entirely without changing the computed frame (animTime here is always
+  // < the total anyway, so animTime%total === min(animTime,total)).
+  animLoop=false;
+  animTime=sec; animScrubbing=true;
+  updateInnerLayers(clock.getElapsedTime(),0);
+  animScrubbing=false;
+
+  renderer.setRenderTarget(thumbTarget);
+  renderer.setClearColor(0x000000,0);
+  renderer.render(scene,camera);
+  renderer.readRenderTargetPixels(thumbTarget,0,0,THUMB_W,THUMB_H,thumbPixelBuf);
+  renderer.setRenderTarget(null);
+
+  // WebGL reads bottom-up; flip into the glCanvas
+  const data=thumbGlImgData.data;
+  for(let y=0;y<THUMB_H;y++){
+    const s=(THUMB_H-1-y)*THUMB_W*4, d=y*THUMB_W*4;
+    data.set(thumbPixelBuf.subarray(s,s+THUMB_W*4),d);
+  }
+  thumbGlCtx.putImageData(thumbGlImgData,0,0);
+
+  // The live canvas always clears transparent and relies on a CSS gradient
+  // + 'plus-lighter' blending behind it (see applyBackground) — a thumbnail
+  // has no such backdrop, so paint the same background gradient in first,
+  // then composite the additive render on top the same way.
+  const bottom=mixHex(bgColor,bgColor2,bgGradientAmount);
+  const grad=thumbCtx.createLinearGradient(0,0,0,THUMB_H);
+  grad.addColorStop(0,bgColor); grad.addColorStop(1,bottom);
+  thumbCtx.globalCompositeOperation='source-over';
+  thumbCtx.fillStyle=grad;
+  thumbCtx.fillRect(0,0,THUMB_W,THUMB_H);
+  thumbCtx.globalCompositeOperation='lighter';
+  thumbCtx.drawImage(thumbGlCanvas,0,0);
+  thumbCtx.globalCompositeOperation='source-over';
+
+  fireflyLayers.forEach((F,i)=>{ F.points.visible=savedVis[i]; });
+  animTime=savedTime; animScrubbing=true;
+  updateInnerLayers(clock.getElapsedTime(),0);
+  animScrubbing=false;
+  animLoop=savedLoop;
+
+  return thumbCanvas.toDataURL('image/jpeg',0.72);
+}
+const thumbCache=new Map(); // "trackIndex|second" -> data URL
+let thumbLastTrackCount=-1; // layer add/remove reshuffles what each track index means
+const thumbQueue=[]; // pending {key,sec,trackIndex,el} jobs
+let thumbQueueRunning=false;
+// One capture per animation frame — readRenderTargetPixels stalls the GPU
+// pipeline, so batching them all synchronously would freeze the tab exactly
+// when the timeline first opens with lots of phases to fill in.
+function thumbProcessQueue(){
+  if(!thumbQueue.length){ thumbQueueRunning=false; return; }
+  thumbQueueRunning=true;
+  const job=thumbQueue.shift();
+  let url=thumbCache.get(job.key);
+  if(url===undefined){
+    if(thumbCache.size>THUMB_CACHE_MAX) thumbCache.clear();
+    url=captureThumbnailAt(job.sec,job.trackIndex);
+    thumbCache.set(job.key,url);
+  }
+  // Setting the style is harmless even if this element's own rpRenderTracks()
+  // pass hasn't attached it to the DOM yet (the very first request of a batch
+  // is processed synchronously, inline, before its own slot is appended) —
+  // an isConnected guard here would just silently drop that element's image.
+  job.el.style.backgroundImage='url('+url+')';
+  requestAnimationFrame(thumbProcessQueue);
+}
+function thumbRequest(trackIndex,sec,el){
+  const key=trackIndex+'|'+sec.toFixed(2);
+  const cached=thumbCache.get(key);
+  if(cached!==undefined){ el.style.backgroundImage='url('+cached+')'; return; }
+  thumbQueue.push({key,sec,trackIndex,el});
+  if(!thumbQueueRunning) thumbProcessQueue();
+}
+// A phase's own content changed (live-edited) without its timing shifting,
+// so its cache key wouldn't naturally miss — clear that track's entries
+// explicitly. Structural changes (resize/insert/delete) shift downstream
+// seconds instead, which already misses the cache on its own.
+function thumbInvalidateTrack(trackIndex){
+  for(const key of thumbCache.keys()) if(key.startsWith(trackIndex+'|')) thumbCache.delete(key);
+}
 
 function animate(){
   requestAnimationFrame(animate);
