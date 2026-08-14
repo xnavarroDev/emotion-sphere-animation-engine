@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Emotion Sphere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@600&family=Inter:wght@600&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#000; min-height:100vh; overflow:hidden; font-family:'Courier New',monospace; cursor:grab; }
@@ -176,6 +179,15 @@ body.watch #dots { display:none !important; }
   flex:1; text-align:center; font:10px/1 'Courier New',monospace; letter-spacing:1px;
   text-transform:uppercase; color:rgba(160,202,239,0.9);
 }
+.ilayer-name-input {
+  display:block; width:100%; box-sizing:border-box; margin-bottom:10px;
+  appearance:none; font:12px/1.2 'Courier New',monospace; text-align:center;
+  color:rgba(255,255,255,0.85); background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 8px;
+}
+.ilayer-name-input:hover { border-color:rgba(160,202,239,0.4); }
+.ilayer-name-input:focus { outline:none; border-color:rgba(160,202,239,0.6); background:rgba(255,255,255,0.08); }
+.ilayer-name-input::placeholder { color:rgba(255,255,255,0.35); }
 /* ---- Animation editor ---- */
 #anim-section {
   margin-top:20px; padding-top:18px;
@@ -275,6 +287,285 @@ body.watch #dots { display:none !important; }
   color: #a0caef; border-color: rgba(160,202,239,0.55);
   box-shadow: 0 0 8px rgba(160,202,239,0.2);
 }
+
+/* ================================================================
+   REDESIGNED PANEL — the new light-theme UI (Parameters / Animate /
+   Background), replacing the old dark #params-panel. Scoped entirely
+   under #redesign-panel so nothing here leaks into the legacy styles
+   above, which stay in place for their own (now-hidden) elements.
+   Values below are pulled directly from the Figma file via the Figma
+   MCP (get_design_context on nodes 1:2 and 73:1346), not approximated.
+   ================================================================ */
+:root {
+  /* Defined on :root (not #redesign-panel) so these cascade to EVERY
+     element regardless of DOM nesting — .rp-float-card and
+     #anim-canvas-controls are siblings of #redesign-panel, not
+     descendants, so scoping these vars to #redesign-panel alone silently
+     dropped every var(--rp-*) declaration inside them (invalid at
+     computed-value time), which is why they were rendering in the old
+     dark theme's Courier New / blue accents instead of this one. */
+  --rp-bg: #e2e8f0;
+  --rp-bg-2: #cedbeb;
+  --rp-bg-3: #cedbeb;
+  --rp-ink: #000000;
+  --rp-ink-2: #44546f;
+  --rp-ink-3: #7d8394;
+  --rp-accent: #64748b;
+  --rp-accent-hover: #55637a;
+  --rp-border: rgba(0,0,0,0.12);
+  --rp-pill: #e9f2ff;
+  --rp-white: #ffffff;
+  --rp-danger: #a8443b;
+  --rp-font: 'Inclusive Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --rp-font-num: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+#redesign-panel {
+  position: fixed; top: 0; left: 0; width: 339px; height: 100%;
+  background: var(--rp-bg); color: var(--rp-ink);
+  font-family: var(--rp-font); font-weight: 600;
+  display: flex; flex-direction: column;
+  overflow: hidden; z-index: 40;
+  transform: translateX(0); transition: transform 0.25s ease;
+}
+#redesign-panel.collapsed { transform: translateX(-100%); }
+#redesign-panel *,
+#anim-canvas-controls *,
+.rp-float-card * { box-sizing: border-box; font-family: inherit; }
+#rp-scroll { flex: 1 1 auto; overflow-y: auto; padding: 9px 15px 16px 14px; }
+#rp-collapse-rail {
+  position: fixed; top: 16px; left: 16px; z-index: 41;
+  width: 34px; height: 34px; border-radius: 8px; border: none;
+  background: var(--rp-bg, #e2e8f0); color: #000;
+  display: none; align-items: center; justify-content: center;
+  cursor: pointer; font: 16px/1 sans-serif;
+}
+#redesign-panel.collapsed ~ #rp-collapse-rail,
+body.rp-collapsed #rp-collapse-rail { display: flex; }
+
+/* ---- header ---- */
+.rp-header-row { display: flex; align-items: center; gap: 16px; justify-content: flex-start; }
+.rp-logo { font-size: 44px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.rp-title { font-size: 16px; font-weight: 600; line-height: 1.25; flex: 1 1 auto; }
+.rp-caption { font-size: 12px; font-weight: 600; color: var(--rp-ink); line-height: 1.4; margin: 8px 0 24px; }
+.rp-collapse-btn {
+  appearance: none; border: none; background: transparent; color: var(--rp-ink);
+  font-size: 18px; cursor: pointer; padding: 4px; line-height: 1; flex: 0 0 auto;
+}
+
+/* ---- generic buttons ---- */
+.rp-btn-primary {
+  display: block; width: 100%; padding: 11px 57px; border: none; border-radius: 10px;
+  background: var(--rp-accent); color: var(--rp-white); font-size: 18px; font-weight: 600;
+  cursor: pointer; text-align: center; min-height: 59px;
+}
+.rp-btn-primary:hover { background: var(--rp-accent-hover); }
+.rp-btn-primary:disabled { opacity: 0.55; cursor: default; }
+.rp-btn-sm {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7.5px;
+  padding: 8px 16px; border: none; border-radius: 7.5px; background: var(--rp-accent);
+  color: var(--rp-white); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.rp-btn-sm:hover { background: var(--rp-accent-hover); }
+.rp-btn-sm.rp-btn-danger { background: var(--rp-bg-3); color: var(--rp-danger); }
+.rp-btn-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.rp-icon-btn {
+  width: 32px; height: 32px; flex: 0 0 auto; border: none; border-radius: 10px;
+  background: var(--rp-accent); color: var(--rp-white); font-size: 15px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.rp-icon-btn:hover { background: var(--rp-accent-hover); }
+.rp-icon-btn-plain { background: transparent; }
+.rp-icon-btn-plain:hover { background: var(--rp-bg-2); }
+
+/* ---- Lucide icon <img> utility classes (exact SVG exports pulled from Figma) ---- */
+.rp-ico { width: 24px; height: 24px; display: block; }
+.rp-ico-18 { width: 18px; height: 18px; }
+.rp-flip-x { transform: scaleX(-1); }
+.rp-flip-y { transform: scaleY(-1); }
+.rp-btn-primary.rp-btn-with-ico { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.rp-section-head .chev .rp-ico, .rp-pinned-row .chev .rp-ico { display: block; }
+
+/* ---- preset cards row ---- */
+.rp-cards-row { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin: 12px 0 12px; }
+.rp-card-stub {
+  flex: 0 0 auto; width: 89px; height: 62px; border-radius: 10px; background: var(--rp-bg-2);
+}
+.rp-cards-arrow { flex: 0 0 auto; background: none; border: none; color: var(--rp-ink); font-size: 18px; cursor: pointer; }
+.rp-stub-note { font-size: 10.5px; font-weight: 400; color: var(--rp-ink-2); margin: -6px 0 24px; }
+
+/* ---- collapsible sections (Describe a feeling / Parameters) ---- */
+.rp-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none; font-size: 20px; font-weight: 600;
+  padding: 0;
+}
+.rp-section-head .chev { font-size: 16px; color: var(--rp-ink); transition: transform 0.15s; }
+.rp-section-body { margin-top: 12px; }
+.rp-section.collapsed .rp-section-body { display: none; }
+.rp-textarea-wrap { position: relative; margin-bottom: 24px; }
+.rp-textarea {
+  width: 100%; min-height: 112px; resize: vertical; border-radius: 10px;
+  border: none; background: var(--rp-pill);
+  color: var(--rp-ink); font: 600 12px/1.45 var(--rp-font);
+  padding: 12px 34px 12px 12px;
+}
+.rp-textarea::placeholder { color: var(--rp-ink-2); opacity: 0.8; }
+.rp-sparkle {
+  position: absolute; right: 12px; bottom: 9px; font-size: 16px; pointer-events: none;
+}
+
+/* ---- Parameters ---- */
+.rp-layer-eyebrow { text-align: center; font-size: 12px; font-weight: 600; color: var(--rp-ink); margin-bottom: 4px; }
+.rp-layer-stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.rp-layer-stepper .rp-name-input { flex: 1 1 auto; text-align: center; }
+.rp-name-input {
+  border: none; background: var(--rp-pill); color: var(--rp-ink);
+  border-radius: 10px; padding: 4px 8px; font: 600 16px/1.3 var(--rp-font);
+  width: 100%;
+}
+.rp-name-input::placeholder { color: var(--rp-ink-2); opacity: 0.8; }
+
+.rp-groups { margin-left: 12px; border-left: 1px solid var(--rp-border); padding-left: 12px; }
+.rp-group { margin-bottom: 4px; }
+.rp-group-head {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  user-select: none; padding: 11px 2px; font-size: 16px; font-weight: 600; color: var(--rp-ink);
+}
+.rp-group-head .chev { font-size: 13px; color: var(--rp-ink); }
+.rp-group-body { display: none; padding: 2px 2px 12px; }
+.rp-group.open .rp-group-body { display: block; }
+.rp-slider-row { display: grid; grid-template-columns: 78px 1fr 40px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.rp-slider-row span { font-size: 11px; font-weight: 600; color: var(--rp-ink-2); text-transform: capitalize; }
+.rp-slider-row input[type=range] { width: 100%; accent-color: var(--rp-accent); }
+.rp-slider-row em { font: 600 11px var(--rp-font-num); color: var(--rp-ink-2); font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+.rp-color-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rp-color-row span { font-size: 11px; font-weight: 600; color: var(--rp-ink-2); flex: 1; }
+.rp-color-row input[type=color] { width: 30px; height: 26px; border: none; border-radius: 6px; padding: 0; background: none; }
+
+/* Rotate applies to the whole sphere, not one layer — sits below the
+   per-layer groups but deliberately un-indented, so it doesn't read as
+   belonging to whichever layer happens to be selected. */
+.rp-sphere-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rp-border); }
+.rp-sphere-row .rp-toggle-row span { font-size: 13px; font-weight: 600; color: var(--rp-ink); }
+.rp-sphere-row .rp-slider-row { margin-top: 8px; opacity: 1; transition: opacity 0.15s; }
+.rp-sphere-row .rp-slider-row.disabled { opacity: 0.4; pointer-events: none; }
+
+/* ---- pinned rows: Background / Animation ---- */
+.rp-pinned-row {
+  display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  user-select: none; font-size: 20px; font-weight: 600; padding: 6px 0;
+}
+.rp-pinned-row .chev { font-size: 18px; color: var(--rp-ink); }
+
+/* ---- persistent footer ---- */
+.rp-footer {
+  flex: 0 0 auto; padding: 13px 15px 13px 14px; min-height: 130px;
+  background: linear-gradient(70deg, rgb(206,219,235) 0%, rgb(226,232,240) 99.57%);
+}
+.rp-footer-row { display: flex; align-items: center; justify-content: flex-start; gap: 17px; margin-bottom: 12px; }
+.rp-footer .rp-name-input { flex: 0 1 auto; width: auto; padding: 4px 8px; }
+.rp-unsaved { font-size: 12px; font-weight: 600; color: var(--rp-ink); }
+.rp-unsaved.show { display: inline; }
+.rp-unsaved:not(.show) { display: none; }
+
+/* ---- floating Background card ---- */
+.rp-float-card {
+  position: fixed; z-index: 60; width: 260px; background: var(--rp-white);
+  border-radius: 12px; box-shadow: 0 10px 30px rgba(10,12,20,0.35);
+  border: 1px solid var(--rp-border); color: var(--rp-ink);
+  font-family: var(--rp-font); overflow: hidden; display: none;
+}
+.rp-float-card.open { display: block; }
+.rp-float-titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; background: var(--rp-bg-2); cursor: grab; font-size: 12.5px; font-weight: 600;
+}
+.rp-float-titlebar:active { cursor: grabbing; }
+.rp-float-close { border: none; background: none; font-size: 15px; color: var(--rp-ink-2); cursor: pointer; }
+.rp-float-body { padding: 14px 14px 16px; }
+.rp-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.rp-toggle-row span { font-size: 12.5px; font-weight: 600; }
+.rp-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--rp-bg-3); border: none; cursor: pointer; }
+.rp-switch::after {
+  content:""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--rp-white); transition: transform 0.15s;
+}
+.rp-switch.on { background: var(--rp-accent); }
+.rp-switch.on::after { transform: translateX(16px); }
+.rp-gradientbar-wrap { margin-top: 6px; }
+.rp-gradientbar-label { font-size: 11px; color: var(--rp-ink-2); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+.rp-gradientbar {
+  position: relative; height: 26px; border-radius: 13px; border: 1px solid var(--rp-border);
+  margin: 0 13px 6px;
+}
+.rp-gradientbar .stop {
+  position: absolute; top: -3px; width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--rp-white); box-shadow: 0 0 0 1px var(--rp-border); cursor: pointer;
+}
+.rp-gradientbar .stop.a { left: -12px; }
+.rp-gradientbar .stop.b { right: -12px; }
+.rp-gradientbar .thumb {
+  position: absolute; top: -5px; width: 12px; height: 36px; border-radius: 6px;
+  background: var(--rp-white); border: 1px solid var(--rp-border); cursor: grab;
+  transform: translateX(-50%);
+}
+.rp-gradientbar .thumb:active { cursor: grabbing; }
+.rp-gradient-toggle { border: none; background: none; cursor: pointer; font-size: 11px; color: var(--rp-accent); font-weight: 600; }
+
+/* ---- Animate timeline ---- */
+#anim-canvas-controls {
+  position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
+  background: var(--rp-bg, #e2e8f0); color: var(--rp-ink, #000);
+  font-family: var(--rp-font); display: none;
+  max-height: 46vh; overflow-y: auto;
+}
+#anim-canvas-controls.open { display: block; }
+.rp-transport { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px; }
+.rp-transport .time { font: 600 16px/1 var(--rp-font-num); font-variant-numeric: tabular-nums; }
+.rp-transport button.rp-icon-btn { background: transparent; color: var(--rp-ink); }
+.rp-transport button.rp-icon-btn:hover { background: var(--rp-bg-3); }
+#rp-tracks { position: relative; }
+.rp-track { display: flex; padding: 10px 20px; }
+.rp-track-label { width: 100px; flex: 0 0 auto; font: 600 12px/1 var(--rp-font-num); padding-top: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-ink-2); }
+/* which track "add phase" targets — a quiet colour/weight shift, not an underline */
+.rp-track-label.focused { color: var(--rp-ink); font-weight: 700; }
+.rp-track-lane { flex: 1 1 auto; position: relative; }
+.rp-phase-labels { position: relative; height: 28px; }
+.rp-phase-durs { position: relative; height: 20px; }
+.rp-phase-name { position: absolute; transform: translateX(-50%); top: 0; background: var(--rp-pill); border-radius: 12.5px; padding: 5px 10px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.rp-phase-dur { position: absolute; transform: translateX(-50%); top: 0; font: 600 12px/1 var(--rp-font-num); color: var(--rp-ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.rp-phase-dur .ease-ico { width: 16.125px; height: 16.125px; cursor: pointer; display: block; }
+.rp-bracket-row { position: relative; height: 10px; }
+.rp-bracket { position: absolute; top: 0; height: 10px; border-left: 2px solid var(--rp-ink-2); border-right: 2px solid var(--rp-ink-2); border-top: 2px solid var(--rp-ink-2); }
+.rp-segments-row { position: relative; height: 48px; display: flex; overflow: hidden; border-radius: 0; }
+.rp-segment { position: absolute; top: 0; height: 48px; cursor: pointer; overflow: hidden; }
+/* a hairline gap in the panel colour keeps adjacent segments readable as
+   separate blocks even when they hold the same colour */
+.rp-segment .swatch { box-shadow: inset -2px 0 0 var(--rp-bg); }
+.rp-segment:first-child { border-radius: 10px 0 0 10px; }
+.rp-segment:last-child { border-radius: 0 10px 10px 0; }
+.rp-segment:last-child .swatch { box-shadow: none; }
+.rp-segment .swatch { position: absolute; inset: 0; }
+.rp-segment.editing { outline: 2px solid var(--rp-ink); outline-offset: -2px; }
+.rp-segment .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
+.rp-segment .resize-handle.left { left: 0; }
+.rp-segment .resize-handle.right { right: 0; }
+.rp-seam-add {
+  position: absolute; top: 7px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--rp-ink); color: var(--rp-white); border: none; font-size: 12px;
+  display: none; align-items: center; justify-content: center; cursor: pointer;
+  transform: translateX(-50%); z-index: 5;
+}
+.rp-track-lane:hover .rp-seam-add { display: flex; }
+.rp-playhead {
+  position: absolute; top: 12px; bottom: 0; width: 2px; background: var(--rp-ink-2);
+  z-index: 6; cursor: ew-resize;
+}
+.rp-playhead::before {
+  content:""; position: absolute; top: -6px; left: -5px; border-left: 6px solid transparent;
+  border-right: 6px solid transparent; border-top: 8px solid var(--rp-ink-2);
+}
+.rp-add-phase-row { padding: 4px 20px 16px; }
 </style>
 </head>
 <body>
@@ -286,14 +577,125 @@ body.watch #dots { display:none !important; }
   <div class="dot" style="background:#c890b0;box-shadow:0 0 8px #e8b0c8" onclick="switchEmotion('purple')" id="d-purple"></div>
   <div class="dot dot-cycle" onclick="toggleCycle()" id="d-cycle" title="Cycle: blue → purple → red → yellow (click a colour dot to stop)"></div>
 </div>
-<div id="hint">DRAG TO ROTATE · CYCLE RUNS ALL FOUR · CLICK A DOT TO STOP</div>
-<div id="proto-switch">
+<div id="hint" style="display:none">DRAG TO ROTATE · CYCLE RUNS ALL FOUR · CLICK A DOT TO STOP</div>
+<div id="proto-switch" style="display:none">
   <button class="proto active" data-proto="core" onclick="switchPrototype('core')">1</button>
   <button class="proto" data-proto="dense" onclick="switchPrototype('dense')">2</button>
   <button class="proto" data-proto="flow" onclick="switchPrototype('flow')">3</button>
   <button class="proto" data-proto="breath" onclick="switchPrototype('breath')">4</button>
 </div>
-<div id="view-toggles">
+
+<!-- ================= REDESIGNED PANEL ================= -->
+<button id="rp-collapse-rail" type="button" title="Show panel"><img class="rp-ico" src="icons/chevron-right.svg" alt=""></button>
+<div id="redesign-panel">
+  <div id="rp-scroll">
+    <div class="rp-header-row">
+      <div class="rp-logo">ipmd</div>
+      <div class="rp-title">Emotion Sphere<br>Particle Engine</div>
+      <button class="rp-collapse-btn" id="rp-collapse-btn" title="Collapse panel"><img class="rp-ico" src="icons/chevron-left.svg" alt=""></button>
+    </div>
+    <div class="rp-caption">Create and tune emotion presets for<br>IPMD's Emotion Sphere</div>
+
+    <button class="rp-btn-primary" id="rp-browse-btn" type="button" disabled title="Preset library not built yet">Browse saved presets</button>
+    <div class="rp-cards-row">
+      <div class="rp-card-stub"></div>
+      <div class="rp-card-stub"></div>
+      <div class="rp-card-stub"></div>
+      <button class="rp-cards-arrow" type="button"><img class="rp-ico rp-ico-18" src="icons/chevron-right.svg" alt=""></button>
+    </div>
+
+    <div class="rp-section" id="rp-describe-section">
+      <div class="rp-section-head" id="rp-describe-head">Describe a feeling… <span class="chev"><img class="rp-ico" src="icons/chevron-down.svg" alt=""></span></div>
+      <div class="rp-section-body">
+        <div class="rp-textarea-wrap">
+          <textarea class="rp-textarea" id="rp-describe-textarea" placeholder="e.g. &#39;a slow deep breath that ripples outward&#39;" disabled></textarea>
+          <span class="rp-sparkle" title="AI generation not built yet">✦</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rp-section" id="rp-params-section">
+      <div class="rp-section-head" id="rp-params-head">Parameters <span class="chev"><img class="rp-ico" src="icons/chevron-down.svg" alt=""></span></div>
+      <div class="rp-section-body" id="rp-params-body">
+        <div class="rp-layer-eyebrow" id="rp-layer-eyebrow">Layer 1/1</div>
+        <div class="rp-layer-stepper">
+          <button class="rp-icon-btn" id="rp-layer-prev" type="button"><img class="rp-ico rp-ico-18" src="icons/chevron-left.svg" alt=""></button>
+          <input class="rp-name-input" id="rp-layer-name" type="text" maxlength="40">
+          <button class="rp-icon-btn" id="rp-layer-next" type="button"><img class="rp-ico rp-ico-18 rp-flip-x" src="icons/chevron-left.svg" alt=""></button>
+        </div>
+        <div class="rp-btn-row">
+          <button class="rp-btn-sm" id="rp-layer-add" type="button"><img class="rp-ico rp-ico-18" src="icons/plus.svg" alt="">add</button>
+          <button class="rp-btn-sm" id="rp-layer-remove" type="button"><img class="rp-ico rp-ico-18" src="icons/x.svg" alt="">remove</button>
+        </div>
+        <div class="rp-btn-row">
+          <button class="rp-btn-sm" id="rp-layer-clear" type="button"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">clear layer</button>
+          <button class="rp-btn-sm" id="rp-layer-zero-all" type="button"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">zero all</button>
+        </div>
+        <div class="rp-groups" id="rp-groups"></div>
+        <div class="rp-sphere-row" id="rp-sphere-row">
+          <div class="rp-toggle-row">
+            <span>Rotate whole sphere</span>
+            <button class="rp-switch" id="rp-rotate-toggle" type="button" title="Whole-sphere setting, not per-layer"></button>
+          </div>
+          <div class="rp-slider-row" id="rp-rotate-speed-row">
+            <span>speed</span>
+            <input type="range" id="rp-rotate-speed" min="-0.5" max="0.5" step="0.005">
+            <em id="rp-rotate-speed-val">0.10</em>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rp-pinned-row" id="rp-background-row">Background <span class="chev rp-flip-y"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
+    <div class="rp-pinned-row" id="rp-animation-row">Animation <span class="chev"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
+  </div>
+
+  <div class="rp-footer">
+    <div class="rp-footer-row">
+      <input class="rp-name-input" id="rp-preset-name" type="text" placeholder="Untitled preset" maxlength="60">
+      <span class="rp-unsaved" id="rp-unsaved">you have unsaved changes!</span>
+    </div>
+    <button class="rp-btn-primary rp-btn-with-ico" id="rp-save-btn" type="button"><img class="rp-ico" src="icons/save-plus.svg" alt="">save to presets</button>
+  </div>
+</div>
+
+<!-- Floating Background card -->
+<div class="rp-float-card" id="rp-bg-card">
+  <div class="rp-float-titlebar" id="rp-bg-titlebar">
+    <span>Background</span>
+    <button class="rp-float-close" id="rp-bg-close" type="button">×</button>
+  </div>
+  <div class="rp-float-body">
+    <div class="rp-toggle-row">
+      <span>Glow</span>
+      <button class="rp-switch" id="rp-glow-toggle" type="button"></button>
+    </div>
+    <div class="rp-color-row">
+      <span>Glow colour</span>
+      <input type="color" id="rp-glow-color">
+    </div>
+    <div class="rp-slider-row" style="grid-template-columns:78px 1fr 40px;">
+      <span>Glow opacity</span>
+      <input type="range" id="rp-glow-opacity" min="0" max="1" step="0.01">
+      <em id="rp-glow-opacity-val">1.00</em>
+    </div>
+    <div class="rp-gradientbar-wrap">
+      <div class="rp-gradientbar-label">
+        <span>Background gradient</span>
+        <button class="rp-gradient-toggle" id="rp-gradient-toggle" type="button">off</button>
+      </div>
+      <div class="rp-gradientbar" id="rp-gradientbar">
+        <div class="stop a" id="rp-bg-stop-a" title="Top colour"></div>
+        <div class="stop b" id="rp-bg-stop-b" title="Bottom colour"></div>
+        <div class="thumb" id="rp-gradient-thumb" title="Drag to blend"></div>
+        <input type="color" id="rp-bg-color-a" style="display:none">
+        <input type="color" id="rp-bg-color-b" style="display:none">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-toggles" style="display:none">
   <button class="vtoggle active" id="toggle-glow" type="button" title="Show/hide the background glow">Glow</button>
   <input type="color" id="glow-color" value="#ffffff" title="Glow colour">
   <input type="range" id="glow-opacity" min="0" max="1" step="0.01" value="1" title="Glow opacity">
@@ -304,7 +706,7 @@ body.watch #dots { display:none !important; }
   <button class="vtoggle" id="toggle-rotate" type="button" title="Auto-rotate the whole sphere">Rotate</button>
   <input type="range" id="rotate-speed" min="-0.5" max="0.5" step="0.005" value="0.10" title="Rotation speed (rad/s about the diagonal axis; negative reverses)" style="display:none">
 </div>
-<button id="params-toggle" type="button">Params</button>
+<button id="params-toggle" type="button" style="display:none">Params</button>
 <aside id="params-panel" class="hidden">
   <h2>Emotion Sphere</h2>
   <div id="params-actions">
@@ -345,6 +747,17 @@ body.watch #dots { display:none !important; }
   </div>
 </aside>
 
+<!-- Redesigned Animate multi-track timeline, docked under the canvas -->
+<div id="anim-canvas-controls">
+  <div class="rp-transport">
+    <span class="time" id="rp-anim-time">0:00/0:00</span>
+    <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-play" type="button" title="Play/Pause"><img class="rp-ico" src="icons/play.svg" id="rp-anim-play-ico" alt=""></button>
+    <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-reset" type="button" title="Reset"><img class="rp-ico" src="icons/rotate-ccw.svg" alt=""></button>
+    <button class="rp-btn-sm" id="rp-anim-add-phase" type="button"><img class="rp-ico rp-ico-18" src="icons/plus.svg" alt="">add phase</button>
+  </div>
+  <div id="rp-tracks"></div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="cloud-background.js?v=5"></script>
 <script>
@@ -365,6 +778,10 @@ body.watch #dots { display:none !important; }
 function hexRgb(h){
   const n=parseInt(h.slice(1),16);
   return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];
+}
+function mixHex(a,b,t){
+  const ca=hexRgb(a), cb=hexRgb(b);
+  return '#'+ca.map((v,i)=>Math.round(Math.max(0,Math.min(1,v+(cb[i]-v)*t))*255).toString(16).padStart(2,'0')).join('');
 }
 const SILVER=hexRgb('#B8C8DC');
 
@@ -820,7 +1237,7 @@ group.add(shellPoints);
   glowColor?.addEventListener('input',()=>{ glowUserColor=glowColor.value; cloudBg.setUserTint(glowColor.value, null); });
   document.getElementById('bg-color')?.addEventListener('input',(e)=>{ setBgColor(e.target.value); });
   document.getElementById('bg-color-2')?.addEventListener('input',(e)=>{ setBgColor2(e.target.value); });
-  document.getElementById('toggle-bg-gradient')?.addEventListener('click',()=>{ setBgGradient(!bgGradient); });
+  document.getElementById('toggle-bg-gradient')?.addEventListener('click',()=>{ setBgGradientAmount(bgGradientAmount>0?0:1); });
   glowOpacity?.addEventListener('input',()=>{ glowUserOpacity=parseFloat(glowOpacity.value); cloudBg.setUserTint(null, glowUserOpacity); });
   document.getElementById('toggle-rotate')?.addEventListener('click',()=>{ setSphereRotate(!sphereRotate); });
   document.getElementById('rotate-speed')?.addEventListener('input',(e)=>{ sphereRotateSpeed=parseFloat(e.target.value); });
@@ -885,13 +1302,16 @@ let sphereMode='circles';
 let applySphereModeFn=null; // set once the panel is built
 let addFireflyLayerFn=null; // set once the panel is built (used by Load)
 let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
+let backgroundCardSyncUI=null; // re-sync the Background card's controls after animation lerps
+let rpPanelReady=false; // true once the redesigned panel's own elements/consts exist —
+                          // ffSync() can fire during early setup, before that's true
 
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
 let glowUserColor='#ffffff';
 let glowUserOpacity=1.0;
 let bgColor='#000000';
 let bgColor2='#c9d0d6';
-let bgGradient=false;
+let bgGradientAmount=0; // 0 = solid bgColor, 1 = full gradient to bgColor2 (continuous, animatable)
 // ---- Whole-sphere auto-rotation (the group all layers live in) ----
 let sphereRotate=false;
 let sphereRotateSpeed=0.10; // rad/s about SPHERE_SPIN_AXIS; negative reverses
@@ -909,25 +1329,22 @@ function setSphereRotateSpeed(v){
   sphereRotateSpeed=v;
   const el=document.getElementById('rotate-speed'); if(el&&document.activeElement!==el) el.value=v;
 }
-// Solid: opaque WebGL clear in bgColor (canvas is the whole background).
-// Gradient: the canvas clears fully TRANSPARENT so a CSS linear-gradient on
+// The canvas always clears fully TRANSPARENT so a CSS linear-gradient on
 // <body> shows through underneath it — the additive circles/glow then sit
 // on top of that gradient exactly like a flat sky-with-bokeh backdrop.
+// bgGradientAmount blends the gradient's bottom stop toward bgColor itself
+// (not just toggling the gradient on/off), so at 0 both stops match — reading
+// as a solid colour — and it can animate smoothly to a full two-tone gradient.
 function applyBackground(){
-  if(bgGradient){
-    renderer.setClearColor(0x000000,0);
-    document.body.style.background='linear-gradient(to bottom, '+bgColor+', '+bgColor2+')';
-    // The scene is all-additive, but the browser composites the transparent
-    // canvas with normal source-over: where particle alpha builds up, the raw
-    // sprite colour REPLACES the light gradient instead of adding to it,
-    // leaving dark cores with pale fringes. plus-lighter makes the page
-    // compositor add the canvas to the gradient, matching in-canvas additive.
-    renderer.domElement.style.mixBlendMode='plus-lighter';
-  }else{
-    renderer.setClearColor(new THREE.Color(bgColor),1);
-    document.body.style.background=bgColor;
-    renderer.domElement.style.mixBlendMode='';
-  }
+  const bottom=mixHex(bgColor,bgColor2,bgGradientAmount);
+  renderer.setClearColor(0x000000,0);
+  document.body.style.background='linear-gradient(to bottom, '+bgColor+', '+bottom+')';
+  // The scene is all-additive, but the browser composites the transparent
+  // canvas with normal source-over: where particle alpha builds up, the raw
+  // sprite colour REPLACES the light gradient instead of adding to it,
+  // leaving dark cores with pale fringes. plus-lighter makes the page
+  // compositor add the canvas to the gradient, matching in-canvas additive.
+  renderer.domElement.style.mixBlendMode='plus-lighter';
 }
 function setBgColor(hex){
   bgColor=hex;
@@ -939,21 +1356,22 @@ function setBgColor2(hex){
   const el=document.getElementById('bg-color-2'); if(el) el.value=hex;
   applyBackground();
 }
-function setBgGradient(on){
-  bgGradient=on;
-  document.getElementById('toggle-bg-gradient')?.classList.toggle('active',on);
-  const el=document.getElementById('bg-color-2'); if(el) el.style.display=on?'':'none';
+function setBgGradientAmount(v){
+  bgGradientAmount=Math.max(0,Math.min(1,v));
+  document.getElementById('toggle-bg-gradient')?.classList.toggle('active',bgGradientAmount>0);
   applyBackground();
 }
 
 // ---- Animation editor state ----
-const ANIM_N=5;
 // Every firefly layer owns its own timeline (F.timeline) so different layers
 // can run phases of different lengths simultaneously; the Scene track carries
 // everything that isn't a circle layer (Fireflies-mode CLASSIC params + glow
 // opacity). With Loop on, each track wraps on its own total duration, so
 // layers drift in and out of phase with each other by design.
-const makeTimeline=()=>Array.from({length:ANIM_N},()=>({duration:5.0,snapshot:null}));
+// A fresh track starts empty — the redesigned UI grows it via "+ Add Phase"
+// (each new phase always arrives with a real, inherited snapshot, never a
+// blank placeholder), so there's nothing to pre-seed.
+const makeTimeline=()=>[];
 const sceneTimeline=makeTimeline();
 let sceneAnim=true;
 let animTimelineSyncHook=null; // set by the anim UI; called after Load rewrites timelines
@@ -1016,6 +1434,15 @@ function lerpFireflySnap(F,a,b,frac){
     }
   }
   F.setParams(p);
+  // colour is captured per phase too (not a numeric param) — lerp it the same
+  // way the Scene track lerps bgColor. Flag it so the live emotion-palette
+  // follow (in updateInnerLayers) doesn't fight this frame's phase-driven colour.
+  if(a.colour&&b.colour){
+    const ca=hexRgb(a.colour), cb=hexRgb(b.colour);
+    const mix=ca.map((v,i)=>v+(cb[i]-v)*frac);
+    F.setColor('#'+mix.map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join(''));
+    F._phaseColourActive=true;
+  }
 }
 function lerpSceneSnap(a,b,frac){
   if(a.classic&&b.classic){
@@ -1032,18 +1459,44 @@ function lerpSceneSnap(a,b,frac){
     const goEl=document.getElementById('glow-opacity');
     if(goEl&&document.activeElement!==goEl) goEl.value=op;
   }
-  // animate the background colour (full-frame warm wash, etc.) between phases
-  if(a.bgColor&&b.bgColor){
-    const ca=hexRgb(a.bgColor), cb=hexRgb(b.bgColor);
-    const mix=ca.map((v,i)=>v+(cb[i]-v)*frac);
-    const hx='#'+mix.map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join('');
-    setBgColor(hx);
+  // the glow's own colour (not just its opacity) — the Background card's
+  // first colour stop, animatable the same way a layer's colour is
+  if(a.glowColor&&b.glowColor){
+    glowUserColor=mixHex(a.glowColor,b.glowColor,frac);
+    cloudBg.setUserTint(glowUserColor,null);
+    const gcEl=document.getElementById('glow-color');
+    if(gcEl&&document.activeElement!==gcEl) gcEl.value=glowUserColor;
   }
+  // animate the background colour (full-frame warm wash, etc.) between phases
+  if(a.bgColor&&b.bgColor) setBgColor(mixHex(a.bgColor,b.bgColor,frac));
+  if(a.bgColor2&&b.bgColor2) setBgColor2(mixHex(a.bgColor2,b.bgColor2,frac));
+  if(typeof a.bgGradientAmount==='number'&&typeof b.bgGradientAmount==='number')
+    setBgGradientAmount(a.bgGradientAmount+(b.bgGradientAmount-a.bgGradientAmount)*frac);
+  if(backgroundCardSyncUI) backgroundCardSyncUI();
 }
 
+let animScrubbing=false; // true while the redesigned playhead is being dragged —
+                          // lets a frame render at the current animTime without
+                          // also advancing it (external code sets animTime directly)
+// The current cycle length — longest enabled track (any layer, or Scene) —
+// exposed for the redesigned timeline UI (track widths, playhead position).
+function getAnimMaxTotal(){
+  let max=0;
+  for(const F of fireflyLayers){
+    if(F.anim===false) continue;
+    const seq=trackSeq(F.timeline);
+    if(seq.length<2) continue;
+    max=Math.max(max,trackTotal(seq));
+  }
+  if(sceneAnim!==false){
+    const seq=trackSeq(sceneTimeline);
+    if(seq.length>=2) max=Math.max(max,trackTotal(seq));
+  }
+  return max;
+}
 function applyAnimFrame(dt){
-  if(!innerLayersReady||!animPlaying) return;
-  animTime+=dt;
+  if(!innerLayersReady||(!animPlaying&&!animScrubbing)) return;
+  if(!animScrubbing) animTime+=dt;
   // One master clock: each track plays its own sequence, then HOLDS its final
   // look — however short its timeline is — until the longest enabled track
   // finishes; with Loop on, everything wraps together at that point.
@@ -1094,6 +1547,7 @@ function applyAnimFrame(dt){
 
 function updateInnerLayers(t,dt){
   if(!innerLayersReady) return;
+  for(const F of fireflyLayers) F._phaseColourActive=false;
   applyAnimFrame(dt||0);
   const cyc=cycleOn&&cycleSegment;
   const emo=currentEmotionColor();
@@ -1122,14 +1576,14 @@ function updateInnerLayers(t,dt){
       _ffBlendColor.set(ovB||FIREFLY_EMOTION_COLORS[segB]||0xffc24a);
       _ffTargetColor.lerp(_ffBlendColor,st);
     }
-    F.color().lerp(_ffTargetColor,0.05);
+    if(!F._phaseColourActive) F.color().lerp(_ffTargetColor,0.05);
     F.update(t);
     if(F.params.spin&&F.spinAxis) F.points.rotateOnAxis(F.spinAxis,F.params.spin*F.params.speed*(dt||0));
   }
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=29')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=30')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -1192,7 +1646,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     });
     F.overrides={...overrides};
     F.anim=true; // included in animation playback (per-layer toggle)
-    F.tintColor='#'+F.tintColor().getHexString(); // the `tint` blend target (default silver)
+    F.name=null; // optional custom label ("main blue layer"); falls back to "Layer N"
     F.idle={...F.params}; // the resting/static look; Reset restores this (kept
                           // current by manual slider edits + preset load)
     F.timeline=makeTimeline(); // this layer's own phases + durations
@@ -1232,6 +1686,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const ffTitle=document.createElement('span'); ffTitle.className='ilayer-title';
   const ffNext=document.createElement('button'); ffNext.type='button'; ffNext.className='ilayer-arrow'; ffNext.textContent='\u203a';
   ffTabsEl.append(ffPrev,ffTitle,ffNext);
+  // Optional per-layer name, edited here and reflected everywhere the layer
+  // is referenced (the Animation track selector shares this same value).
+  const ffNameInput=document.createElement('input'); ffNameInput.type='text';
+  ffNameInput.className='ilayer-name-input'; ffNameInput.maxLength=40;
+  ffTabsEl.after(ffNameInput);
+  ffNameInput.addEventListener('input',()=>{
+    fireflyLayers[ffActive].name=ffNameInput.value.trim()||null;
+    if(animLayerSyncHook) animLayerSyncHook();
+  });
   const ffLayerActions=document.createElement('div');
   ffLayerActions.style.cssText='display:flex;gap:8px;margin-bottom:14px;';
   const mkLayerBtn=(label,title)=>{
@@ -1286,18 +1749,6 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ffSync();
   });
 
-  // Tint colour: the target the `tint` slider blends toward (per layer). Lets a
-  // climax shift the particles to any colour, not just the default silver.
-  const ffTintRow=document.createElement('div'); ffTintRow.className='row';
-  const ffTintSpan=document.createElement('span'); ffTintSpan.textContent='tint col';
-  const ffTintInput=document.createElement('input'); ffTintInput.type='color';
-  ffTintRow.append(ffTintSpan,ffTintInput); ffCtrlEl.appendChild(ffTintRow);
-  ffTintInput.addEventListener('input',()=>{
-    const F=fireflyLayers[ffActive];
-    F.tintColor='#'+ffTintInput.value.replace('#','');
-    F.setTintColor(F.tintColor);
-  });
-
   const FF_SLIDERS=[
     ['count',0,600,5],
     ['radius',0.2,4,0.05],
@@ -1315,7 +1766,6 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ['ripple',0,1,0.02],
     ['rippleSpeed',0.1,3,0.05],
     ['rectFill',0,1,0.02],
-    ['tint',0,1,0.02],
     ['spawnSpan',0,40,0.5],
     ['orbit',0,2,0.02],
     ['spin',-0.4,0.4,0.01],
@@ -1344,11 +1794,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   function ffSync(){
     const F=fireflyLayers[ffActive];
     const ov=F.overrides[activeEmotion];
-    ffTitle.textContent='Layer '+(ffActive+1)+' / '+fireflyLayers.length;
+    ffTitle.textContent=(ffActive+1)+' / '+fireflyLayers.length;
+    ffNameInput.placeholder='Layer '+(ffActive+1);
+    if(document.activeElement!==ffNameInput) ffNameInput.value=F.name||'';
     if(animLayerSyncHook) animLayerSyncHook();
     if(document.activeElement!==ffColorInput) ffColorInput.value=ov||ffRgbHex(F.color());
     ffColorReset.classList.toggle('on',!ov); // lit = following this emotion
-    if(document.activeElement!==ffTintInput) ffTintInput.value=F.tintColor||ffRgbHex(F.tintColor());
     for(const [key,,,step] of FF_SLIDERS){
       const { input,em }=ffRows[key];
       // never fight a slider the user is holding (animation lerps re-sync
@@ -1356,6 +1807,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       if(document.activeElement!==input) input.value=F.params[key];
       em.textContent=(+F.params[key]).toFixed(step<1?2:0);
     }
+    if(rpPanelReady) rpSyncParams();
   }
   ffPrev.addEventListener('click',()=>{ ffActive=(ffActive-1+fireflyLayers.length)%fireflyLayers.length; ffSync(); });
   ffNext.addEventListener('click',()=>{ ffActive=(ffActive+1)%fireflyLayers.length; ffSync(); });
@@ -1577,7 +2029,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const n=fireflyLayers.length+1;
     trackActive=Math.min(trackActive,n-1);
     const on=isSceneTrack()?sceneAnim!==false:fireflyLayers[trackActive].anim!==false;
-    trTitle.textContent=isSceneTrack()?'Scene':'Layer '+(trackActive+1)+' / '+fireflyLayers.length;
+    trTitle.textContent=isSceneTrack()?'Scene':(fireflyLayers[trackActive].name||'Layer '+(trackActive+1))+' — '+(trackActive+1)+'/'+fireflyLayers.length;
     trToggle.textContent=on?'On':'Off';
     trToggle.classList.toggle('on',on);
   }
@@ -1604,8 +2056,25 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // Capture the active track's current state into one phase snapshot
   function captureTrackSnapshot(){
     return isSceneTrack()
-      ? { classic:{...CLASSIC}, glowOpacity:glowUserOpacity }
-      : { params:{...fireflyLayers[trackActive].params} };
+      ? { classic:{...CLASSIC}, glowOpacity:glowUserOpacity, glowColor:glowUserColor,
+          bgColor, bgColor2, bgGradientAmount }
+      : { params:{...fireflyLayers[trackActive].params}, colour:ffRgbHex(fireflyLayers[trackActive].color()) };
+  }
+
+  // Deep-copy a snapshot so a new phase can start as an independent clone of
+  // another one (editing the new phase must never mutate the source).
+  function cloneSnapshot(snap){
+    if(!snap) return null;
+    const c={};
+    if(snap.params) c.params={...snap.params};
+    if(snap.colour) c.colour=snap.colour;
+    if(snap.classic) c.classic={...snap.classic};
+    if(typeof snap.glowOpacity==='number') c.glowOpacity=snap.glowOpacity;
+    if(snap.glowColor) c.glowColor=snap.glowColor;
+    if(snap.bgColor) c.bgColor=snap.bgColor;
+    if(snap.bgColor2) c.bgColor2=snap.bgColor2;
+    if(typeof snap.bgGradientAmount==='number') c.bgGradientAmount=snap.bgGradientAmount;
+    return c;
   }
 
   // Load a phase's stored snapshot back onto the live controls so it can be
@@ -1621,9 +2090,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         glowUserOpacity=snapshot.glowOpacity; cloudBg.setUserTint(null,glowUserOpacity);
         const el=document.getElementById('glow-opacity'); if(el) el.value=glowUserOpacity;
       }
+      if(snapshot.glowColor){
+        glowUserColor=snapshot.glowColor; cloudBg.setUserTint(glowUserColor,null);
+        const el=document.getElementById('glow-color'); if(el) el.value=glowUserColor;
+      }
+      if(snapshot.bgColor) setBgColor(snapshot.bgColor);
+      if(snapshot.bgColor2) setBgColor2(snapshot.bgColor2);
+      if(typeof snapshot.bgGradientAmount==='number') setBgGradientAmount(snapshot.bgGradientAmount);
       if(classicSyncUI) classicSyncUI();
+      if(backgroundCardSyncUI) backgroundCardSyncUI();
     }else if(snapshot.params){
       fireflyLayers[trackActive].setParams({...snapshot.params});
+      if(snapshot.colour) fireflyLayers[trackActive].setColor(snapshot.colour);
       // switch the FIREFLY FIELD sliders to the layer being edited, so the
       // controls you see and drag are the ones this phase belongs to
       if(fireflyFieldSelect) fireflyFieldSelect(trackActive);
@@ -1683,7 +2161,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const addBtn=document.createElement('button'); addBtn.className='anim-cap';
     addBtn.textContent='+ Add Phase'; addBtn.style.cssText='margin-top:10px;width:100%;padding:6px;';
     addBtn.addEventListener('click',()=>{
-      timeline.push({duration:5.0,snapshot:null});
+      // a new phase starts as a clone of the one before it (same values,
+      // held until you deliberately change something) — never blank, since
+      // a blank phase is just extra typing to get back to where you were.
+      // With nothing before it yet, fall back to the current live look.
+      const last=timeline[timeline.length-1];
+      const snapshot=cloneSnapshot(last&&last.snapshot)||captureTrackSnapshot();
+      timeline.push({duration:5.0,snapshot});
       rebuildPhaseRows();
     });
     animPhasesEl.appendChild(addBtn);
@@ -1775,6 +2259,599 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     animBody.style.display=open?'':'none';
     animChevron.style.transform=open?'rotate(90deg)':'rotate(0deg)';
   });
+  // ================= REDESIGNED PANEL WIRING =================
+  const rpPanel=document.getElementById('redesign-panel');
+  const rpCollapseBtn=document.getElementById('rp-collapse-btn');
+  const rpCollapseRail=document.getElementById('rp-collapse-rail');
+  const rpTracksContainer=document.getElementById('anim-canvas-controls');
+  function rpSetCollapsed(on){
+    rpPanel.classList.toggle('collapsed',on);
+    document.body.classList.toggle('rp-collapsed',on);
+    if(rpTracksContainer) rpTracksContainer.style.left=on?'0':'339px';
+    // re-fit the sphere to the newly-freed (or newly-covered) area, after
+    // the slide transition finishes so offsetWidth reads its settled value
+    if(window.rpLayoutViewport){ window.rpLayoutViewport(); setTimeout(window.rpLayoutViewport,280); }
+  }
+  rpCollapseBtn.addEventListener('click',()=>rpSetCollapsed(true));
+  rpCollapseRail.addEventListener('click',()=>rpSetCollapsed(false));
+
+  // ---- Collapsible sections — the chevron flips (points up) while
+  // expanded, matching the Figma source exactly, and drops back to
+  // pointing down once collapsed.
+  function wireSectionToggle(headId,sectionId){
+    const head=document.getElementById(headId);
+    const chev=head.querySelector('.chev');
+    head.addEventListener('click',()=>{
+      const collapsed=document.getElementById(sectionId).classList.toggle('collapsed');
+      chev.classList.toggle('rp-flip-y',!collapsed);
+    });
+  }
+  wireSectionToggle('rp-describe-head','rp-describe-section');
+  wireSectionToggle('rp-params-head','rp-params-section');
+  document.querySelector('#rp-describe-head .chev').classList.add('rp-flip-y');
+  document.querySelector('#rp-params-head .chev').classList.add('rp-flip-y');
+
+  // ---- Persistent footer: preset name + dirty tracking + save ----
+  let rpPresetName=null;
+  let rpDirty=false;
+  const rpUnsavedEl=document.getElementById('rp-unsaved');
+  const rpPresetNameInput=document.getElementById('rp-preset-name');
+  function markDirty(){ rpDirty=true; rpUnsavedEl.classList.add('show'); }
+  rpPresetNameInput.addEventListener('input',()=>{
+    rpPresetName=rpPresetNameInput.value.trim()||null;
+    markDirty();
+  });
+  document.getElementById('rp-save-btn').addEventListener('click',(e)=>{
+    navigator.clipboard?.writeText(paramsToText()).catch(()=>{});
+    rpDirty=false;
+    rpUnsavedEl.classList.remove('show');
+    const btn=e.currentTarget;
+    const orig=btn.textContent;
+    btn.textContent='Saved to clipboard!';
+    setTimeout(()=>{ btn.textContent=orig; },1400);
+  });
+
+  // ---- Parameters: layer stepper, add/remove/clear, regrouped sliders ----
+  const rpLayerEyebrow=document.getElementById('rp-layer-eyebrow');
+  const rpLayerName=document.getElementById('rp-layer-name');
+  document.getElementById('rp-layer-prev').addEventListener('click',()=>{
+    ffActive=(ffActive-1+fireflyLayers.length)%fireflyLayers.length; ffSync();
+  });
+  document.getElementById('rp-layer-next').addEventListener('click',()=>{
+    ffActive=(ffActive+1)%fireflyLayers.length; ffSync();
+  });
+  rpLayerName.addEventListener('input',()=>{
+    fireflyLayers[ffActive].name=rpLayerName.value.trim()||null;
+    if(animLayerSyncHook) animLayerSyncHook();
+    markDirty();
+  });
+  document.getElementById('rp-layer-add').addEventListener('click',()=>{
+    const F=addFireflyLayerFn&&addFireflyLayerFn();
+    if(!F) return;
+    ffActive=fireflyLayers.length-1; ffSync(); rpRenderTracks(); markDirty();
+  });
+  document.getElementById('rp-layer-remove').addEventListener('click',()=>{
+    if(fireflyLayers.length<=1) return;
+    disposeFireflyLayer(fireflyLayers[ffActive]);
+    fireflyLayers.splice(ffActive,1);
+    ffActive=Math.min(ffActive,fireflyLayers.length-1);
+    ffSync(); rpRenderTracks(); markDirty();
+  });
+  document.getElementById('rp-layer-clear').addEventListener('click',()=>{
+    const F=fireflyLayers[ffActive];
+    const patch={};
+    for(const [key,min] of FF_SLIDERS) patch[key]=min;
+    F.setParams(patch);
+    F.idle={...F.params};
+    rpLiveEditCommit();
+    ffSync(); markDirty();
+  });
+  document.getElementById('rp-layer-zero-all').addEventListener('click',()=>{
+    if(!confirm('This clears all '+fireflyLayers.length+' layers — continue?')) return;
+    const patch={};
+    for(const [key,min] of FF_SLIDERS) patch[key]=min;
+    for(const F of fireflyLayers){ F.setParams(patch); F.idle={...F.params}; }
+    ffSync(); rpRenderTracks(); markDirty();
+  });
+
+  // ---- Rotate whole sphere — global, not per-layer (see .rp-sphere-row) ----
+  const rpRotateToggle=document.getElementById('rp-rotate-toggle');
+  const rpRotateSpeed=document.getElementById('rp-rotate-speed');
+  const rpRotateSpeedVal=document.getElementById('rp-rotate-speed-val');
+  const rpRotateSpeedRow=document.getElementById('rp-rotate-speed-row');
+  function rpSyncRotate(){
+    rpRotateToggle.classList.toggle('on',sphereRotate);
+    rpRotateSpeedRow.classList.toggle('disabled',!sphereRotate);
+    if(document.activeElement!==rpRotateSpeed) rpRotateSpeed.value=sphereRotateSpeed;
+    rpRotateSpeedVal.textContent=(+sphereRotateSpeed).toFixed(3);
+  }
+  rpRotateToggle.addEventListener('click',()=>{
+    setSphereRotate(!sphereRotate);
+    rpSyncRotate(); markDirty();
+  });
+  rpRotateSpeed.addEventListener('input',()=>{
+    setSphereRotateSpeed(parseFloat(rpRotateSpeed.value));
+    rpRotateSpeedVal.textContent=sphereRotateSpeed.toFixed(3);
+    markDirty();
+  });
+  rpSyncRotate();
+
+  const RP_GROUPS=[
+    {name:'Look', keys:['count','radius','intensity','hot','size','blinkSpeed','blinkDepth','spawnSpan'], color:true},
+    {name:'Motion', keys:['wander','orbit','spin','speed']},
+    {name:'Breathing', keys:['breath','breathSpeed','pulse','pulseSpeed','ripple','rippleSpeed']},
+    {name:'Shape', keys:['coreBias','rectFill']},
+  ];
+  const rpGroupsEl=document.getElementById('rp-groups');
+  const rpSliderEls={};
+  let rpColorInput=null;
+  RP_GROUPS.forEach(g=>{
+    const wrap=document.createElement('div'); wrap.className='rp-group';
+    const head=document.createElement('div'); head.className='rp-group-head';
+    head.innerHTML='<span>'+g.name+'</span><span class="chev"><img class="rp-ico rp-ico-18" src="icons/chevron-down.svg" alt=""></span>';
+    const body=document.createElement('div'); body.className='rp-group-body';
+    const groupChev=head.querySelector('.chev');
+    head.addEventListener('click',()=>{
+      const open=wrap.classList.toggle('open');
+      groupChev.classList.toggle('rp-flip-y',open);
+    });
+    if(g.color){
+      const row=document.createElement('div'); row.className='rp-color-row';
+      const span=document.createElement('span'); span.textContent='colour';
+      const input=document.createElement('input'); input.type='color';
+      row.append(span,input); body.appendChild(row);
+      rpColorInput=input;
+      input.addEventListener('input',()=>{
+        fireflyLayers[ffActive].overrides[activeEmotion]=input.value;
+        fireflyLayers[ffActive].setColor(input.value);
+        rpLiveEditCommit();
+        markDirty();
+      });
+    }
+    for(const key of g.keys){
+      const def=FF_SLIDERS.find(d=>d[0]===key);
+      if(!def) continue;
+      const [,min,max,step]=def;
+      const row=document.createElement('div'); row.className='rp-slider-row';
+      const span=document.createElement('span'); span.textContent=key;
+      const input=document.createElement('input');
+      input.type='range'; input.min=min; input.max=max; input.step=step;
+      const em=document.createElement('em');
+      row.append(span,input,em); body.appendChild(row);
+      input.addEventListener('input',()=>{
+        const v=parseFloat(input.value);
+        em.textContent=v.toFixed(step<1?2:0);
+        fireflyLayers[ffActive].setParams({ [key]:v });
+        if(!animPlaying&&!editingPhase) fireflyLayers[ffActive].idle={...fireflyLayers[ffActive].params};
+        rpLiveEditCommit();
+        markDirty();
+      });
+      rpSliderEls[key]={input,em,step};
+    }
+    // Rotate is whole-sphere, not per-layer, but it's grouped here with
+    // Motion's other rotation-ish control (spin) for discoverability — the
+    // "whole sphere" wording on it still says so honestly.
+    if(g.name==='Motion'){
+      const sphereRow=document.getElementById('rp-sphere-row');
+      if(sphereRow) body.appendChild(sphereRow);
+    }
+    wrap.append(head,body);
+    rpGroupsEl.appendChild(wrap);
+  });
+  // All four groups start COLLAPSED, matching the Figma source — an
+  // expanded Look pushed Background/Animation below the fold.
+
+  function rpSyncParams(){
+    const F=fireflyLayers[ffActive];
+    if(!F) return;
+    rpLayerEyebrow.textContent='Layer '+(ffActive+1)+'/'+fireflyLayers.length;
+    if(document.activeElement!==rpLayerName) rpLayerName.value=F.name||'';
+    rpLayerName.placeholder='Layer '+(ffActive+1);
+    const ov=F.overrides[activeEmotion];
+    if(rpColorInput&&document.activeElement!==rpColorInput) rpColorInput.value=ov||ffRgbHex(F.color());
+    for(const key in rpSliderEls){
+      const {input,em,step}=rpSliderEls[key];
+      if(document.activeElement!==input) input.value=F.params[key];
+      em.textContent=(+F.params[key]).toFixed(step<1?2:0);
+    }
+  }
+
+  // ---- Live phase editing: whichever phase is currently loaded (if any)
+  // gets overwritten with the live state on every edit — no separate Capture.
+  let rpEditingPhase=null; // the {duration,snapshot,ease} object being live-edited, or null
+  function rpLiveEditCommit(){
+    if(!rpEditingPhase) return;
+    rpEditingPhase.snapshot=captureTrackSnapshot();
+    // recolour just this segment — a full rebuild here fired on every pixel
+    // of every slider drag, which is what made tuning feel janky
+    const el=rpSegmentEls.get(rpEditingPhase);
+    if(el){
+      const s=rpEditingPhase.snapshot;
+      el.swatch.style.background=rpSegmentTint(rpEditingPhase,el.isScene,el.pi);
+    }
+  }
+  function rpStopEditingPhase(){
+    rpEditingPhase=null;
+    editingPhase=false;
+  }
+
+  // ---- Background floating card ----
+  const rpBgCard=document.getElementById('rp-bg-card');
+  const rpBgTitlebar=document.getElementById('rp-bg-titlebar');
+  document.getElementById('rp-bg-close').addEventListener('click',()=>rpBgCard.classList.remove('open'));
+  document.getElementById('rp-background-row').addEventListener('click',()=>{
+    rpBgCard.classList.toggle('open');
+    if(rpBgCard.classList.contains('open')&&!rpBgCard.style.left){
+      rpBgCard.style.left='360px'; rpBgCard.style.top='80px';
+    }
+  });
+  (function makeDraggable(handle,target){
+    let dragging=false,dx=0,dy=0;
+    handle.addEventListener('pointerdown',(e)=>{
+      dragging=true; handle.setPointerCapture(e.pointerId);
+      const r=target.getBoundingClientRect();
+      dx=e.clientX-r.left; dy=e.clientY-r.top;
+    });
+    handle.addEventListener('pointermove',(e)=>{
+      if(!dragging) return;
+      target.style.left=Math.max(0,e.clientX-dx)+'px';
+      target.style.top=Math.max(0,e.clientY-dy)+'px';
+    });
+    handle.addEventListener('pointerup',(e)=>{ dragging=false; try{handle.releasePointerCapture(e.pointerId);}catch(err){} });
+  })(rpBgTitlebar,rpBgCard);
+
+  const rpGlowToggle=document.getElementById('rp-glow-toggle');
+  const rpGlowColor=document.getElementById('rp-glow-color');
+  const rpGlowOpacity=document.getElementById('rp-glow-opacity');
+  const rpGlowOpacityVal=document.getElementById('rp-glow-opacity-val');
+  const rpBgColorA=document.getElementById('rp-bg-color-a');
+  const rpBgColorB=document.getElementById('rp-bg-color-b');
+  const rpBgStopA=document.getElementById('rp-bg-stop-a');
+  const rpBgStopB=document.getElementById('rp-bg-stop-b');
+  const rpGradientBar=document.getElementById('rp-gradientbar');
+  const rpGradientThumb=document.getElementById('rp-gradient-thumb');
+  const rpGradientToggle=document.getElementById('rp-gradient-toggle');
+  let rpLastGradientAmount=1;
+
+  rpGlowToggle.addEventListener('click',()=>{
+    const on=!rpGlowToggle.classList.contains('on');
+    rpGlowToggle.classList.toggle('on',on);
+    cloudBg.setVisible(on);
+    document.getElementById('toggle-glow')?.classList.toggle('active',on);
+    rpLiveEditCommit(); markDirty();
+  });
+  rpGlowColor.addEventListener('input',()=>{
+    glowUserColor=rpGlowColor.value; cloudBg.setUserTint(glowUserColor,null);
+    rpLiveEditCommit(); markDirty();
+  });
+  rpGlowOpacity.addEventListener('input',()=>{
+    glowUserOpacity=parseFloat(rpGlowOpacity.value);
+    cloudBg.setUserTint(null,glowUserOpacity);
+    rpGlowOpacityVal.textContent=glowUserOpacity.toFixed(2);
+    rpLiveEditCommit(); markDirty();
+  });
+  rpBgStopA.addEventListener('click',()=>rpBgColorA.click());
+  rpBgStopB.addEventListener('click',()=>rpBgColorB.click());
+  rpBgColorA.addEventListener('input',()=>{ setBgColor(rpBgColorA.value); rpSyncBgCard(); rpLiveEditCommit(); markDirty(); });
+  rpBgColorB.addEventListener('input',()=>{ setBgColor2(rpBgColorB.value); rpSyncBgCard(); rpLiveEditCommit(); markDirty(); });
+  rpGradientToggle.addEventListener('click',()=>{
+    if(bgGradientAmount>0){ rpLastGradientAmount=bgGradientAmount; setBgGradientAmount(0); }
+    else setBgGradientAmount(rpLastGradientAmount||1);
+    rpSyncBgCard(); rpLiveEditCommit(); markDirty();
+  });
+  (function(){
+    let dragging=false;
+    function setFromClientX(clientX){
+      const r=rpGradientBar.getBoundingClientRect();
+      const t=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+      setBgGradientAmount(t);
+      rpSyncBgCard(); rpLiveEditCommit(); markDirty();
+    }
+    rpGradientThumb.addEventListener('pointerdown',(e)=>{
+      dragging=true; rpGradientThumb.setPointerCapture(e.pointerId); setFromClientX(e.clientX);
+    });
+    rpGradientThumb.addEventListener('pointermove',(e)=>{ if(dragging) setFromClientX(e.clientX); });
+    rpGradientThumb.addEventListener('pointerup',(e)=>{ dragging=false; try{rpGradientThumb.releasePointerCapture(e.pointerId);}catch(err){} });
+  })();
+  function rpSyncBgCard(){
+    rpGlowToggle.classList.toggle('on', cloudBg.visible!==false);
+    if(document.activeElement!==rpGlowColor) rpGlowColor.value=glowUserColor;
+    if(document.activeElement!==rpGlowOpacity) rpGlowOpacity.value=glowUserOpacity;
+    rpGlowOpacityVal.textContent=(+glowUserOpacity).toFixed(2);
+    rpBgColorA.value=bgColor; rpBgColorB.value=bgColor2;
+    rpBgStopA.style.background=bgColor; rpBgStopB.style.background=bgColor2;
+    rpGradientBar.style.background='linear-gradient(to right, '+bgColor+', '+bgColor2+')';
+    rpGradientThumb.style.left=(bgGradientAmount*100)+'%';
+    rpGradientToggle.textContent=bgGradientAmount>0?'on':'off';
+  }
+  backgroundCardSyncUI=rpSyncBgCard;
+  rpSyncBgCard();
+
+  // ---- Multi-track Animate timeline ----
+  const rpTracksEl=document.getElementById('rp-tracks');
+  const rpTimeEl=document.getElementById('rp-anim-time');
+  const rpPlayBtn=document.getElementById('rp-anim-play');
+  const rpResetBtn=document.getElementById('rp-anim-reset');
+  function rpTrackCount(){ return fireflyLayers.length+1; } // +1 for Background/Scene
+  function rpFmtTime(s){ s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+
+  // Re-position one lane's segments/labels from its phase durations, without
+  // rebuilding any DOM — so a resize drag keeps the pointer capture alive.
+  function rpRelayoutLane(lane){
+    const timeline=lane&&lane._timeline, recs=lane&&lane._segs;
+    if(!timeline||!recs) return;
+    // every lane is measured against the SHARED cycle length, never its own
+    // total — otherwise a 10s track would stretch to the same width as a 15s
+    // one, destroying the "same destination, different pacing" reading
+    const total=getAnimMaxTotal()||1;
+    let acc=0;
+    for(const r of recs){
+      const w=(r.phase.duration/total)*100;
+      const leftPct=(acc/total)*100;
+      acc+=r.phase.duration;
+      r.seg.style.left=leftPct+'%'; r.seg.style.width=w+'%';
+      r.nameEl.style.left=(leftPct+w/2)+'%';
+      r.durEl.style.left=(leftPct+w/2)+'%';
+      r.durText.textContent=r.phase.duration.toFixed(1)+'s';
+      if(r.bracket){ r.bracket.style.left=leftPct+'%'; r.bracket.style.width=w+'%'; }
+      if(r.seam) r.seam.style.left=(leftPct+w)+'%';
+    }
+  }
+  function wireSegmentResize(handle,phase,lane,edge){
+    let dragging=false;
+    handle.addEventListener('pointerdown',(e)=>{ dragging=true; handle.setPointerCapture(e.pointerId); e.stopPropagation(); });
+    handle.addEventListener('pointermove',(e)=>{
+      if(!dragging) return;
+      const laneRect=lane.getBoundingClientRect();
+      const secPerPx=(getAnimMaxTotal()||1)/laneRect.width;
+      const delta=edge==='right'?e.movementX:-e.movementX;
+      phase.duration=Math.max(0.5,phase.duration+delta*secPerPx);
+      rpRelayoutLane(lane); // in-place: never destroys this handle mid-drag
+    });
+    handle.addEventListener('pointerup',(e)=>{
+      dragging=false;
+      try{handle.releasePointerCapture(e.pointerId);}catch(err){}
+      markDirty();
+      rpRenderTracks(); // resync cycle length, playhead + the other tracks
+    });
+  }
+  function wireScrub(ph,lane,maxTotal){
+    let dragging=false;
+    function seekFromClientX(clientX){
+      const r=lane.getBoundingClientRect();
+      const t=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+      animTime=t*maxTotal;
+      animScrubbing=true;
+      updateInnerLayers(clock.getElapsedTime(),0);
+      animScrubbing=false;
+      // move the playhead only — rebuilding here would destroy the very
+      // element holding this drag's pointer capture, ending the scrub
+      rpUpdatePlayhead();
+    }
+    ph.addEventListener('pointerdown',(e)=>{ dragging=true; ph.setPointerCapture(e.pointerId); seekFromClientX(e.clientX); e.stopPropagation(); });
+    ph.addEventListener('pointermove',(e)=>{ if(dragging) seekFromClientX(e.clientX); });
+    ph.addEventListener('pointerup',(e)=>{ dragging=false; try{ph.releasePointerCapture(e.pointerId);}catch(err){} });
+  }
+
+  // ---- Timeline render split into two tiers ----
+  // rpRenderTracks() = full DOM rebuild, only when STRUCTURE changes
+  //   (phase added/removed/resized, layer added/renamed, selection moved).
+  // rpUpdatePlayhead() = the per-frame path: moves one element and sets one
+  //   string. Rebuilding the whole tree at 60fps (the old behaviour) killed
+  //   hover states mid-hover, made the seam "+" buttons flicker, and fought
+  //   every drag interaction.
+  let rpPlayheadEl=null;   // the single shared playhead
+  let rpRefLane=null;      // first track's lane — defines the shared x-axis
+  let rpLaneGeom=null;     // cached {left,width} so the per-frame path never reads layout
+  let rpMaxTotal=1;
+  const rpSegmentEls=new Map(); // phase object -> its swatch element (for cheap live-edit recolour)
+
+  function rpCacheLaneGeom(){
+    if(!rpRefLane||!rpTracksEl){ rpLaneGeom=null; return; }
+    const c=rpTracksEl.getBoundingClientRect();
+    const l=rpRefLane.getBoundingClientRect();
+    rpLaneGeom={ left:l.left-c.left, width:l.width };
+  }
+  // A phase's swatch colour: the captured colour blended most of the way
+  // toward the panel's pale pill tone, so the strip reads as the soft bands
+  // in the design rather than blocks of saturated alarm-colour. Alternating
+  // phases sit at slightly different strengths so neighbours holding the
+  // same colour still read as separate.
+  function rpSegmentTint(phase,isScene,pi){
+    const s=phase.snapshot;
+    if(!s) return 'rgba(20,22,28,0.08)';
+    const raw=(isScene?s.bgColor:s.colour)||null;
+    if(!raw) return pi%2?'#e9f2ff':'#cedbeb';
+    return mixHex(pi%2?'#e9f2ff':'#dbe6f5', raw, 0.30);
+  }
+  function rpUpdatePlayhead(){
+    if(!rpPlayheadEl||!rpLaneGeom) return;
+    const pct=Math.min(1,(animTime%rpMaxTotal)/rpMaxTotal);
+    rpPlayheadEl.style.left=(rpLaneGeom.left+pct*rpLaneGeom.width)+'px';
+    rpTimeEl.textContent=rpFmtTime(animTime%rpMaxTotal)+'/'+rpFmtTime(rpMaxTotal);
+  }
+
+  function rpRenderTracks(){
+    if(!rpTracksEl) return;
+    rpTracksEl.innerHTML='';
+    rpSegmentEls.clear();
+    const maxTotal=getAnimMaxTotal()||1;
+    let refLane=null; // the first track's lane — defines the shared x-axis every track's segments align to
+    for(let ti=0; ti<rpTrackCount(); ti++){
+      const isScene=ti===fireflyLayers.length;
+      const F=isScene?null:fireflyLayers[ti];
+      const timeline=isScene?sceneTimeline:F.timeline;
+      const track=document.createElement('div'); track.className='rp-track';
+      const label=document.createElement('div'); label.className='rp-track-label';
+      label.textContent=isScene?'Background':(F.name||'Layer '+(ti+1));
+      const lane=document.createElement('div'); lane.className='rp-track-lane';
+      // Figma stacks these as four separate rows per track: phase-name pill,
+      // then duration + easing icon, then a bracket PER PHASE spanning that
+      // phase's span, then the segments. Previously name/duration shared one
+      // row (they overlapped) and there was a single bracket per track.
+      const labelsRow=document.createElement('div'); labelsRow.className='rp-phase-labels';
+      const dursRow=document.createElement('div'); dursRow.className='rp-phase-durs';
+      const bracketsRow=document.createElement('div'); bracketsRow.className='rp-bracket-row';
+      const segsRow=document.createElement('div'); segsRow.className='rp-segments-row';
+      if(timeline.length===0){
+        segsRow.style.cssText='display:flex;align-items:center;padding-left:10px;color:var(--rp-ink-3,#7d8394);font-size:11px;';
+        segsRow.textContent='no phases yet — click + to add one';
+      }
+
+      const total=maxTotal; // shared time axis across every track (see rpRelayoutLane)
+      const laneRecs=[]; // element refs so a resize drag can re-lay-out in place
+      lane._timeline=timeline; lane._segs=laneRecs;
+      let acc=0;
+      timeline.forEach((phase,pi)=>{
+        const w=(phase.duration/total)*100;
+        const leftPct=(acc/total)*100;
+        acc+=phase.duration;
+
+        const seg=document.createElement('div'); seg.className='rp-segment';
+        seg.style.left=leftPct+'%'; seg.style.width=w+'%';
+        const swatch=document.createElement('div'); swatch.className='swatch';
+        swatch.style.background=rpSegmentTint(phase,isScene,pi);
+        seg.appendChild(swatch);
+        rpSegmentEls.set(phase,{swatch,isScene,pi}); // so a live edit can recolour just this one
+        if(rpEditingPhase===phase) seg.classList.add('editing');
+        seg.addEventListener('click',(e)=>{
+          if(e.target.closest('.resize-handle')) return;
+          trackActive=ti; // reuse the shared track-selector state
+          applyTrackSnapshot(phase.snapshot||captureTrackSnapshot());
+          rpEditingPhase=phase;
+          if(isScene) rpBgCard.classList.add('open');
+          rpRenderTracks();
+        });
+        const rL=document.createElement('div'); rL.className='resize-handle left';
+        const rR=document.createElement('div'); rR.className='resize-handle right';
+        seg.append(rL,rR);
+        wireSegmentResize(rL,phase,lane,'left');
+        wireSegmentResize(rR,phase,lane,'right');
+        segsRow.appendChild(seg);
+
+        const nameEl=document.createElement('div'); nameEl.className='rp-phase-name';
+        nameEl.textContent=phase.name||(pi===0?'Starting':'Phase '+(pi+1));
+        nameEl.style.left=(leftPct+w/2)+'%';
+        labelsRow.appendChild(nameEl);
+
+        // one bracket per phase, spanning exactly that phase's range
+        const pbracket=document.createElement('div'); pbracket.className='rp-bracket';
+        pbracket.style.left=leftPct+'%'; pbracket.style.width=w+'%';
+        bracketsRow.appendChild(pbracket);
+
+        const durEl=document.createElement('div'); durEl.className='rp-phase-dur';
+        durEl.style.left=(leftPct+w/2)+'%';
+        const durText=document.createElement('span'); durText.textContent=phase.duration.toFixed(1)+'s';
+        const easeIco=document.createElement('img'); easeIco.className='ease-ico'; easeIco.src='icons/spline.svg';
+        easeIco.title='Easing: '+(phase.ease||'smootherstep')+' (click to cycle)';
+        easeIco.addEventListener('click',(e)=>{
+          e.stopPropagation();
+          const opts=Object.keys(EASINGS);
+          const cur=opts.indexOf(phase.ease||'smootherstep');
+          phase.ease=opts[(cur+1)%opts.length];
+          markDirty(); rpRenderTracks();
+        });
+        durEl.append(durText,easeIco);
+        dursRow.appendChild(durEl);
+
+        let seam=null;
+        if(pi<timeline.length-1){
+          seam=document.createElement('button'); seam.className='rp-seam-add'; seam.type='button';
+          seam.textContent='+'; seam.title='Insert a phase here';
+          seam.style.left=(leftPct+w)+'%'; seam.style.top='13px';
+          seam.addEventListener('click',(e)=>{
+            e.stopPropagation();
+            const clone=cloneSnapshot(phase.snapshot)||captureTrackSnapshot();
+            timeline.splice(pi+1,0,{duration:Math.max(0.5,phase.duration/2),snapshot:clone});
+            markDirty(); rpRenderTracks();
+          });
+          lane.appendChild(seam);
+        }
+        laneRecs.push({phase,seg,nameEl,durEl,durText,seam,bracket:pbracket});
+      });
+      lane.append(labelsRow,dursRow,bracketsRow,segsRow);
+      if(!refLane) refLane=lane; // first track's lane defines the shared x-axis
+
+      // clicking the label focuses this track — the transport's single
+      // "add phase" button (matching Figma, not one button per track) adds
+      // to whichever track was last focused this way
+      label.style.cursor='pointer';
+      if(trackActive===ti) label.classList.add('focused');
+      label.title='Click to make this the track "add phase" targets';
+      label.addEventListener('click',()=>{ trackActive=ti; rpRenderTracks(); });
+
+      track.append(label,lane);
+      rpTracksEl.appendChild(track);
+    }
+    // ONE playhead, spanning every track — not one per lane (that was the
+    // bug: each track drew its own marker, reading as scattered arrows
+    // instead of a single shared line). Positioned against refLane's x-axis,
+    // which every track's segments already share.
+    rpRefLane=refLane; rpMaxTotal=maxTotal; rpPlayheadEl=null;
+    if(refLane){
+      const ph=document.createElement('div'); ph.className='rp-playhead';
+      rpTracksEl.appendChild(ph);
+      rpPlayheadEl=ph;
+      wireScrub(ph,refLane,maxTotal);
+      rpCacheLaneGeom();
+    }
+    rpUpdatePlayhead();
+  }
+
+  const rpPlayIco=document.getElementById('rp-anim-play-ico');
+  rpPlayBtn.addEventListener('click',()=>{
+    rpStopEditingPhase();
+    if(!animPlaying){
+      if(animTime===0) animPrevGlobalT=0;
+      if(animTime===0) fireflyLayers.forEach(F=>{
+        const seq=trackSeq(F.timeline);
+        if(F.anim===false||seq.length<2) return;
+        F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
+      });
+      animPlaying=true; rpPlayIco.src='icons/pause.svg';
+    }else{
+      if(animStop) animStop();
+      rpPlayIco.src='icons/play.svg';
+    }
+  });
+  rpResetBtn.addEventListener('click',()=>{
+    animTime=0;
+    if(animStop) animStop();
+    rpPlayIco.src='icons/play.svg';
+    rpStopEditingPhase();
+    for(const F of fireflyLayers) if(F.idle) F.setParams({...F.idle});
+    animPrevGlobalT=0;
+    ffSync();
+    rpRenderTracks();
+  });
+  // one shared "add phase" (matching Figma — not one button per track);
+  // it targets whichever track was last clicked/focused (trackActive)
+  document.getElementById('rp-anim-add-phase').addEventListener('click',()=>{
+    const timeline=isSceneTrack()?sceneTimeline:fireflyLayers[trackActive].timeline;
+    const last=timeline[timeline.length-1];
+    const snapshot=cloneSnapshot(last&&last.snapshot)||captureTrackSnapshot();
+    timeline.push({duration:5,snapshot});
+    markDirty(); rpRenderTracks();
+  });
+  document.getElementById('rp-animation-row').addEventListener('click',()=>{
+    rpTracksContainer.classList.toggle('open');
+    if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
+    // the timeline eats vertical space — refit the sphere above it
+    if(window.rpLayoutViewport) window.rpLayoutViewport();
+  });
+
+  // re-render the timeline while it's open and something's actually moving
+  (function rpTick(){
+    // per-frame: move the playhead only — never rebuild the tree
+    if(animPlaying&&rpTracksContainer.classList.contains('open')) rpUpdatePlayhead();
+    requestAnimationFrame(rpTick);
+  })();
+  // lane width changes with the window, so refresh the cached geometry the
+  // per-frame path relies on (and reposition immediately)
+  window.addEventListener('resize',()=>{ rpCacheLaneGeom(); rpUpdatePlayhead(); });
+
+  rpPanelReady=true;
+  rpSyncParams();
 }).catch(err=>console.error('inner layers failed',err));
 
 // Inner core + glow halo
@@ -1982,12 +3059,12 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     fireflyLayers.forEach((F,i)=>{
       if(i>0) lines.push('');
       lines.push('Firefly Layer '+(i+1));
+      if(F.name) lines.push('name '+F.name);
       for(const [key,step] of ffSliderDefs()){
         const v=F.params[key];
         if(typeof v==='number') lines.push(key+' '+fmt(v,step));
       }
       for(const [emo,c] of Object.entries(F.overrides)) lines.push('@'+emo+' '+c);
-      if(F.tintColor) lines.push('tintcolor '+F.tintColor);
     });
     lines.push('','Classic');
     for(const [key,step] of [...document.querySelectorAll('#classic-controls .row')]
@@ -2005,6 +3082,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
           for(const [k,v] of Object.entries(ph.snapshot.params))
             if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
         }
+        if(ph.snapshot&&ph.snapshot.colour) lines.push('colour '+ph.snapshot.colour);
       });
     });
     lines.push('','Anim Scene','animate '+(sceneAnim===false?0:1));
@@ -2016,7 +3094,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
           for(const [k,v] of Object.entries(ph.snapshot.classic))
             if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
         if(typeof ph.snapshot.glowOpacity==='number') lines.push('glowopacity '+ph.snapshot.glowOpacity.toFixed(2));
+        if(ph.snapshot.glowColor) lines.push('glowcolor '+ph.snapshot.glowColor);
         if(ph.snapshot.bgColor) lines.push('bgcolor '+ph.snapshot.bgColor);
+        if(ph.snapshot.bgColor2) lines.push('bgcolor2 '+ph.snapshot.bgColor2);
+        if(typeof ph.snapshot.bgGradientAmount==='number') lines.push('bggradient '+ph.snapshot.bgGradientAmount.toFixed(2));
       }
     });
     lines.push('','View','emotion '+activeEmotion,
@@ -2028,7 +3109,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       'glowopacity '+glowUserOpacity.toFixed(2),
       'bgcolor '+bgColor,
       'bgcolor2 '+bgColor2,
-      'bggradient '+(bgGradient?1:0),
+      'bggradient '+bgGradientAmount.toFixed(2),
       'rotate '+(sphereRotate?1:0),
       'rotatespeed '+sphereRotateSpeed.toFixed(3));
     return lines.join('\n');
@@ -2046,7 +3127,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     // A full snapshot resets layer overrides so it reproduces exactly; an old
     // core-only file leaves the current layers untouched.
     if(/^layer\s+\d+/im.test(text) && innerLayersReady) innerLayers.forEach(L=>L.overrides={});
-    if(/^firefly layer\s+\d+/im.test(text)) fireflyLayers.forEach(F=>F.overrides={});
+    if(/^firefly layer\s+\d+/im.test(text)) fireflyLayers.forEach(F=>{ F.overrides={}; F.name=null; });
     let fli=0;
     let ani=-1, aphase=null;
     let section=null, li=-1;
@@ -2091,14 +3172,28 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(section==='ffield'&&fireflyLayers[fli]) fireflyLayers[fli].overrides[m[1].toLowerCase()]=m[2];
         continue;
       }
-      m=line.match(/^tintcolor\s+(#[0-9a-fA-F]{6})$/i);
-      if(m&&section==='ffield'&&fireflyLayers[fli]){ fireflyLayers[fli].tintColor=m[1]; fireflyLayers[fli].setTintColor(m[1]); continue; }
+      m=line.match(/^name\s+(.+)$/i);
+      if(m&&section==='ffield'&&fireflyLayers[fli]){ fireflyLayers[fli].name=m[1].trim()||null; continue; }
+      m=line.match(/^colour\s+(#[0-9a-fA-F]{6})$/i);
+      if(m&&section==='anim'&&ani>=0&&aphase){
+        if(!aphase.snapshot) aphase.snapshot={params:{}};
+        aphase.snapshot.colour=m[1]; continue;
+      }
       m=line.match(/^emotion\s+(\w+)$/i);
       if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
       m=line.match(/^glowcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ glowUserColor=m[1]; const el=document.getElementById('glow-color'); if(el) el.value=m[1]; cloudBg.setUserTint(m[1],null); continue; }
+      // a glowcolor inside an Anim Scene phase animates the glow's own colour
+      if(m&&section==='anim'&&ani===-2&&aphase){
+        if(!aphase.snapshot) aphase.snapshot={classic:{}};
+        aphase.snapshot.glowColor=m[1]; continue;
+      }
       m=line.match(/^bgcolor2\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ setBgColor2(m[1]); continue; }
+      if(m&&section==='anim'&&ani===-2&&aphase){
+        if(!aphase.snapshot) aphase.snapshot={classic:{}};
+        aphase.snapshot.bgColor2=m[1]; continue;
+      }
       m=line.match(/^bgcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ setBgColor(m[1]); continue; }
       // a bgcolor inside an Anim Scene phase animates the background colour
@@ -2127,6 +3222,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
           if(ani===-2){
             if(!aphase.snapshot) aphase.snapshot={classic:{}};
             if(key==='glowopacity') aphase.snapshot.glowOpacity=val;
+            else if(key==='bggradient') aphase.snapshot.bgGradientAmount=val;
             else aphase.snapshot.classic[key]=val;
           }else if(fireflyLayers[ani]){
             if(!aphase.snapshot) aphase.snapshot={params:{}};
@@ -2138,7 +3234,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
         if(key==='glow') setToggle('toggle-glow',!!val,v=>cloudBg.setVisible(v));
         if(key==='fireflies') setToggle('toggle-fireflies',!!val,v=>{ shellPoints.visible=v; });
         if(key==='glowopacity'){ glowUserOpacity=val; const el=document.getElementById('glow-opacity'); if(el) el.value=val; cloudBg.setUserTint(null,val); }
-        if(key==='bggradient') setBgGradient(!!val);
+        if(key==='bggradient') setBgGradientAmount(val);
         if(key==='rotate') setSphereRotate(!!val);
         if(key==='rotatespeed') setSphereRotateSpeed(val);
       }
@@ -3254,12 +4350,26 @@ function animate(){
 }
 animate();
 
-window.addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;
+// The sphere renders into the region the panels DON'T cover, so it stays
+// centred in the visible black area instead of behind the left panel /
+// under the timeline. Called on resize and whenever a panel opens/closes.
+function layoutViewport(){
+  const panel=document.getElementById('redesign-panel');
+  const timeline=document.getElementById('anim-canvas-controls');
+  const left=(panel&&!panel.classList.contains('collapsed'))?panel.offsetWidth:0;
+  const bottom=(timeline&&timeline.classList.contains('open'))?timeline.offsetHeight:0;
+  const w=Math.max(1,innerWidth-left);
+  const h=Math.max(1,innerHeight-bottom);
+  camera.aspect=w/h;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-  cloudBg.onResize(innerWidth, innerHeight);
-});
+  renderer.setSize(w,h);
+  renderer.domElement.style.left=left+'px';
+  renderer.domElement.style.top='0px';
+  cloudBg.onResize(w,h);
+}
+window.rpLayoutViewport=layoutViewport; // called by the panel/timeline toggles
+window.addEventListener('resize',layoutViewport);
+layoutViewport();
 </script>
 </body>
 </html>

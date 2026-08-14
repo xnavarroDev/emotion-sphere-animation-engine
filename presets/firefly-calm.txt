@@ -15,13 +15,11 @@ pulseSpeed 0.40
 ripple 0.60
 rippleSpeed 0.40
 rectFill 0.00
-tint 0.00
 spawnSpan 16.00
 orbit 0.12
 spin 0.01
 speed 0.35
 @purple #a86fbf
-tintcolor #b8c0d1
 
 Firefly Layer 2
 count 9
@@ -40,13 +38,11 @@ pulseSpeed 0.40
 ripple 0.55
 rippleSpeed 0.40
 rectFill 0.00
-tint 0.00
 spawnSpan 15.00
 orbit 0.14
 spin -0.01
 speed 0.35
 @purple #d8b8e8
-tintcolor #b8c0d1
 
 Firefly Layer 3
 count 46
@@ -65,13 +61,11 @@ pulseSpeed 0.40
 ripple 0.65
 rippleSpeed 0.40
 rectFill 0.00
-tint 0.00
 spawnSpan 18.00
 orbit 0.10
 spin 0.01
 speed 0.35
 @purple #7a5090
-tintcolor #b8c0d1
 
 Classic
 scale 1.00
@@ -104,7 +98,7 @@ pulseSpeed 0.400
 ripple 0.600
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.000
+colour #a86fbf
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
@@ -126,7 +120,7 @@ pulseSpeed 0.400
 ripple 0.768
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.850
+colour #b6b4ce
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
@@ -148,7 +142,7 @@ pulseSpeed 0.400
 ripple 0.768
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.850
+colour #b6b4ce
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
@@ -170,7 +164,7 @@ pulseSpeed 0.400
 ripple 0.660
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.350
+colour #ae8bc5
 spawnSpan 16.000
 orbit 0.312
 spin 0.008
@@ -192,7 +186,7 @@ pulseSpeed 0.400
 ripple 0.600
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.000
+colour #a86fbf
 spawnSpan 16.000
 orbit 0.120
 spin 0.008
@@ -217,7 +211,7 @@ pulseSpeed 0.400
 ripple 0.550
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.000
+colour #d8b8e8
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
@@ -239,7 +233,7 @@ pulseSpeed 0.400
 ripple 0.704
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.850
+colour #bdbfd4
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
@@ -261,7 +255,7 @@ pulseSpeed 0.400
 ripple 0.704
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.850
+colour #bdbfd4
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
@@ -283,7 +277,7 @@ pulseSpeed 0.400
 ripple 0.605
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.350
+colour #cdbbe0
 spawnSpan 15.000
 orbit 0.364
 spin -0.008
@@ -305,7 +299,7 @@ pulseSpeed 0.400
 ripple 0.550
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.000
+colour #d8b8e8
 spawnSpan 15.000
 orbit 0.140
 spin -0.008
@@ -330,7 +324,7 @@ pulseSpeed 0.400
 ripple 0.650
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.000
+colour #7a5090
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
@@ -352,7 +346,7 @@ pulseSpeed 0.400
 ripple 0.832
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.850
+colour #afafc7
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
@@ -374,7 +368,7 @@ pulseSpeed 0.400
 ripple 0.832
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.850
+colour #afafc7
 spawnSpan 18.000
 orbit 0.100
 spin 0.006
@@ -396,7 +390,7 @@ pulseSpeed 0.400
 ripple 0.715
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.350
+colour #9077a7
 spawnSpan 18.000
 orbit 0.260
 spin 0.006
@@ -418,7 +412,7 @@ pulseSpeed 0.400
 ripple 0.650
 rippleSpeed 0.400
 rectFill 0.000
-tint 0.000
+colour #7a5090
 spawnSpan 18.000
 orbit 0.100
 spin 0.006

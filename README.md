@@ -121,7 +121,7 @@ An emotion is a **field of up to 3 particle layers**, each animated by a
 - **breath / pulse** — whole-layer swell, and per-particle size pulsing
 - **ripple** — a swell that travels from the center outward
 - **rectFill** — morph the sphere outward into a screen-filling rectangle
-- **tint / tint col** — blend the particle color toward another color (e.g. silver at a climax)
+- **colour** — the layer's particle color; animatable per phase, so a preset can shift color at a climax (e.g. a silver flush) and back
 - **speed** — global motion-rate multiplier
 
 **Animation:** each layer has a phase timeline; the animation smoothly

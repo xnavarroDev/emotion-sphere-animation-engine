@@ -52,10 +52,6 @@ export const FIREFLY_DEFAULTS = {
   rectFill: 0.0, // morph the sphere toward a screen-shaped RECTANGLE (0 = sphere,
                  // 1 = fills the frame corner-to-corner). Animate it up at a
                  // climax to "fill the whole screen" instead of a round cluster.
-  tint: 0.0, // blend the particle colour toward the layer's TINT colour (see
-             // setTintColor; 0 = the layer's own colour, 1 = full tint colour).
-             // Animatable, so particles can shift to another colour at a climax
-             // and back to their hue.
   radius: 1.6, // sphere shape: cluster radius (live uniform, animatable)
   coreBias: 1.0, // sphere shape: >1 packs circles toward the centre (rebuilds positions)
   spin: 0.0, // rad/s rigid rotation of this layer as a whole, about its own axis
@@ -163,8 +159,6 @@ export function createFireflyField(THREE, opts = {}) {
     uPulse: { value: params.pulse },
     uRipple: { value: params.ripple },
     uRectFill: { value: params.rectFill },
-    uTint: { value: params.tint },
-    uTintColor: { value: new THREE.Color(opts.tintColor != null ? opts.tintColor : 0xb8c0d1) }, // default: cool silver
     // accumulated motion clocks, integrated on the CPU each frame
     // (dt * rate). Animating a rate param then only changes tempo from now
     // on — computing phase as elapsedTime * rate instead would rescale the
@@ -351,8 +345,6 @@ export function createFireflyField(THREE, opts = {}) {
     `,
     fragmentShader: `
       uniform vec3 uColor;
-      uniform float uTint;
-      uniform vec3 uTintColor;
       uniform float uIntensity;
       uniform float uHot;
       varying float vAlpha;
@@ -380,10 +372,7 @@ export function createFireflyField(THREE, opts = {}) {
         // uHot blends between colour-true circles (brightness variance only
         // in alpha, hue stays at uColor) and the official over-saturated
         // white-hot centres (channels clip toward white).
-        // blend the layer colour toward its tint colour before the hot/
-        // intensity shaping, so it reads as a colour shift, not a blowout
-        vec3 tinted = mix(uColor, uTintColor, uTint);
-        vec3 col = tinted * mix(min(uIntensity, 1.0), uIntensity * (1.0 + vGlow * 2.5) * vBright, uHot);
+        vec3 col = uColor * mix(min(uIntensity, 1.0), uIntensity * (1.0 + vGlow * 2.5) * vBright, uHot);
         gl_FragColor = vec4(col, alpha);
       }
     `,
@@ -412,7 +401,6 @@ export function createFireflyField(THREE, opts = {}) {
     uniforms.uPulse.value = params.pulse;
     uniforms.uRipple.value = params.ripple;
     uniforms.uRectFill.value = params.rectFill;
-    uniforms.uTint.value = params.tint;
     // coreBias reshapes the distribution — rebuild spawn positions (CPU; only
     // on change, so skip it during animation lerps like the layers do)
     if (params.coreBias !== prevBias) {
@@ -428,8 +416,6 @@ export function createFireflyField(THREE, opts = {}) {
     setParams,
     setColor(c) { uniforms.uColor.value.set(c); },
     color() { return uniforms.uColor.value; },
-    setTintColor(c) { uniforms.uTintColor.value.set(c); }, // target for the `tint` blend
-    tintColor() { return uniforms.uTintColor.value; },
     setDpr(d) { uniforms.uDpr.value = d; },
     // Restart the staggered spawn-in from "now" — the same fill-in the field
     // plays on load. Pass a window (seconds) to complete the fill within it
