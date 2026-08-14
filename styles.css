@@ -1,0 +1,593 @@
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; min-height:100vh; overflow:hidden; font-family:'Courier New',monospace; cursor:grab; }
+body.dragging { cursor:grabbing; }
+canvas { position:fixed; top:0; left:0; z-index:1; }
+#label { display:none; }
+/* Kiosk / embed mode: hide all authoring UI, leaving only the sphere. Enabled
+   with ?mode=kiosk (or ?embed=1); everything still exists in the DOM (just
+   hidden) so the playback engine keeps working. */
+body.kiosk #hint,
+body.kiosk #proto-switch,
+body.kiosk #view-toggles,
+body.kiosk #params-toggle,
+body.kiosk #params-panel { display:none !important; }
+/* keep the emotion dots in kiosk mode — they're the emotion selector;
+   hide the cycle dot (auto-cycle isn't used) */
+body.kiosk #d-cycle { display:none; }
+/* watch link (a shared ?preset in kiosk): one fixed look, so hide the emotion
+   selector too — nothing to pick */
+body.watch #dots { display:none !important; }
+/* Emotion switcher — sits over the canvas, top-right, styled to match the
+   redesigned panel (larger targets, a ring on the active one) rather than
+   the tiny low-opacity dots the old dark UI used. */
+#dots {
+  position:fixed; top:20px; right:20px; z-index:100; display:flex; gap:10px;
+  align-items:center; padding:8px 12px; border-radius:999px;
+  background:rgba(226,232,240,0.10); backdrop-filter:blur(6px);
+}
+.dot {
+  width:16px; height:16px; border-radius:50%; cursor:pointer;
+  opacity:0.55; transition:opacity .18s, box-shadow .18s, transform .18s;
+}
+.dot:hover { opacity:1; transform:scale(1.1); }
+.dot.active { opacity:1; box-shadow:0 0 0 2px rgba(255,255,255,0.9); }
+.dot-cycle {
+  width:16px; height:16px; border-radius:50%;
+  background:conic-gradient(from 90deg,#22b8e8,#c890b0,#E83040,#FFE066,#22b8e8);
+}
+#hint { display:none; }
+#proto-switch {
+  position:fixed; right:24px; bottom:24px;
+  z-index:120; display:flex; gap:6px; align-items:center;
+}
+.proto {
+  appearance:none; font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  color:rgba(255,255,255,0.6);
+  background:rgba(8,8,12,0.82); border:1px solid rgba(255,255,255,0.15);
+  border-radius:4px; padding:8px 11px; cursor:pointer; transition:all 0.25s;
+}
+.proto:hover { color:rgba(255,255,255,0.9); border-color:rgba(160,202,239,0.4); }
+.proto.active {
+  color:#a0caef; border-color:rgba(160,202,239,0.6);
+  box-shadow:0 0 10px rgba(160,202,239,0.25);
+}
+
+#view-toggles {
+  position:fixed; right:24px; bottom:62px;
+  z-index:120; display:flex; gap:6px; align-items:center;
+}
+#glow-color {
+  width:22px; height:22px; border:1px solid rgba(255,255,255,0.12); border-radius:3px;
+  background:none; cursor:pointer; padding:0; flex-shrink:0;
+}
+#glow-opacity {
+  width:52px; accent-color:#a0caef; cursor:pointer;
+}
+#bg-color, #bg-color-2 {
+  width:22px; height:22px; border:1px solid rgba(255,255,255,0.12); border-radius:3px;
+  background:none; cursor:pointer; padding:0; flex-shrink:0;
+}
+.vtoggle {
+  appearance:none; font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  text-transform:uppercase; color:rgba(255,255,255,0.32);
+  background:rgba(8,8,12,0.82); border:1px solid rgba(255,255,255,0.12);
+  border-radius:4px; padding:8px 11px; cursor:pointer; transition:all 0.25s;
+}
+.vtoggle:hover { color:rgba(255,255,255,0.7); border-color:rgba(160,202,239,0.35); }
+.vtoggle.active {
+  color:#a0caef; border-color:rgba(160,202,239,0.55);
+  box-shadow:0 0 10px rgba(160,202,239,0.2);
+}
+
+#params-toggle {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 120;
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(8,8,12,0.82);
+  color: rgba(255,255,255,0.75);
+  font: 10px/1 'Courier New', monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#params-toggle:hover { color: #a0caef; border-color: rgba(160,202,239,0.35); }
+
+#params-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  z-index: 110;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  background: rgba(8,8,12,0.94);
+  padding: 20px 16px 80px;
+  transform: translateX(0);
+  transition: transform 0.25s ease;
+}
+#params-panel.hidden { transform: translateX(-100%); pointer-events: none; }
+#params-panel h2 {
+  font-size: 10px;
+  letter-spacing: 3px;
+  font-weight: 400;
+  color: rgba(160,202,239,0.9);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+#params-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+#params-actions button, #inner-layer-actions button {
+  flex: 1; appearance: none; font: 10px/1 'Courier New', monospace;
+  letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px; padding: 8px; cursor: pointer; transition: all 0.2s;
+}
+#params-actions button:hover, #inner-layer-actions button:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
+#inner-layers-heading, #firefly-field-heading {
+  font-size: 10px; letter-spacing: 3px; font-weight: 400;
+  color: rgba(160,202,239,0.9); text-transform: uppercase;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 14px;
+}
+#inner-layer-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+#params-panel .row {
+  display: grid;
+  grid-template-columns: 92px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 8px;
+}
+#params-panel .row span { text-transform: lowercase; }
+#params-panel .row em {
+  font-style: normal;
+  text-align: right;
+  color: rgba(160,202,239,0.85);
+}
+#params-panel input[type="range"] {
+  width: 100%;
+  accent-color: #a0caef;
+}
+#params-panel input[type="color"] {
+  width: 100%; height: 20px; padding: 0; cursor: pointer;
+  background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 3px;
+}
+.ilayer-reset {
+  appearance:none; font:12px/1 'Courier New',monospace;
+  color:rgba(255,255,255,0.5);
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  border-radius:3px; padding:3px 0; cursor:pointer; transition:all 0.2s;
+}
+.ilayer-reset:hover { color:#a0caef; border-color:rgba(160,202,239,0.5); }
+.ilayer-reset.on { color:#a0caef; border-color:rgba(160,202,239,0.55); box-shadow:0 0 6px rgba(160,202,239,0.2); }
+#inner-layer-tabs {
+  display:flex; gap:8px; align-items:center; margin-bottom:14px;
+}
+.ilayer-arrow {
+  appearance:none; font:14px/1 'Courier New',monospace;
+  color:rgba(255,255,255,0.7);
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  border-radius:4px; padding:4px 10px; cursor:pointer; transition:all 0.2s;
+}
+.ilayer-arrow:hover { color:#a0caef; border-color:rgba(160,202,239,0.5); }
+.ilayer-title {
+  flex:1; text-align:center; font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  text-transform:uppercase; color:rgba(160,202,239,0.9);
+}
+.ilayer-name-input {
+  display:block; width:100%; box-sizing:border-box; margin-bottom:10px;
+  appearance:none; font:12px/1.2 'Courier New',monospace; text-align:center;
+  color:rgba(255,255,255,0.85); background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 8px;
+}
+.ilayer-name-input:hover { border-color:rgba(160,202,239,0.4); }
+.ilayer-name-input:focus { outline:none; border-color:rgba(160,202,239,0.6); background:rgba(255,255,255,0.08); }
+.ilayer-name-input::placeholder { color:rgba(255,255,255,0.35); }
+/* ---- Animation editor ---- */
+#anim-section {
+  margin-top:20px; padding-top:18px;
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+#anim-heading {
+  font-size:10px; letter-spacing:3px; font-weight:400;
+  color:rgba(160,202,239,0.9); text-transform:uppercase;
+  margin-bottom:14px; cursor:pointer; user-select:none;
+  display:flex; align-items:center; gap:6px;
+}
+#anim-heading:hover { color:#a0caef; }
+#anim-chevron { font-size:8px; transition:transform 0.2s; }
+#anim-body { }
+.anim-phase-row {
+  display:flex; align-items:center; gap:7px;
+  font:10px/1 'Courier New',monospace;
+}
+.anim-phase-label {
+  font:10px/1 'Courier New',monospace; letter-spacing:1px;
+  color:rgba(160,202,239,0.75); text-transform:uppercase; flex:1;
+}
+.anim-dot {
+  width:7px; height:7px; border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,0.15);
+  transition:background 0.25s,box-shadow 0.25s;
+}
+.anim-dot.set { background:#a0caef; box-shadow:0 0 6px rgba(160,202,239,0.55); }
+.anim-phase-row.editing .anim-phase-label { color:#ffd27a; }
+.anim-phase-row.editing .anim-dot { background:#ffd27a; box-shadow:0 0 6px rgba(255,210,122,0.6); }
+.anim-cap {
+  appearance:none; font:9px/1 'Courier New',monospace; letter-spacing:1px;
+  color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12); border-radius:3px;
+  padding:4px 7px; cursor:pointer; transition:all 0.2s; text-align:center;
+}
+.anim-cap:hover { color:#a0caef; border-color:rgba(160,202,239,0.4); }
+.anim-dur-row {
+  display:flex; align-items:center; gap:5px;
+  padding:4px 0 4px 12px; /* indent under phase label */
+  border-left:1px solid rgba(255,255,255,0.08); margin:3px 0 3px 3px;
+}
+.anim-dur {
+  width:42px; font:10px/1 'Courier New',monospace;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+  border-radius:3px; color:rgba(255,255,255,0.7); padding:3px 5px;
+  text-align:right;
+}
+.anim-dur:focus { outline:none; border-color:rgba(160,202,239,0.4); }
+.anim-dur-s { font:9px/1 'Courier New',monospace; color:rgba(255,255,255,0.3); }
+#anim-transport {
+  display:flex; gap:6px; align-items:center; margin-top:14px; flex-wrap:wrap;
+}
+.anim-btn {
+  appearance:none; font:9px/1 'Courier New',monospace; letter-spacing:1px;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.6); background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12); border-radius:3px;
+  padding:6px 10px; cursor:pointer; transition:all 0.2s;
+}
+.anim-btn:hover { color:#a0caef; border-color:rgba(160,202,239,0.4); }
+.anim-btn.active { color:#a0caef; border-color:rgba(160,202,239,0.55); box-shadow:0 0 8px rgba(160,202,239,0.2); }
+#anim-loop-lbl {
+  font:9px/1 'Courier New',monospace; color:rgba(255,255,255,0.45);
+  display:flex; align-items:center; gap:4px; cursor:pointer; letter-spacing:1px;
+}
+#anim-progress-wrap {
+  height:3px; background:rgba(255,255,255,0.08);
+  border-radius:2px; margin-top:12px; overflow:hidden;
+}
+#anim-progress-fill {
+  height:100%; width:0%; background:#a0caef; border-radius:2px;
+}
+/* Circles-as-sphere branch: the firefly field is the only visual, so the
+   old core/layer particle-cloud controls and prototype switch are hidden
+   (still wired underneath, just not part of this editor). */
+#params-controls, #inner-layers-heading, #inner-layer-actions,
+#inner-layer-tabs, #inner-layer-controls, #reset-core-params, #proto-switch {
+  display: none;
+}
+#firefly-field-heading, #classic-heading { margin-top: 0; padding-top: 0; border-top: none; }
+#classic-heading {
+  font-size: 10px; letter-spacing: 3px; font-weight: 400;
+  color: rgba(160,202,239,0.9); text-transform: uppercase; margin-bottom: 14px;
+}
+#firefly-layer-tabs { display:flex; gap:8px; align-items:center; margin-bottom:14px; }
+/* Circles / Fireflies mode switch */
+#sphere-mode { display: flex; gap: 8px; margin-bottom: 16px; }
+.mode-btn {
+  flex: 1; appearance: none; font: 10px/1 'Courier New', monospace;
+  letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px; padding: 8px; cursor: pointer; transition: all 0.2s;
+}
+.mode-btn:hover { color: #a0caef; border-color: rgba(160,202,239,0.4); }
+.mode-btn.active {
+  color: #a0caef; border-color: rgba(160,202,239,0.55);
+  box-shadow: 0 0 8px rgba(160,202,239,0.2);
+}
+
+/* ================================================================
+   REDESIGNED PANEL — the new light-theme UI (Parameters / Animate /
+   Background), replacing the old dark #params-panel. Scoped entirely
+   under #redesign-panel so nothing here leaks into the legacy styles
+   above, which stay in place for their own (now-hidden) elements.
+   Values below are pulled directly from the Figma file via the Figma
+   MCP (get_design_context on nodes 1:2 and 73:1346), not approximated.
+   ================================================================ */
+:root {
+  /* Defined on :root (not #redesign-panel) so these cascade to EVERY
+     element regardless of DOM nesting — .rp-float-card and
+     #anim-canvas-controls are siblings of #redesign-panel, not
+     descendants, so scoping these vars to #redesign-panel alone silently
+     dropped every var(--rp-*) declaration inside them (invalid at
+     computed-value time), which is why they were rendering in the old
+     dark theme's Courier New / blue accents instead of this one. */
+  --rp-bg: #e2e8f0;
+  --rp-bg-2: #cedbeb;
+  --rp-bg-3: #cedbeb;
+  --rp-ink: #000000;
+  --rp-ink-2: #44546f;
+  --rp-ink-3: #7d8394;
+  --rp-accent: #64748b;
+  --rp-accent-hover: #55637a;
+  --rp-border: rgba(0,0,0,0.12);
+  --rp-pill: #e9f2ff;
+  --rp-white: #ffffff;
+  --rp-danger: #a8443b;
+  --rp-font: 'Inclusive Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --rp-font-num: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+#redesign-panel {
+  position: fixed; top: 0; left: 0; width: 339px; height: 100%;
+  background: var(--rp-bg); color: var(--rp-ink);
+  font-family: var(--rp-font); font-weight: 600;
+  display: flex; flex-direction: column;
+  overflow: hidden; z-index: 40;
+  transform: translateX(0); transition: transform 0.25s ease;
+}
+#redesign-panel.collapsed { transform: translateX(-100%); }
+#redesign-panel *,
+#anim-canvas-controls *,
+.rp-float-card * { box-sizing: border-box; font-family: inherit; }
+#rp-scroll { flex: 1 1 auto; overflow-y: auto; padding: 9px 15px 16px 14px; }
+#rp-collapse-rail {
+  position: fixed; top: 16px; left: 16px; z-index: 41;
+  width: 34px; height: 34px; border-radius: 8px; border: none;
+  background: var(--rp-bg, #e2e8f0); color: #000;
+  display: none; align-items: center; justify-content: center;
+  cursor: pointer; font: 16px/1 sans-serif;
+}
+#redesign-panel.collapsed ~ #rp-collapse-rail,
+body.rp-collapsed #rp-collapse-rail { display: flex; }
+
+/* ---- header ---- */
+.rp-header-row { display: flex; align-items: center; gap: 16px; justify-content: flex-start; }
+.rp-logo { font-size: 44px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.rp-title { font-size: 16px; font-weight: 600; line-height: 1.25; flex: 1 1 auto; }
+.rp-caption { font-size: 12px; font-weight: 600; color: var(--rp-ink); line-height: 1.4; margin: 8px 0 24px; }
+.rp-collapse-btn {
+  appearance: none; border: none; background: transparent; color: var(--rp-ink);
+  font-size: 18px; cursor: pointer; padding: 4px; line-height: 1; flex: 0 0 auto;
+}
+
+/* ---- generic buttons ---- */
+.rp-btn-primary {
+  display: block; width: 100%; padding: 11px 57px; border: none; border-radius: 10px;
+  background: var(--rp-accent); color: var(--rp-white); font-size: 18px; font-weight: 600;
+  cursor: pointer; text-align: center; min-height: 59px;
+}
+.rp-btn-primary:hover { background: var(--rp-accent-hover); }
+.rp-btn-primary:disabled { opacity: 0.55; cursor: default; }
+.rp-btn-sm {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7.5px;
+  padding: 8px 16px; border: none; border-radius: 7.5px; background: var(--rp-accent);
+  color: var(--rp-white); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.rp-btn-sm:hover { background: var(--rp-accent-hover); }
+.rp-btn-sm.rp-btn-danger { background: var(--rp-bg-3); color: var(--rp-danger); }
+.rp-btn-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.rp-icon-btn {
+  width: 32px; height: 32px; flex: 0 0 auto; border: none; border-radius: 10px;
+  background: var(--rp-accent); color: var(--rp-white); font-size: 15px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.rp-icon-btn:hover { background: var(--rp-accent-hover); }
+.rp-icon-btn-plain { background: transparent; }
+.rp-icon-btn-plain:hover { background: var(--rp-bg-2); }
+
+/* ---- Lucide icon <img> utility classes (exact SVG exports pulled from Figma) ---- */
+.rp-ico { width: 24px; height: 24px; display: block; }
+.rp-ico-18 { width: 18px; height: 18px; }
+.rp-flip-x { transform: scaleX(-1); }
+.rp-flip-y { transform: scaleY(-1); }
+.rp-btn-primary.rp-btn-with-ico { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.rp-section-head .chev .rp-ico, .rp-pinned-row .chev .rp-ico { display: block; }
+
+/* ---- preset cards row ---- */
+.rp-cards-row { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin: 12px 0 12px; }
+.rp-card-stub {
+  flex: 0 0 auto; width: 89px; height: 62px; border-radius: 10px; background: var(--rp-bg-2);
+}
+.rp-cards-arrow { flex: 0 0 auto; background: none; border: none; color: var(--rp-ink); font-size: 18px; cursor: pointer; }
+.rp-cards-arrow:disabled { opacity: 0.4; cursor: default; }
+.rp-stub-note { font-size: 10.5px; font-weight: 400; color: var(--rp-ink-2); margin: -6px 0 24px; }
+
+/* ---- collapsible sections (Describe a feeling / Parameters) ---- */
+.rp-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none; font-size: 20px; font-weight: 600;
+  padding: 0;
+}
+.rp-section-head .chev { font-size: 16px; color: var(--rp-ink); transition: transform 0.15s; }
+.rp-section-body { margin-top: 12px; }
+.rp-section.collapsed .rp-section-body { display: none; }
+.rp-textarea-wrap { position: relative; margin-bottom: 24px; }
+.rp-textarea {
+  width: 100%; min-height: 112px; resize: vertical; border-radius: 10px;
+  border: none; background: var(--rp-pill);
+  color: var(--rp-ink); font: 600 12px/1.45 var(--rp-font);
+  padding: 12px 34px 12px 12px;
+}
+.rp-textarea::placeholder { color: var(--rp-ink-2); opacity: 0.8; }
+.rp-sparkle {
+  position: absolute; right: 12px; bottom: 9px; font-size: 16px; pointer-events: none;
+}
+
+/* ---- Parameters ---- */
+.rp-layer-eyebrow { text-align: center; font-size: 12px; font-weight: 600; color: var(--rp-ink); margin-bottom: 4px; }
+.rp-layer-stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.rp-layer-stepper .rp-name-input { flex: 1 1 auto; text-align: center; }
+.rp-name-input {
+  border: none; background: var(--rp-pill); color: var(--rp-ink);
+  border-radius: 10px; padding: 4px 8px; font: 600 16px/1.3 var(--rp-font);
+  width: 100%;
+}
+.rp-name-input::placeholder { color: var(--rp-ink-2); opacity: 0.8; }
+
+.rp-groups { margin-left: 12px; border-left: 1px solid var(--rp-border); padding-left: 12px; }
+.rp-group { margin-bottom: 4px; }
+.rp-group-head {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  user-select: none; padding: 11px 2px; font-size: 16px; font-weight: 600; color: var(--rp-ink);
+}
+.rp-group-head .chev { font-size: 13px; color: var(--rp-ink); }
+.rp-group-body { display: none; padding: 2px 2px 12px; }
+.rp-group.open .rp-group-body { display: block; }
+.rp-slider-row { display: grid; grid-template-columns: 78px 1fr 40px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.rp-slider-row span { font-size: 11px; font-weight: 600; color: var(--rp-ink-2); text-transform: capitalize; }
+.rp-slider-row input[type=range] { width: 100%; accent-color: var(--rp-accent); }
+.rp-slider-row em { font: 600 11px var(--rp-font-num); color: var(--rp-ink-2); font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+.rp-color-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rp-color-row span { font-size: 11px; font-weight: 600; color: var(--rp-ink-2); flex: 1; }
+.rp-color-row input[type=color] { width: 30px; height: 26px; border: none; border-radius: 6px; padding: 0; background: none; }
+
+/* Rotate applies to the whole sphere, not one layer — sits below the
+   per-layer groups but deliberately un-indented, so it doesn't read as
+   belonging to whichever layer happens to be selected. */
+.rp-sphere-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rp-border); }
+.rp-sphere-row .rp-toggle-row span { font-size: 13px; font-weight: 600; color: var(--rp-ink); }
+.rp-sphere-row .rp-slider-row { margin-top: 8px; opacity: 1; transition: opacity 0.15s; }
+.rp-sphere-row .rp-slider-row.disabled { opacity: 0.4; pointer-events: none; }
+
+/* ---- pinned rows: Background / Animation ----
+   Deliberately live outside #rp-scroll (as a sibling flex child) so they
+   never scroll away or end up buried under whatever's expanded above —
+   they're always the last thing visible before the save bar. */
+.rp-pinned-rows {
+  flex: 0 0 auto; padding: 12px 15px 6px 14px;
+  border-top: 1px solid var(--rp-border);
+}
+.rp-pinned-row {
+  display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  user-select: none; font-size: 20px; font-weight: 600; padding: 6px 0;
+}
+.rp-pinned-row .chev { font-size: 18px; color: var(--rp-ink); transition: transform 0.15s; }
+
+/* ---- persistent footer ---- */
+.rp-footer {
+  flex: 0 0 auto; padding: 13px 15px 13px 14px; min-height: 130px;
+  background: linear-gradient(70deg, rgb(206,219,235) 0%, rgb(226,232,240) 99.57%);
+}
+.rp-footer-row { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 12px; }
+.rp-footer .rp-name-input { flex: 1 1 auto; min-width: 0; width: auto; padding: 4px 8px; }
+.rp-unsaved { font-size: 11px; font-weight: 600; color: var(--rp-ink); flex: 0 0 auto; max-width: 96px; line-height: 1.15; }
+.rp-unsaved.show { display: inline; }
+.rp-unsaved:not(.show) { display: none; }
+
+/* ---- floating Background card ---- */
+.rp-float-card {
+  position: fixed; z-index: 60; width: 260px; background: var(--rp-white);
+  border-radius: 12px; box-shadow: 0 10px 30px rgba(10,12,20,0.35);
+  border: 1px solid var(--rp-border); color: var(--rp-ink);
+  font-family: var(--rp-font); overflow: hidden; display: none;
+}
+.rp-float-card.open { display: block; }
+.rp-float-titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; background: var(--rp-bg-2); cursor: grab; font-size: 12.5px; font-weight: 600;
+}
+.rp-float-titlebar:active { cursor: grabbing; }
+.rp-float-close { border: none; background: none; font-size: 15px; color: var(--rp-ink-2); cursor: pointer; }
+.rp-float-body { padding: 14px 14px 16px; }
+.rp-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.rp-toggle-row span { font-size: 12.5px; font-weight: 600; }
+.rp-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--rp-bg-3); border: none; cursor: pointer; }
+.rp-switch::after {
+  content:""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--rp-white); transition: transform 0.15s;
+}
+.rp-switch.on { background: var(--rp-accent); }
+.rp-switch.on::after { transform: translateX(16px); }
+.rp-gradientbar-wrap { margin-top: 6px; }
+.rp-gradientbar-label { font-size: 11px; color: var(--rp-ink-2); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+.rp-gradientbar {
+  position: relative; height: 26px; border-radius: 13px; border: 1px solid var(--rp-border);
+  margin: 0 13px 6px;
+}
+.rp-gradientbar .stop {
+  position: absolute; top: -3px; width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--rp-white); box-shadow: 0 0 0 1px var(--rp-border); cursor: pointer;
+}
+.rp-gradientbar .stop.a { left: -12px; }
+.rp-gradientbar .stop.b { right: -12px; }
+.rp-gradientbar .thumb {
+  position: absolute; top: -5px; width: 12px; height: 36px; border-radius: 6px;
+  background: var(--rp-white); border: 1px solid var(--rp-border); cursor: grab;
+  transform: translateX(-50%);
+}
+.rp-gradientbar .thumb:active { cursor: grabbing; }
+.rp-gradient-toggle { border: none; background: none; cursor: pointer; font-size: 11px; color: var(--rp-accent); font-weight: 600; }
+
+/* ---- Animate timeline ---- */
+#anim-canvas-controls {
+  position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
+  background: var(--rp-bg, #e2e8f0); color: var(--rp-ink, #000);
+  font-family: var(--rp-font); display: none;
+  max-height: 46vh; overflow-y: auto;
+}
+#anim-canvas-controls.open { display: block; }
+.rp-transport { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px; }
+.rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
+/* per-track "does playback drive this layer" switch, in the timeline */
+.rp-track-toggle { display: flex; align-items: center; gap: 6px; padding-top: 48px; margin-right: 10px; flex: 0 0 auto; }
+.rp-track-toggle .rp-switch { width: 30px; height: 17px; }
+.rp-track-toggle .rp-switch::after { width: 13px; height: 13px; }
+.rp-track-toggle .rp-switch.on::after { transform: translateX(13px); }
+.rp-track.off .rp-track-lane { opacity: 0.4; }
+.rp-transport .time { font: 600 16px/1 var(--rp-font-num); font-variant-numeric: tabular-nums; }
+.rp-transport button.rp-icon-btn { background: transparent; color: var(--rp-ink); }
+.rp-transport button.rp-icon-btn:hover { background: var(--rp-bg-3); }
+#rp-tracks { position: relative; }
+.rp-track { display: flex; padding: 10px 20px; }
+.rp-track-label { width: 100px; flex: 0 0 auto; font: 600 12px/1 var(--rp-font-num); padding-top: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-ink-2); }
+/* which track "add phase" targets — a quiet colour/weight shift, not an underline */
+.rp-track-label.focused { color: var(--rp-ink); font-weight: 700; }
+.rp-track-lane { flex: 1 1 auto; position: relative; }
+.rp-phase-labels { position: relative; height: 28px; }
+.rp-phase-durs { position: relative; height: 20px; }
+.rp-phase-name {
+  position: absolute; transform: translateX(-50%); top: 0; background: var(--rp-pill);
+  border-radius: 12.5px; padding: 5px 10px; font-size: 15px; font-weight: 600;
+  white-space: nowrap; cursor: text; outline: none; max-width: 90%; overflow: hidden;
+}
+.rp-phase-name:hover { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
+.rp-phase-name:focus { box-shadow: inset 0 0 0 2px var(--rp-accent); background: var(--rp-white); }
+/* hover-sync: everything sharing a phase label lights up at once */
+.rp-phase-name.hl { background: var(--rp-accent); color: var(--rp-white); }
+.rp-segment.hl { box-shadow: inset 0 0 0 2px var(--rp-accent); z-index: 2; }
+.rp-phase-dur { position: absolute; transform: translateX(-50%); top: 0; font: 600 12px/1 var(--rp-font-num); color: var(--rp-ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.rp-phase-dur .ease-ico { width: 16.125px; height: 16.125px; cursor: pointer; display: block; }
+.rp-bracket-row { position: relative; height: 10px; }
+.rp-bracket { position: absolute; top: 0; height: 10px; border-left: 2px solid var(--rp-ink-2); border-right: 2px solid var(--rp-ink-2); border-top: 2px solid var(--rp-ink-2); }
+.rp-segments-row { position: relative; height: 48px; display: flex; overflow: hidden; border-radius: 0; }
+.rp-segment { position: absolute; top: 0; height: 48px; cursor: pointer; overflow: hidden; }
+/* a hairline gap in the panel colour keeps adjacent segments readable as
+   separate blocks even when they hold the same colour */
+.rp-segment .swatch { box-shadow: inset -2px 0 0 var(--rp-bg); }
+.rp-segment:first-child { border-radius: 10px 0 0 10px; }
+.rp-segment:last-child { border-radius: 0 10px 10px 0; }
+.rp-segment:last-child .swatch { box-shadow: none; }
+.rp-segment .swatch { position: absolute; inset: 0; }
+.rp-segment.editing { outline: 2px solid var(--rp-ink); outline-offset: -2px; }
+.rp-segment .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
+.rp-segment .resize-handle.left { left: 0; }
+.rp-segment .resize-handle.right { right: 0; }
+.rp-seam-add {
+  position: absolute; top: 7px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--rp-ink); color: var(--rp-white); border: none; font-size: 12px;
+  display: none; align-items: center; justify-content: center; cursor: pointer;
+  transform: translateX(-50%); z-index: 5;
+}
+.rp-track-lane:hover .rp-seam-add { display: flex; }
+.rp-playhead {
+  position: absolute; top: 12px; bottom: 0; width: 2px; background: var(--rp-ink-2);
+  z-index: 6; cursor: ew-resize;
+}
+.rp-playhead::before {
+  content:""; position: absolute; top: -6px; left: -5px; border-left: 6px solid transparent;
+  border-right: 6px solid transparent; border-top: 8px solid var(--rp-ink-2);
+}
+.rp-add-phase-row { padding: 4px 20px 16px; }
