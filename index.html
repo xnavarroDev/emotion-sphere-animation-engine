@@ -26,13 +26,23 @@ body.kiosk #d-cycle { display:none; }
 /* watch link (a shared ?preset in kiosk): one fixed look, so hide the emotion
    selector too — nothing to pick */
 body.watch #dots { display:none !important; }
-#dots { position:fixed; top:24px; right:24px; z-index:100; display:flex; gap:10px; }
-.dot { width:10px; height:10px; border-radius:50%; cursor:pointer; opacity:0.35; transition:all 0.3s; }
-.dot:hover,.dot.active { opacity:1; transform:scale(1.5); }
+/* Emotion switcher — sits over the canvas, top-right, styled to match the
+   redesigned panel (larger targets, a ring on the active one) rather than
+   the tiny low-opacity dots the old dark UI used. */
+#dots {
+  position:fixed; top:20px; right:20px; z-index:100; display:flex; gap:10px;
+  align-items:center; padding:8px 12px; border-radius:999px;
+  background:rgba(226,232,240,0.10); backdrop-filter:blur(6px);
+}
+.dot {
+  width:16px; height:16px; border-radius:50%; cursor:pointer;
+  opacity:0.55; transition:opacity .18s, box-shadow .18s, transform .18s;
+}
+.dot:hover { opacity:1; transform:scale(1.1); }
+.dot.active { opacity:1; box-shadow:0 0 0 2px rgba(255,255,255,0.9); }
 .dot-cycle {
-  width:14px; height:14px; border-radius:50%;
+  width:16px; height:16px; border-radius:50%;
   background:conic-gradient(from 90deg,#22b8e8,#c890b0,#E83040,#FFE066,#22b8e8);
-  box-shadow:0 0 8px rgba(255,255,255,0.35);
 }
 #hint { display:none; }
 #proto-switch {
@@ -462,9 +472,9 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   flex: 0 0 auto; padding: 13px 15px 13px 14px; min-height: 130px;
   background: linear-gradient(70deg, rgb(206,219,235) 0%, rgb(226,232,240) 99.57%);
 }
-.rp-footer-row { display: flex; align-items: center; justify-content: flex-start; gap: 17px; margin-bottom: 12px; }
-.rp-footer .rp-name-input { flex: 0 1 auto; width: auto; padding: 4px 8px; }
-.rp-unsaved { font-size: 12px; font-weight: 600; color: var(--rp-ink); }
+.rp-footer-row { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 12px; }
+.rp-footer .rp-name-input { flex: 1 1 auto; min-width: 0; width: auto; padding: 4px 8px; }
+.rp-unsaved { font-size: 11px; font-weight: 600; color: var(--rp-ink); flex: 0 0 auto; max-width: 96px; line-height: 1.15; }
 .rp-unsaved.show { display: inline; }
 .rp-unsaved:not(.show) { display: none; }
 
@@ -521,6 +531,13 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 }
 #anim-canvas-controls.open { display: block; }
 .rp-transport { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px; }
+.rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
+/* per-track "does playback drive this layer" switch, in the timeline */
+.rp-track-toggle { display: flex; align-items: center; gap: 6px; padding-top: 48px; margin-right: 10px; flex: 0 0 auto; }
+.rp-track-toggle .rp-switch { width: 30px; height: 17px; }
+.rp-track-toggle .rp-switch::after { width: 13px; height: 13px; }
+.rp-track-toggle .rp-switch.on::after { transform: translateX(13px); }
+.rp-track.off .rp-track-lane { opacity: 0.4; }
 .rp-transport .time { font: 600 16px/1 var(--rp-font-num); font-variant-numeric: tabular-nums; }
 .rp-transport button.rp-icon-btn { background: transparent; color: var(--rp-ink); }
 .rp-transport button.rp-icon-btn:hover { background: var(--rp-bg-3); }
@@ -653,6 +670,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   <div class="rp-footer">
     <div class="rp-footer-row">
       <input class="rp-name-input" id="rp-preset-name" type="text" placeholder="Untitled preset" maxlength="60">
+      <button class="rp-icon-btn" id="rp-share-link" type="button" title="Copy a link that plays this exact look live"><img class="rp-ico rp-ico-18" src="icons/link.svg" alt="link"></button>
       <span class="rp-unsaved" id="rp-unsaved">you have unsaved changes!</span>
     </div>
     <button class="rp-btn-primary rp-btn-with-ico" id="rp-save-btn" type="button"><img class="rp-ico" src="icons/save-plus.svg" alt="">save to presets</button>
@@ -754,6 +772,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-play" type="button" title="Play/Pause"><img class="rp-ico" src="icons/play.svg" id="rp-anim-play-ico" alt=""></button>
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-reset" type="button" title="Reset"><img class="rp-ico" src="icons/rotate-ccw.svg" alt=""></button>
     <button class="rp-btn-sm" id="rp-anim-add-phase" type="button"><img class="rp-ico rp-ico-18" src="icons/plus.svg" alt="">add phase</button>
+    <span class="rp-loop-row"><span>loop</span><button class="rp-switch on" id="rp-anim-loop" type="button" title="Loop the cycle"></button></span>
   </div>
   <div id="rp-tracks"></div>
 </div>
@@ -1052,6 +1071,7 @@ function switchEmotion(name){
   const _gc=document.getElementById('glow-color');
   if(_gc) _gc.value='#ffffff';
   cloudBg.setUserTint('#ffffff',null);
+  if(backgroundCardSyncUI) backgroundCardSyncUI(); // glow colour just changed
 }
 
 function toggleCycle(){
@@ -1303,6 +1323,8 @@ let applySphereModeFn=null; // set once the panel is built
 let addFireflyLayerFn=null; // set once the panel is built (used by Load)
 let classicSyncUI=null; // re-sync the Fireflies sliders after animation lerps
 let backgroundCardSyncUI=null; // re-sync the Background card's controls after animation lerps
+let rpLoopSyncUI=null; // re-sync the redesigned loop toggle after a preset load
+let rpRenderTracksHook=null; // rebuild the redesigned timeline after a preset load
 let rpPanelReady=false; // true once the redesigned panel's own elements/consts exist —
                           // ffSync() can fire during early setup, before that's true
 
@@ -2780,7 +2802,23 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       label.title='Click to make this the track "add phase" targets';
       label.addEventListener('click',()=>{ trackActive=ti; rpRenderTracks(); });
 
-      track.append(label,lane);
+      // per-track "does playback drive this?" switch (regression from v1's
+      // On/Off track toggle). Off dims the lane so it reads as inert.
+      const isOn=isScene?(sceneAnim!==false):(F.anim!==false);
+      const tgWrap=document.createElement('div'); tgWrap.className='rp-track-toggle';
+      const tg=document.createElement('button'); tg.type='button';
+      tg.className='rp-switch'+(isOn?' on':'');
+      tg.title=isOn?'Animation drives this track — click to disable':'This track is static — click to animate it';
+      tg.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        if(isScene) sceneAnim=sceneAnim===false;
+        else F.anim=F.anim===false;
+        markDirty(); rpRenderTracks();
+      });
+      tgWrap.appendChild(tg);
+      if(!isOn) track.classList.add('off');
+
+      track.append(label,tgWrap,lane);
       rpTracksEl.appendChild(track);
     }
     // ONE playhead, spanning every track — not one per lane (that was the
@@ -2833,6 +2871,33 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     timeline.push({duration:5,snapshot});
     markDirty(); rpRenderTracks();
   });
+
+  // ---- Loop toggle (regression: existed in v1, had no home in the redesign)
+  const rpLoopBtn=document.getElementById('rp-anim-loop');
+  function rpSyncLoop(){
+    rpLoopBtn.classList.toggle('on',animLoop!==false);
+    const legacy=document.getElementById('anim-loop-chk');
+    if(legacy) legacy.checked=animLoop!==false; // keep save/load in sync
+  }
+  rpLoopBtn.addEventListener('click',()=>{ animLoop=!animLoop; rpSyncLoop(); markDirty(); });
+  rpLoopSyncUI=rpSyncLoop;
+  rpRenderTracksHook=rpRenderTracks;
+  rpSyncLoop();
+
+  // ---- Share Link (regression: the kiosk share URL was unreachable) ----
+  document.getElementById('rp-share-link').addEventListener('click',(e)=>{
+    const b64=btoa(unescape(encodeURIComponent(paramsToText())))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    const url=location.origin+location.pathname+'?mode=kiosk&preset='+b64;
+    const btn=e.currentTarget; // icon-only — flash the button, don't overwrite its contents
+    const flashBtn=(ok)=>{
+      btn.style.background=ok?'#3f7d58':'#a8443b';
+      btn.title=ok?'Link copied to clipboard':'Copy failed';
+      setTimeout(()=>{ btn.style.background=''; btn.title='Copy a link that plays this exact look live'; },1400);
+    };
+    navigator.clipboard?.writeText(url).then(()=>flashBtn(true)).catch(()=>flashBtn(false));
+  });
+
   document.getElementById('rp-animation-row').addEventListener('click',()=>{
     rpTracksContainer.classList.toggle('open');
     if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
@@ -3245,6 +3310,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     if(fireflyFieldSyncUI) fireflyFieldSyncUI();
     if(classicSyncUI) classicSyncUI();
     if(animTimelineSyncHook) animTimelineSyncHook();
+    // the redesigned panel mirrors this state too
+    if(rpLoopSyncUI) rpLoopSyncUI();
+    if(backgroundCardSyncUI) backgroundCardSyncUI();
+    if(typeof rpRenderTracksHook==='function') rpRenderTracksHook();
   }
 
   const flash=(btn,msg)=>{
