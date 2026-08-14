@@ -401,6 +401,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   flex: 0 0 auto; width: 89px; height: 62px; border-radius: 10px; background: var(--rp-bg-2);
 }
 .rp-cards-arrow { flex: 0 0 auto; background: none; border: none; color: var(--rp-ink); font-size: 18px; cursor: pointer; }
+.rp-cards-arrow:disabled { opacity: 0.4; cursor: default; }
 .rp-stub-note { font-size: 10.5px; font-weight: 400; color: var(--rp-ink-2); margin: -6px 0 24px; }
 
 /* ---- collapsible sections (Describe a feeling / Parameters) ---- */
@@ -624,11 +625,12 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 
     <button class="rp-btn-primary" id="rp-browse-btn" type="button" disabled title="Preset library not built yet">Browse saved presets</button>
     <div class="rp-cards-row">
-      <div class="rp-card-stub"></div>
-      <div class="rp-card-stub"></div>
-      <div class="rp-card-stub"></div>
-      <button class="rp-cards-arrow" type="button"><img class="rp-ico rp-ico-18" src="icons/chevron-right.svg" alt=""></button>
+      <div class="rp-card-stub" title="Saved preset — library not built yet"></div>
+      <div class="rp-card-stub" title="Saved preset — library not built yet"></div>
+      <div class="rp-card-stub" title="Saved preset — library not built yet"></div>
+      <button class="rp-cards-arrow" type="button" disabled title="Preset library not built yet"><img class="rp-ico rp-ico-18" src="icons/chevron-right.svg" alt=""></button>
     </div>
+    <div class="rp-stub-note">Preset library isn't built yet — slots above are placeholders.</div>
 
     <div class="rp-section" id="rp-describe-section">
       <div class="rp-section-head" id="rp-describe-head">Describe a feeling… <span class="chev"><img class="rp-ico" src="icons/chevron-down.svg" alt=""></span></div>
