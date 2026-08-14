@@ -36,14 +36,14 @@
     </div>
     <div class="rp-caption">Create and tune emotion presets for<br>IPMD's Emotion Sphere</div>
 
-    <button class="rp-btn-primary" id="rp-browse-btn" type="button" disabled title="Preset library not built yet">Browse saved presets</button>
+    <button class="rp-btn-primary" id="rp-browse-btn" type="button" disabled title="Saving and browsing your own custom presets isn't built yet">Browse saved presets</button>
     <div class="rp-cards-row">
-      <div class="rp-card-stub" title="Saved preset — library not built yet"></div>
-      <div class="rp-card-stub" title="Saved preset — library not built yet"></div>
-      <div class="rp-card-stub" title="Saved preset — library not built yet"></div>
-      <button class="rp-cards-arrow" type="button" disabled title="Preset library not built yet"><img class="rp-ico rp-ico-18" src="icons/chevron-right.svg" alt=""></button>
+      <button class="rp-card-stub" type="button"></button>
+      <button class="rp-card-stub" type="button"></button>
+      <button class="rp-card-stub" type="button"></button>
+      <button class="rp-cards-arrow" type="button" title="Show more"><img class="rp-ico rp-ico-18" src="icons/chevron-right.svg" alt=""></button>
     </div>
-    <div class="rp-stub-note">Preset library isn't built yet — slots above are placeholders.</div>
+    <div class="rp-stub-note">Quick-load a built-in emotion above — saving your own custom presets isn't built yet.</div>
 
     <div class="rp-section" id="rp-describe-section">
       <div class="rp-section-head" id="rp-describe-head">Describe a feeling… <span class="chev"><img class="rp-ico" src="icons/chevron-down.svg" alt=""></span></div>
@@ -1722,6 +1722,34 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   rpCollapseBtn.addEventListener('click',()=>rpSetCollapsed(true));
   rpCollapseRail.addEventListener('click',()=>rpSetCollapsed(false));
+
+  // ---- Built-in presets quick-load cards ----
+  // Not the "saved presets library" (rp-browse-btn stays disabled — that
+  // needs real storage for custom presets). This just quick-loads the 4
+  // shipped emotion presets, which already exist as static files.
+  const RP_BUILTIN_PRESETS=[
+    {emo:'calm',  label:'Calm',  bg:'#c890b0', fg:'#ffffff'},
+    {emo:'sad',   label:'Sad',   bg:'#22b8e8', fg:'#ffffff'},
+    {emo:'warm',  label:'Warm',  bg:'#FFE066', fg:'#3a2f00'},
+    {emo:'anger', label:'Anger', bg:'#E83040', fg:'#ffffff'},
+  ];
+  let rpCardsOffset=0;
+  const rpCardEls=[...document.querySelectorAll('.rp-cards-row .rp-card-stub')];
+  function rpRenderCards(){
+    rpCardEls.forEach((el,i)=>{
+      const p=RP_BUILTIN_PRESETS[(rpCardsOffset+i)%RP_BUILTIN_PRESETS.length];
+      el.textContent=p.label;
+      el.style.background=p.bg;
+      el.style.color=p.fg;
+      el.title='Load the '+p.label+' preset';
+      el.onclick=()=>window.emotionSphere.play(p.emo).catch(err=>console.warn(err.message));
+    });
+  }
+  rpRenderCards();
+  document.querySelector('.rp-cards-arrow').addEventListener('click',()=>{
+    rpCardsOffset=(rpCardsOffset+1)%RP_BUILTIN_PRESETS.length;
+    rpRenderCards();
+  });
 
   // ---- Collapsible sections — the chevron flips (points up) while
   // expanded, matching the Figma source exactly, and drops back to
