@@ -549,7 +549,16 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-track-lane { flex: 1 1 auto; position: relative; }
 .rp-phase-labels { position: relative; height: 28px; }
 .rp-phase-durs { position: relative; height: 20px; }
-.rp-phase-name { position: absolute; transform: translateX(-50%); top: 0; background: var(--rp-pill); border-radius: 12.5px; padding: 5px 10px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.rp-phase-name {
+  position: absolute; transform: translateX(-50%); top: 0; background: var(--rp-pill);
+  border-radius: 12.5px; padding: 5px 10px; font-size: 15px; font-weight: 600;
+  white-space: nowrap; cursor: text; outline: none; max-width: 90%; overflow: hidden;
+}
+.rp-phase-name:hover { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
+.rp-phase-name:focus { box-shadow: inset 0 0 0 2px var(--rp-accent); background: var(--rp-white); }
+/* hover-sync: everything sharing a phase label lights up at once */
+.rp-phase-name.hl { background: var(--rp-accent); color: var(--rp-white); }
+.rp-segment.hl { box-shadow: inset 0 0 0 2px var(--rp-accent); z-index: 2; }
 .rp-phase-dur { position: absolute; transform: translateX(-50%); top: 0; font: 600 12px/1 var(--rp-font-num); color: var(--rp-ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .rp-phase-dur .ease-ico { width: 16.125px; height: 16.125px; cursor: pointer; display: block; }
 .rp-bracket-row { position: relative; height: 10px; }
@@ -2667,6 +2676,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   let rpLaneGeom=null;     // cached {left,width} so the per-frame path never reads layout
   let rpMaxTotal=1;
   const rpSegmentEls=new Map(); // phase object -> its swatch element (for cheap live-edit recolour)
+  const rpPhaseGroups=new Map(); // lowercased phase label -> every element sharing it (hover-sync)
 
   function rpCacheLaneGeom(){
     if(!rpRefLane||!rpTracksEl){ rpLaneGeom=null; return; }
@@ -2697,6 +2707,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(!rpTracksEl) return;
     rpTracksEl.innerHTML='';
     rpSegmentEls.clear();
+    rpPhaseGroups.clear();
     const maxTotal=getAnimMaxTotal()||1;
     let refLane=null; // the first track's lane — defines the shared x-axis every track's segments align to
     for(let ti=0; ti<rpTrackCount(); ti++){
@@ -2752,9 +2763,38 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         segsRow.appendChild(seg);
 
         const nameEl=document.createElement('div'); nameEl.className='rp-phase-name';
-        nameEl.textContent=phase.name||(pi===0?'Starting':'Phase '+(pi+1));
+        const shownName=phase.name||(pi===0?'Starting':'Phase '+(pi+1));
+        nameEl.textContent=shownName;
         nameEl.style.left=(leftPct+w/2)+'%';
+        // click to rename: "build-up"/"climax" beats "Phase 2" for anyone
+        // reading the timeline cold. Enter or blur commits; empty reverts
+        // to the automatic label.
+        nameEl.contentEditable='true';
+        nameEl.spellcheck=false;
+        nameEl.title='Click to rename this phase';
+        nameEl.addEventListener('keydown',(e)=>{
+          e.stopPropagation();
+          if(e.key==='Enter'){ e.preventDefault(); nameEl.blur(); }
+          if(e.key==='Escape'){ nameEl.textContent=shownName; nameEl.blur(); }
+        });
+        nameEl.addEventListener('blur',()=>{
+          const v=nameEl.textContent.trim();
+          const next=v||null;
+          if((phase.name||null)!==next){ phase.name=next; markDirty(); rpRenderTracks(); }
+          else nameEl.textContent=shownName;
+        });
         labelsRow.appendChild(nameEl);
+        // hover-sync: every phase sharing this label lights up together,
+        // across all tracks — the cross-track link that drawn connectors
+        // could never express once lanes diverge in length
+        const gkey=shownName.toLowerCase();
+        if(!rpPhaseGroups.has(gkey)) rpPhaseGroups.set(gkey,[]);
+        rpPhaseGroups.get(gkey).push(seg,nameEl);
+        const hl=(on)=>{ for(const el of rpPhaseGroups.get(gkey)||[]) el.classList.toggle('hl',on); };
+        seg.addEventListener('mouseenter',()=>hl(true));
+        seg.addEventListener('mouseleave',()=>hl(false));
+        nameEl.addEventListener('mouseenter',()=>hl(true));
+        nameEl.addEventListener('mouseleave',()=>hl(false));
 
         // one bracket per phase, spanning exactly that phase's range
         const pbracket=document.createElement('div'); pbracket.className='rp-bracket';
@@ -3143,6 +3183,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       F.timeline.forEach((ph,pi)=>{
         lines.push('Phase '+(pi+1)+' @ '+(+ph.duration).toFixed(2));
         if(ph.ease) lines.push('ease '+ph.ease);
+        if(ph.name) lines.push('name '+ph.name);
         if(ph.snapshot&&ph.snapshot.params){
           for(const [k,v] of Object.entries(ph.snapshot.params))
             if(typeof v==='number') lines.push(k+' '+(+v).toFixed(3));
@@ -3154,6 +3195,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     sceneTimeline.forEach((ph,pi)=>{
       lines.push('Phase '+(pi+1)+' @ '+(+ph.duration).toFixed(2));
       if(ph.ease) lines.push('ease '+ph.ease);
+      if(ph.name) lines.push('name '+ph.name);
       if(ph.snapshot){
         if(ph.snapshot.classic)
           for(const [k,v] of Object.entries(ph.snapshot.classic))
@@ -3239,6 +3281,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       }
       m=line.match(/^name\s+(.+)$/i);
       if(m&&section==='ffield'&&fireflyLayers[fli]){ fireflyLayers[fli].name=m[1].trim()||null; continue; }
+      if(m&&section==='anim'&&aphase){ aphase.name=m[1].trim()||null; continue; }
       m=line.match(/^colour\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='anim'&&ani>=0&&aphase){
         if(!aphase.snapshot) aphase.snapshot={params:{}};
