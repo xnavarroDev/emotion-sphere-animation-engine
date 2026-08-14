@@ -461,12 +461,19 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-sphere-row .rp-slider-row { margin-top: 8px; opacity: 1; transition: opacity 0.15s; }
 .rp-sphere-row .rp-slider-row.disabled { opacity: 0.4; pointer-events: none; }
 
-/* ---- pinned rows: Background / Animation ---- */
+/* ---- pinned rows: Background / Animation ----
+   Deliberately live outside #rp-scroll (as a sibling flex child) so they
+   never scroll away or end up buried under whatever's expanded above —
+   they're always the last thing visible before the save bar. */
+.rp-pinned-rows {
+  flex: 0 0 auto; padding: 12px 15px 6px 14px;
+  border-top: 1px solid var(--rp-border);
+}
 .rp-pinned-row {
   display: flex; align-items: center; justify-content: space-between; cursor: pointer;
   user-select: none; font-size: 20px; font-weight: 600; padding: 6px 0;
 }
-.rp-pinned-row .chev { font-size: 18px; color: var(--rp-ink); }
+.rp-pinned-row .chev { font-size: 18px; color: var(--rp-ink); transition: transform 0.15s; }
 
 /* ---- persistent footer ---- */
 .rp-footer {
@@ -673,8 +680,10 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="rp-pinned-row" id="rp-background-row">Background <span class="chev rp-flip-y"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
+  <div class="rp-pinned-rows" id="rp-pinned-rows">
+    <div class="rp-pinned-row" id="rp-background-row">Background <span class="chev"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
     <div class="rp-pinned-row" id="rp-animation-row">Animation <span class="chev"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
   </div>
 
@@ -2511,9 +2520,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // ---- Background floating card ----
   const rpBgCard=document.getElementById('rp-bg-card');
   const rpBgTitlebar=document.getElementById('rp-bg-titlebar');
-  document.getElementById('rp-bg-close').addEventListener('click',()=>rpBgCard.classList.remove('open'));
+  const rpBgChev=document.querySelector('#rp-background-row .chev');
+  const rpSyncBgChevron=()=>{ if(rpBgChev) rpBgChev.classList.toggle('rp-flip-x',rpBgCard.classList.contains('open')); };
+  document.getElementById('rp-bg-close').addEventListener('click',()=>{ rpBgCard.classList.remove('open'); rpSyncBgChevron(); });
   document.getElementById('rp-background-row').addEventListener('click',()=>{
     rpBgCard.classList.toggle('open');
+    rpSyncBgChevron();
     if(rpBgCard.classList.contains('open')&&!rpBgCard.style.left){
       rpBgCard.style.left='360px'; rpBgCard.style.top='80px';
     }
@@ -2754,7 +2766,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
           trackActive=ti; // reuse the shared track-selector state
           applyTrackSnapshot(phase.snapshot||captureTrackSnapshot());
           rpEditingPhase=phase;
-          if(isScene) rpBgCard.classList.add('open');
+          if(isScene){ rpBgCard.classList.add('open'); rpSyncBgChevron(); }
           rpRenderTracks();
         });
         const rL=document.createElement('div'); rL.className='resize-handle left';
@@ -2942,6 +2954,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
 
   document.getElementById('rp-animation-row').addEventListener('click',()=>{
     rpTracksContainer.classList.toggle('open');
+    document.querySelector('#rp-animation-row .chev').classList.toggle('rp-flip-x',rpTracksContainer.classList.contains('open'));
     if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
     // the timeline eats vertical space — refit the sphere above it
     if(window.rpLayoutViewport) window.rpLayoutViewport();
