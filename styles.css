@@ -557,7 +557,20 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   max-height: 46vh; overflow-y: auto; overflow-x: hidden;
 }
 #anim-canvas-controls.open { display: block; }
-.rp-transport { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px; }
+/* The transport pins to the top of the timeline's own scroll area, so the
+   playhead time, play/reset and "add phase" stay reachable no matter how many
+   tracks you scroll through. #anim-canvas-controls is the scroll container and
+   this is a direct child of it, which is what sticky needs.
+   The background must be OPAQUE: --rp-bg is semi-transparent (the timeline
+   floats over the canvas), so reusing it would let track rows show through the
+   pinned bar as they scroll under it. z-index clears the playhead (6) and the
+   placement band (6), which both live in the scrolling content below. */
+.rp-transport {
+  display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px;
+  position: sticky; top: 0; z-index: 20;
+  background: var(--rp-bg-2);
+  border-bottom: 1px solid var(--rp-border);
+}
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
 /* per-track "does playback drive this layer" switch, in the timeline */
 .rp-track-toggle { display: flex; align-items: center; gap: 6px; padding-top: 48px; margin-right: 10px; flex: 0 0 auto; }
