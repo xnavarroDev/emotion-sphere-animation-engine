@@ -323,6 +323,14 @@ body.watch #dots { display:none !important; }
      button text ON the accent colour still needs to stay true white. Split
      the two meanings instead of stretching one token to cover both. */
   --rp-surface: #242428;
+  /* The timeline is a dense work surface (filmstrips, pills, a playhead) and
+     its pinned header has to match it EXACTLY. Both therefore share one
+     OPAQUE token: while the surface was semi-transparent its real colour
+     depended on whatever sat behind it, so the header could only ever
+     approximate it — and anything scrolling under a translucent header
+     stayed legible through it. Value matches how the translucent surface
+     already rendered, so the timeline looks unchanged. */
+  --rp-timeline: #1d1d20;
   --rp-danger: #e5584d;
   --rp-font: 'Inclusive Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --rp-font-num: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -548,7 +556,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 /* ---- Animate timeline ---- */
 #anim-canvas-controls {
   position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
-  background: var(--rp-bg, #e2e8f0); color: var(--rp-ink, #000);
+  background: var(--rp-timeline); color: var(--rp-ink, #000);
   font-family: var(--rp-font); display: none;
   /* overflow-x stated explicitly for the same reason as #rp-scroll: leaving it
      to compute to `auto` paints a permanent horizontal scrollbar under the
@@ -561,14 +569,16 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
    playhead time, play/reset and "add phase" stay reachable no matter how many
    tracks you scroll through. #anim-canvas-controls is the scroll container and
    this is a direct child of it, which is what sticky needs.
-   The background must be OPAQUE: --rp-bg is semi-transparent (the timeline
-   floats over the canvas), so reusing it would let track rows show through the
-   pinned bar as they scroll under it. z-index clears the playhead (6) and the
-   placement band (6), which both live in the scrolling content below. */
+
+   It shares --rp-timeline with the container, so the bar is the same colour
+   as the body by construction rather than by approximation, and being opaque
+   it actually hides the rows scrolling under it (a blurred transparent bar
+   was not enough — the phase pills stayed legible through it). z-index clears
+   the playhead and the placement band (both 6), in the scrolling content. */
 .rp-transport {
-  display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px;
+  display: flex; align-items: center; justify-content: center; gap: 24px; padding: 4px 18px;
   position: sticky; top: 0; z-index: 20;
-  background: var(--rp-bg-2);
+  background: var(--rp-timeline);
   border-bottom: 1px solid var(--rp-border);
 }
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
