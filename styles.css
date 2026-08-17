@@ -329,15 +329,28 @@ body.watch #dots { display:none !important; }
      depended on whatever sat behind it, so the header could only ever
      approximate it — and anything scrolling under a translucent header
      stayed legible through it. Value matches how the translucent surface
-     already rendered, so the timeline looks unchanged. */
-  --rp-timeline: #1d1d20;
+     renders as, so the two panels read as one surface. The timeline reuses
+     the panel's OWN token rather than a hand-matched hex: --rp-bg is 50%
+     translucent, so any fixed value could only approximate it, and would
+     drift the moment the theme changed. Anything that must be opaque (the
+     surface. */
+  /* One OPAQUE surface for both chrome panels. They used to be 50%
+     translucent, which meant neither had a colour of its own: both showed
+     the sphere's background gradient through them, and because the left
+     panel spans the full height while the timeline sits at the bottom, each
+     picked up a different part of that gradient and rendered a visibly
+     different tone (measured 23,22,25 vs 16,15,17). No shared value could
+     fix that while either stayed see-through. Opaque also lets the pinned
+     transport and the sticky track gutter actually hide the rows scrolling
+     underneath them. Tone matches what the panel already rendered as. */
+  --rp-chrome: #17161a;
   --rp-danger: #e5584d;
   --rp-font: 'Inclusive Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --rp-font-num: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 #redesign-panel {
   position: fixed; top: 0; left: 0; width: 339px; height: 100%;
-  background: var(--rp-bg); color: var(--rp-ink);
+  background: var(--rp-chrome); color: var(--rp-ink);
   font-family: var(--rp-font); font-weight: 600;
   display: flex; flex-direction: column;
   overflow: hidden; z-index: 40;
@@ -565,7 +578,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 /* ---- Animate timeline ---- */
 #anim-canvas-controls {
   position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
-  background: var(--rp-timeline); color: var(--rp-ink, #000);
+  background: var(--rp-chrome); color: var(--rp-ink, #000);
   font-family: var(--rp-font); display: none;
   /* overflow-x stated explicitly for the same reason as #rp-scroll: leaving it
      to compute to `auto` paints a permanent horizontal scrollbar under the
@@ -579,15 +592,15 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
    tracks you scroll through. #anim-canvas-controls is the scroll container and
    this is a direct child of it, which is what sticky needs.
 
-   It shares --rp-timeline with the container, so the bar is the same colour
-   as the body by construction rather than by approximation, and being opaque
-   it actually hides the rows scrolling under it (a blurred transparent bar
-   was not enough — the phase pills stayed legible through it). z-index clears
-   the playhead and the placement band (both 6), in the scrolling content. */
+   It shares --rp-chrome with the container, so the bar is the same colour as
+   the body by construction rather than by approximation, and being opaque it
+   actually hides the rows scrolling under it (a blurred transparent bar was
+   not enough — the phase pills stayed legible through it). z-index clears the
+   playhead and the placement band (both 6), in the scrolling content. */
 .rp-transport {
   display: flex; align-items: center; justify-content: center; gap: 24px; padding: 4px 18px;
   position: sticky; top: 0; z-index: 20;
-  background: var(--rp-timeline);
+  background: var(--rp-chrome);
   border-bottom: 1px solid var(--rp-border);
 }
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
@@ -609,7 +622,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 /* Pinned label column: opaque and FULL height, so the lane scrolling under it
    is covered rather than peeking through the gaps around the name pill. */
 .rp-track-gutter { position: sticky; left: 0; z-index: 9; flex: 0 0 auto;
-  display: flex; background: var(--rp-timeline); padding-left: 20px; }
+  display: flex; background: var(--rp-chrome); padding-left: 20px; }
 /* align-self/margin rather than padding-top: as a stretched flex item the
    label box was the full height of the track (~140px), so the editable
    background below painted a big empty slab instead of hugging the name.
@@ -669,7 +682,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   box-shadow: 0 8px 22px rgba(0,0,0,0.45); border: 2px solid var(--rp-white);
 }
 .rp-thumb-preview-sec {
-  background: var(--rp-ink); color: var(--rp-white); font: 600 11px/1 var(--rp-font-num);
+  /* --rp-ink is near-white here, so --rp-white text on it was invisible */
+  background: var(--rp-ink); color: var(--rp-bg-2); font: 600 11px/1 var(--rp-font-num);
   padding: 4px 9px; border-radius: 999px; white-space: nowrap;
 }
 /* ---- Placing a phase (click start → drag → click end) ---- */
