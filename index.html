@@ -2289,6 +2289,23 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const rpSegmentEls=new Map(); // phase object -> its swatch element (for cheap live-edit recolour)
   const rpPhaseGroups=new Map(); // lowercased phase label -> every element sharing it (hover-sync)
 
+  // Hover backdrop marking one phase down every track. Positioned in CONTENT
+  // space (the lane's own offset plus the segment's) so it stays put when the
+  // timeline is scrolled horizontally, and recreated on demand because
+  // rpRenderTracks() empties rpTracksEl.
+  let rpPhaseBand=null;
+  function rpShowPhaseBand(seg,lane){
+    if(!rpTracksEl) return;
+    if(!rpPhaseBand||!rpPhaseBand.isConnected){
+      rpPhaseBand=document.createElement('div'); rpPhaseBand.className='rp-phase-band';
+      rpTracksEl.appendChild(rpPhaseBand);
+    }
+    rpPhaseBand.style.left=(lane.offsetLeft+seg.offsetLeft)+'px';
+    rpPhaseBand.style.width=seg.offsetWidth+'px';
+    rpPhaseBand.style.display='block';
+  }
+  function rpHidePhaseBand(){ if(rpPhaseBand) rpPhaseBand.style.display='none'; }
+
   function rpCacheLaneGeom(){
     if(!rpRefLane||!rpTracksEl){ rpLaneGeom=null; return; }
     // offsetLeft/offsetWidth, not getBoundingClientRect deltas: #rp-tracks is
@@ -2453,7 +2470,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         const gkey=shownName.toLowerCase();
         if(!rpPhaseGroups.has(gkey)) rpPhaseGroups.set(gkey,[]);
         rpPhaseGroups.get(gkey).push(seg,nameEl);
-        const hl=(on)=>{ for(const el of rpPhaseGroups.get(gkey)||[]) el.classList.toggle('hl',on); };
+        const hl=(on)=>{
+          for(const el of rpPhaseGroups.get(gkey)||[]) el.classList.toggle('hl',on);
+          // plus a band down the whole stack, so the phase reads as the shared
+          // COLUMN it is — per-element outlines alone left you tracing which
+          // segment in each row lined up with the one under the cursor
+          if(on) rpShowPhaseBand(seg,lane); else rpHidePhaseBand();
+        };
         seg.addEventListener('mouseenter',()=>hl(true));
         seg.addEventListener('mouseleave',()=>hl(false));
         nameEl.addEventListener('mouseenter',()=>hl(true));

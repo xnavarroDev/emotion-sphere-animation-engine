@@ -344,6 +344,11 @@ body.watch #dots { display:none !important; }
      transport and the sticky track gutter actually hide the rows scrolling
      underneath them. Tone matches what the panel already rendered as. */
   --rp-chrome: #17161a;
+  /* Foreground for anything painted ON an --rp-ink surface. --rp-ink is the
+     high-contrast INK colour, which in a dark theme is near-white — so
+     --rp-white text on it is invisible. That caught the seam + button and
+     the filmstrip hover timestamp; name the pairing so it stops recurring. */
+  --rp-on-ink: #17161a;
   --rp-danger: #e5584d;
   --rp-font: 'Inclusive Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --rp-font-num: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -651,6 +656,14 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 /* hover-sync: everything sharing a phase label lights up at once */
 .rp-phase-name.hl { background: var(--rp-accent); color: var(--rp-white); }
 .rp-segment.hl { box-shadow: inset 0 0 0 2px var(--rp-accent); z-index: 2; }
+/* The hovered phase as a column down every track. It sits OVER the lanes: a
+   band behind them would be hidden by each segment's own swatch/filmstrip, so
+   it is a light wash faint enough to leave the frames readable. */
+.rp-phase-band {
+  position: absolute; top: 0; bottom: 0; z-index: 4; display: none; pointer-events: none;
+  background: rgba(255,255,255,0.07);
+  border-left: 1px solid rgba(255,255,255,0.22); border-right: 1px solid rgba(255,255,255,0.22);
+}
 .rp-phase-dur { position: absolute; transform: translateX(-50%); top: 0; font: 600 12px/1 var(--rp-font-num); color: var(--rp-ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .rp-phase-dur .ease-ico { width: 16.125px; height: 16.125px; cursor: pointer; display: block; }
 .rp-bracket-row { position: relative; height: 10px; }
@@ -685,8 +698,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   box-shadow: 0 8px 22px rgba(0,0,0,0.45); border: 2px solid var(--rp-white);
 }
 .rp-thumb-preview-sec {
-  /* --rp-ink is near-white here, so --rp-white text on it was invisible */
-  background: var(--rp-ink); color: var(--rp-bg-2); font: 600 11px/1 var(--rp-font-num);
+  background: var(--rp-ink); color: var(--rp-on-ink); font: 600 11px/1 var(--rp-font-num);
   padding: 4px 9px; border-radius: 999px; white-space: nowrap;
 }
 /* ---- Placing a phase (click start → drag → click end) ---- */
@@ -697,7 +709,7 @@ body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
 .rp-place-ghost {
   position: fixed; z-index: 300; display: none; pointer-events: none;
   transform: translate(14px, 14px); white-space: nowrap;
-  background: var(--rp-ink); color: var(--rp-bg-2);
+  background: var(--rp-ink); color: var(--rp-on-ink);
   font: 600 11px/1 var(--rp-font-num); padding: 6px 10px; border-radius: 999px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
@@ -719,7 +731,7 @@ body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
 .rp-segment .resize-handle.right { right: 0; }
 .rp-seam-add {
   position: absolute; top: 7px; width: 18px; height: 18px; border-radius: 50%;
-  background: var(--rp-ink); color: var(--rp-white); border: none; font-size: 12px;
+  background: var(--rp-ink); color: var(--rp-on-ink); border: none; font-size: 12px;
   display: none; align-items: center; justify-content: center; cursor: pointer;
   transform: translateX(-50%); z-index: 5;
 }
