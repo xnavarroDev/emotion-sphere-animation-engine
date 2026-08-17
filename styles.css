@@ -305,18 +305,25 @@ body.watch #dots { display:none !important; }
      dropped every var(--rp-*) declaration inside them (invalid at
      computed-value time), which is why they were rendering in the old
      dark theme's Courier New / blue accents instead of this one. */
-  --rp-bg: #e2e8f0;
-  --rp-bg-2: #cedbeb;
-  --rp-bg-3: #cedbeb;
-  --rp-ink: #000000;
-  --rp-ink-2: #44546f;
-  --rp-ink-3: #7d8394;
-  --rp-accent: #64748b;
-  --rp-accent-hover: #55637a;
-  --rp-border: rgba(0,0,0,0.12);
-  --rp-pill: #e9f2ff;
+  --rp-bg: rgba(22,22,24,0.5);
+  --rp-bg-2: #232326;
+  --rp-bg-3: #2b2b2f;
+  --rp-ink: #f4f4f6;
+  --rp-ink-2: #9c9ca3;
+  --rp-ink-3: #6d6d74;
+  --rp-accent: #46464b;
+  --rp-accent-hover: #57575d;
+  --rp-border: rgba(255,255,255,0.09);
+  --rp-pill: #28282c;
   --rp-white: #ffffff;
-  --rp-danger: #a8443b;
+  /* the "lightest surface" (float-card bg, switch knob, gradient thumb,
+     focused-pill bg) used to just reuse --rp-white — light mode's white
+     happened to double as a plausible surface tone, but in dark mode a
+     literal white card would be jarring against everything else, while
+     button text ON the accent colour still needs to stay true white. Split
+     the two meanings instead of stretching one token to cover both. */
+  --rp-surface: #242428;
+  --rp-danger: #e5584d;
   --rp-font: 'Inclusive Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --rp-font-num: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -336,7 +343,7 @@ body.watch #dots { display:none !important; }
 #rp-collapse-rail {
   position: fixed; top: 16px; left: 16px; z-index: 41;
   width: 34px; height: 34px; border-radius: 8px; border: none;
-  background: var(--rp-bg, #e2e8f0); color: #000;
+  background: var(--rp-bg); color: var(--rp-ink);
   display: none; align-items: center; justify-content: center;
   cursor: pointer; font: 16px/1 sans-serif;
 }
@@ -344,8 +351,8 @@ body.watch #dots { display:none !important; }
 body.rp-collapsed #rp-collapse-rail { display: flex; }
 
 /* ---- header ---- */
-.rp-header-row { display: flex; align-items: center; gap: 16px; justify-content: flex-start; }
-.rp-logo { font-size: 44px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.rp-header-row { display: flex; align-items: center; gap: 10px; justify-content: flex-start; }
+.rp-logo { height: 44px; width: auto; flex: 0 0 auto; display: block; }
 .rp-title { font-size: 16px; font-weight: 600; line-height: 1.25; flex: 1 1 auto; }
 .rp-caption { font-size: 12px; font-weight: 600; color: var(--rp-ink); line-height: 1.4; margin: 8px 0 24px; }
 .rp-collapse-btn {
@@ -482,7 +489,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 /* ---- persistent footer ---- */
 .rp-footer {
   flex: 0 0 auto; padding: 13px 15px 13px 14px; min-height: 130px;
-  background: linear-gradient(70deg, rgb(206,219,235) 0%, rgb(226,232,240) 99.57%);
+  background: linear-gradient(70deg, #1c1c1f 0%, #232326 99.57%);
 }
 .rp-footer-row { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 12px; }
 .rp-footer .rp-name-input { flex: 1 1 auto; min-width: 0; width: auto; padding: 4px 8px; }
@@ -492,8 +499,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 
 /* ---- floating Background card ---- */
 .rp-float-card {
-  position: fixed; z-index: 60; width: 260px; background: var(--rp-white);
-  border-radius: 12px; box-shadow: 0 10px 30px rgba(10,12,20,0.35);
+  position: fixed; z-index: 60; width: 260px; background: var(--rp-surface);
+  border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.55);
   border: 1px solid var(--rp-border); color: var(--rp-ink);
   font-family: var(--rp-font); overflow: hidden; display: none;
 }
@@ -566,8 +573,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   border-radius: 12.5px; padding: 5px 10px; font-size: 15px; font-weight: 600;
   white-space: nowrap; cursor: text; outline: none; max-width: 90%; overflow: hidden;
 }
-.rp-phase-name:hover { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
-.rp-phase-name:focus { box-shadow: inset 0 0 0 2px var(--rp-accent); background: var(--rp-white); }
+.rp-phase-name:hover { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22); }
+.rp-phase-name:focus { box-shadow: inset 0 0 0 2px var(--rp-accent); background: var(--rp-surface); }
 /* hover-sync: everything sharing a phase label lights up at once */
 .rp-phase-name.hl { background: var(--rp-accent); color: var(--rp-white); }
 .rp-segment.hl { box-shadow: inset 0 0 0 2px var(--rp-accent); z-index: 2; }
@@ -575,8 +582,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-phase-dur .ease-ico { width: 16.125px; height: 16.125px; cursor: pointer; display: block; }
 .rp-bracket-row { position: relative; height: 10px; }
 .rp-bracket { position: absolute; top: 0; height: 10px; border-left: 2px solid var(--rp-ink-2); border-right: 2px solid var(--rp-ink-2); border-top: 2px solid var(--rp-ink-2); }
-.rp-segments-row { position: relative; height: 48px; display: flex; overflow: hidden; border-radius: 0; }
-.rp-segment { position: absolute; top: 0; height: 48px; cursor: pointer; overflow: hidden; }
+.rp-segments-row { position: relative; height: 68px; display: flex; overflow: hidden; border-radius: 0; }
+.rp-segment { position: absolute; top: 0; height: 68px; cursor: pointer; overflow: hidden; }
 /* a hairline gap in the panel colour keeps adjacent segments readable as
    separate blocks even when they hold the same colour */
 .rp-segment .swatch { box-shadow: inset -2px 0 0 var(--rp-bg); }
@@ -599,8 +606,9 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   position: fixed; z-index: 200; display: none; flex-direction: column; align-items: center;
   gap: 6px; transform: translate(-50%, calc(-100% - 14px)); pointer-events: none;
 }
+/* height is set in JS from the frame's real aspect (see rpShowThumbPreview) */
 .rp-thumb-preview-img {
-  width: 112px; height: 68px; border-radius: 8px; background: #000 center/cover;
+  width: 180px; border-radius: 8px; background: #000 center/contain no-repeat;
   box-shadow: 0 8px 22px rgba(0,0,0,0.45); border: 2px solid var(--rp-white);
 }
 .rp-thumb-preview-sec {

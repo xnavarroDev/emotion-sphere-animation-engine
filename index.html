@@ -30,7 +30,7 @@
 <div id="redesign-panel">
   <div id="rp-scroll">
     <div class="rp-header-row">
-      <div class="rp-logo">ipmd</div>
+      <img class="rp-logo" src="icons/ipmd_categoryname_whitelogo.png" alt="IPMD">
       <div class="rp-title">Emotion Sphere<br>Particle Engine</div>
       <button class="rp-collapse-btn" id="rp-collapse-btn" title="Collapse panel"><img class="rp-ico" src="icons/chevron-left.svg" alt=""></button>
     </div>
@@ -2070,6 +2070,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   (function makeDraggable(handle,target){
     let dragging=false,dx=0,dy=0;
     handle.addEventListener('pointerdown',(e)=>{
+      // Controls living in the titlebar (the close ×) must keep their own
+      // clicks: starting a drag here calls setPointerCapture on the titlebar,
+      // which retargets the following pointerup away from the button — so the
+      // click event never completes and the card can't be closed.
+      if(e.target.closest('button')) return;
       dragging=true; handle.setPointerCapture(e.pointerId);
       const r=target.getBoundingClientRect();
       dx=e.clientX-r.left; dy=e.clientY-r.top;
@@ -2173,7 +2178,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       document.body.appendChild(rpThumbPreviewEl);
     }
     const r=slotEl.getBoundingClientRect();
-    rpThumbPreviewEl.firstChild.style.backgroundImage=slotEl.style.backgroundImage||'none';
+    const img=rpThumbPreviewEl.firstChild;
+    img.style.backgroundImage=slotEl.style.backgroundImage||'none';
+    // Match the frame's own aspect so the popup shows the whole screenshot —
+    // a fixed box would crop it via background-size:cover exactly like the
+    // narrow strip slots used to.
+    img.style.height=Math.round(parseFloat(getComputedStyle(img).width)/thumbAspect())+'px';
     rpThumbPreviewEl.lastChild.textContent=rpFmtTime(sec);
     rpThumbPreviewEl.style.left=(r.left+r.width/2)+'px';
     rpThumbPreviewEl.style.top=r.top+'px';
@@ -2290,6 +2300,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(rpTrackCount()!==thumbLastTrackCount){ thumbCache.clear(); thumbLastTrackCount=rpTrackCount(); }
     const thumbsOn=rpTracksContainer.classList.contains('open'); // don't burn GPU time building filmstrips nobody can see
     const maxTotal=getAnimMaxTotal()||1;
+    const pendingThumbSegs=[]; // {seg,phase,phaseStartSec,ti} — slots built post-layout
     let refLane=null; // the first track's lane — defines the shared x-axis every track's segments align to
     for(let ti=0; ti<rpTrackCount(); ti++){
       const isScene=ti===fireflyLayers.length;
@@ -2328,28 +2339,10 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         const swatch=document.createElement('div'); swatch.className='swatch';
         swatch.style.background=rpSegmentTint(phase,isScene,pi);
         seg.appendChild(swatch);
-        if(thumbsOn){
-          // one slot per second of the SHARED timeline (not phase-relative),
-          // so slot boundaries land on the same absolute seconds across every
-          // track and a phase that starts mid-second gets a partial first slot
-          const slotsWrap=document.createElement('div'); slotsWrap.className='rp-thumb-slots';
-          const phaseEndSec=phaseStartSec+phase.duration;
-          let cursor=phaseStartSec, si=0;
-          while(cursor<phaseEndSec-1e-6){
-            const sliceEnd=Math.min(Math.floor(cursor+1e-6)+1,phaseEndSec);
-            const slot=document.createElement('div');
-            slot.style.left=(((cursor-phaseStartSec)/phase.duration)*100)+'%';
-            slot.style.width=(((sliceEnd-cursor)/phase.duration)*100)+'%';
-            slot.className='rp-thumb-slot';
-            const sampleSec=(cursor+sliceEnd)/2;
-            slotsWrap.appendChild(slot);
-            thumbRequest(ti,sampleSec,slot);
-            slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,sampleSec));
-            slot.addEventListener('mouseleave',rpHideThumbPreview);
-            cursor=sliceEnd; si++;
-          }
-          seg.appendChild(slotsWrap);
-        }
+        // Slot widths depend on the lane's real pixel width, which can't be
+        // measured until the tree is in the DOM — recorded here, filled in by
+        // rpBuildThumbSlots() after this render completes.
+        if(thumbsOn) pendingThumbSegs.push({seg,phase,phaseStartSec,ti});
         rpSegmentEls.set(phase,{swatch,isScene,pi}); // so a live edit can recolour just this one
         if(rpEditingPhase===phase) seg.classList.add('editing');
         seg.addEventListener('click',(e)=>{
@@ -2488,7 +2481,48 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       wireScrub(ph,refLane,maxTotal);
       rpCacheLaneGeom();
     }
+    if(pendingThumbSegs.length) rpBuildThumbSlots(pendingThumbSegs,refLane,maxTotal);
     rpUpdatePlayhead();
+  }
+
+  // Fills each segment's filmstrip, once the lane is in the DOM and its true
+  // pixel width is known. A captured frame is a whole screenshot at the live
+  // canvas's aspect (wide), while the strip is only 48px tall — so a frame
+  // needs ~48*aspect px of width to be shown in full. At one frame per second
+  // each slot was only ~32px, so CSS background-size:cover scaled the frame up
+  // to cover that narrow box and cropped ~66% of it away, magnifying whatever
+  // was left in the middle (the "particles look huge" bug). Stepping in whole
+  // seconds large enough to fit a frame shows each one complete instead.
+  function rpBuildThumbSlots(segs,refLane,maxTotal){
+    const laneW=(refLane&&refLane.getBoundingClientRect().width)||0;
+    if(!laneW) return;
+    const pxPerSec=laneW/maxTotal;
+    // slot must be at least as wide as the frame is at strip height, or CSS
+    // 'cover' crops it; read the height from the DOM so it tracks the CSS
+    const stripH=segs[0].seg.getBoundingClientRect().height||68;
+    const stepSec=Math.max(1,Math.ceil((stripH*thumbAspect())/pxPerSec));
+    for(const {seg,phase,phaseStartSec,ti} of segs){
+      const wrap=document.createElement('div'); wrap.className='rp-thumb-slots';
+      const endSec=phaseStartSec+phase.duration;
+      let cursor=phaseStartSec;
+      while(cursor<endSec-1e-6){
+        // step boundaries are absolute (not phase-relative) so every track's
+        // frames line up on the same instants; a phase starting mid-step just
+        // gets a narrower first slot
+        const stepIdx=Math.floor(cursor/stepSec+1e-6);
+        const sliceEnd=Math.min((stepIdx+1)*stepSec,endSec);
+        const slot=document.createElement('div'); slot.className='rp-thumb-slot';
+        slot.style.left=(((cursor-phaseStartSec)/phase.duration)*100)+'%';
+        slot.style.width=(((sliceEnd-cursor)/phase.duration)*100)+'%';
+        const sampleSec=stepIdx*stepSec; // the step's own instant, so split slots agree
+        wrap.appendChild(slot);
+        thumbRequest(ti,sampleSec,slot);
+        slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,sampleSec));
+        slot.addEventListener('mouseleave',rpHideThumbPreview);
+        cursor=sliceEnd;
+      }
+      seg.appendChild(wrap);
+    }
   }
 
   const rpPlayIco=document.getElementById('rp-anim-play-ico');
@@ -2556,9 +2590,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   document.getElementById('rp-animation-row').addEventListener('click',()=>{
     rpTracksContainer.classList.toggle('open');
     document.querySelector('#rp-animation-row .chev').classList.toggle('rp-flip-x',rpTracksContainer.classList.contains('open'));
-    if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
-    // the timeline eats vertical space — refit the sphere above it
+    // Refit the sphere BEFORE rendering the timeline: opening the panel eats
+    // vertical space, which changes camera.aspect — and thumbnail slots are
+    // sized from that aspect, so rendering first would lay them out against
+    // the stale pre-open shape.
     if(window.rpLayoutViewport) window.rpLayoutViewport();
+    if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
   });
 
   // re-render the timeline while it's open and something's actually moving
@@ -2842,6 +2879,12 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   // Parse a snapshot and apply it to the core, the layers, the emotion and the
   // toggles. Tolerant of the old core-only format (just a "Core Particles" list).
   function applyParamsText(text){
+    // Every look parameter, colour and phase is about to be replaced, so every
+    // cached frame is now of the OLD preset. Nothing else invalidates them:
+    // the keys are trackIndex|second, and loading a preset with the same layer
+    // count and phase timings reuses exactly those keys — which is why the
+    // filmstrips used to keep showing the previous preset after switching.
+    thumbCache.clear();
     const coreInputs={};
     document.querySelectorAll('#params-controls .row').forEach(row=>{
       const k=row.querySelector('span')?.textContent.trim();
@@ -3680,25 +3723,69 @@ const clock = new THREE.Clock();
 const shellPosAttr=shellGeo.getAttribute('position');
 const innerPosAttr=innerGeo.getAttribute('position');
 
-// ---- Animation-timeline thumbnails: a real per-second render of the
-// sphere, captured off an offscreen WebGLRenderTarget — never the on-screen
-// canvas — so seeking through time to generate them never disturbs what's
-// actually on screen. Each track's row previews just THAT track's own
-// contribution (its firefly layer isolated, or nothing but the backdrop for
-// the Background/Scene row), so the filmstrips differ between tracks
-// instead of every row showing the same composed frame.
-const THUMB_W=72, THUMB_H=44, THUMB_CACHE_MAX=600;
+// ---- Animation-timeline thumbnails: a literal screenshot of the sphere at
+// a given second, captured off an offscreen WebGLRenderTarget — never the
+// on-screen canvas — so seeking through time to generate them never disturbs
+// what's actually on screen.
+//
+// The scene is rendered DIRECTLY at thumbnail size, with every layer's point
+// `size` scaled by exactly the same factor as the resolution. Both the
+// position and the radius of every particle are then scaled identically, and
+// the shader's falloff is computed in gl_PointCoord (normalised per point),
+// so the result is a mathematically exact miniature — not an approximation.
+//
+// The alternative — capture at full resolution and shrink the image — sounds
+// safer but is actively wrong for this content: shrinking ~2500px to ~290px
+// box-averages each particle with the dark space around it, so a dot landing
+// on a fraction of a destination pixel keeps only a fraction of its peak
+// brightness. Particles here cover well under 1% of the frame, so the whole
+// field faded to near-black. Rendering small lets the GPU rasterise each dot
+// at its final size at full brightness instead, and reads back ~77x fewer
+// pixels. (An earlier attempt at this scaling ALSO multiplied size by an
+// arbitrary "legibility" constant on top — that was the part that made
+// particles look wrong, not the scaling itself.)
+//
+// Each track's row previews just THAT track's own contribution (its firefly
+// layer isolated, or nothing but the backdrop for the Background/Scene row),
+// so the filmstrips actually differ between rows instead of every row showing
+// the same composed frame. Isolation is only a visibility toggle — it never
+// touches any look parameter, so the layer is rendered exactly as it really
+// is, just alone.
+const THUMB_W=288, THUMB_CACHE_MAX=400; // stored width; height follows the live aspect
+// Fraction of the frame the thumbnail keeps, centred. Measured: the cluster
+// spans ~66% of width and ~68% of height, so 0.72 frames it with a margin.
+// Applied to both axes equally — a tighter crop, never a distortion. The
+// render is made FRAC-times bigger than the stored size so this crop is a
+// plain pixel cut with no resampling at all.
+const THUMB_SUBJECT_FRAC=0.72;
+// Supersampling factor. Each particle is a white-hot core inside a coloured
+// halo (see uHot in firefly-field.js), and the two are sized in proportion to
+// each other — so at 1:1 thumbnail scale a dot is ~2px, the core takes the
+// whole of it, and the halo falls below a pixel. Every particle then reads as
+// a white dot and the orange/yellow of a warm preset disappears entirely.
+// Rendering SS times larger lets core and halo each resolve, and the downscale
+// blends them back into one correctly-coloured dot — the same averaging the
+// eye does looking at the real thing. Only a x3 window is averaged, so unlike
+// shrinking a full-resolution capture this costs almost no peak brightness.
+const THUMB_SS=3;
 let thumbTarget=null, thumbPixelBuf=null, thumbGlCanvas=null, thumbGlCtx=null, thumbGlImgData=null, thumbCanvas=null, thumbCtx=null;
-function thumbInit(){
-  if(thumbTarget) return;
-  thumbTarget=new THREE.WebGLRenderTarget(THUMB_W,THUMB_H);
-  thumbPixelBuf=new Uint8Array(THUMB_W*THUMB_H*4);
-  thumbGlCanvas=document.createElement('canvas'); thumbGlCanvas.width=THUMB_W; thumbGlCanvas.height=THUMB_H;
+let thumbSsW=0, thumbSsH=0, thumbFinalH=0;
+function thumbInit(ssW,ssH,finalH){
+  if(thumbTarget&&thumbSsW===ssW&&thumbSsH===ssH&&thumbFinalH===finalH) return;
+  if(thumbTarget) thumbTarget.dispose();
+  thumbSsW=ssW; thumbSsH=ssH; thumbFinalH=finalH;
+  thumbTarget=new THREE.WebGLRenderTarget(ssW,ssH);
+  thumbPixelBuf=new Uint8Array(ssW*ssH*4);
+  thumbGlCanvas=document.createElement('canvas'); thumbGlCanvas.width=ssW; thumbGlCanvas.height=ssH;
   thumbGlCtx=thumbGlCanvas.getContext('2d');
-  thumbGlImgData=thumbGlCtx.createImageData(THUMB_W,THUMB_H);
-  thumbCanvas=document.createElement('canvas'); thumbCanvas.width=THUMB_W; thumbCanvas.height=THUMB_H;
+  thumbGlImgData=thumbGlCtx.createImageData(ssW,ssH);
+  thumbCanvas=document.createElement('canvas'); thumbCanvas.width=THUMB_W; thumbCanvas.height=finalH;
   thumbCtx=thumbCanvas.getContext('2d');
+  thumbCtx.imageSmoothingEnabled=true; thumbCtx.imageSmoothingQuality='high';
 }
+// The aspect every stored thumbnail has — the live canvas's own. The
+// timeline uses it to size slots so a frame is never cropped or squished.
+function thumbAspect(){ return camera.aspect||16/9; }
 // F.update(t) (in firefly-field.js) is NOT a pure function of time — it's a
 // per-frame integrator: particle count EASES toward its target over real
 // elapsed dt, and per-particle wander/orbit/blink motion accumulates the
@@ -3711,16 +3798,33 @@ function thumbInit(){
 // never rewound) so update()'s own dt math stays sane across calls.
 let thumbFakeClock=0;
 function thumbSettle(toAnimTime,ticks=15){
+  // The fake clock also feeds uTime, which the shader uses for particle BIRTHS:
+  // age = (uTime - uSpawnStart) - birthT (see firefly-field.js). uSpawnStart is
+  // stamped from the real clock whenever a track respawns, so a fake clock
+  // starting at 0 makes every age negative — nothing is born yet and the field
+  // renders empty. That is exactly what happened to the first track's row: its
+  // captures run first, before the fake clock has accumulated past real time,
+  // so it came out blank while later tracks (captured once the fake clock had
+  // overtaken) looked right. Keep it at or ahead of real time so births are
+  // always resolved, and still monotonic so update()'s dt math stays sane.
+  thumbFakeClock=Math.max(thumbFakeClock,clock.getElapsedTime());
   animTime=toAnimTime; animScrubbing=true;
   for(let i=0;i<ticks;i++){ thumbFakeClock+=0.1; updateInnerLayers(thumbFakeClock,0.1); }
   animScrubbing=false;
 }
-// Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer
-// (or none, for the Background/Scene track), renders one offscreen frame,
-// reads it back into a small canvas, then restores everything exactly as it
+// Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer,
+// renders one small offscreen frame, then restores everything exactly as it
 // was — all synchronous, so nothing else ever observes the disturbed state.
 function captureThumbnailAt(sec,trackIndex){
-  thumbInit();
+  const liveW=Math.max(1,renderer.domElement.width);
+  const liveH=Math.max(1,renderer.domElement.height);
+  // Full frame at stored scale (the crop below trims it to the subject), then
+  // the whole thing rendered THUMB_SS times larger for supersampling.
+  const capW=Math.max(1,Math.round(THUMB_W/THUMB_SUBJECT_FRAC));
+  const capH=Math.max(1,Math.round(capW*liveH/liveW));
+  const finalH=Math.max(1,Math.round(capH*THUMB_SUBJECT_FRAC));
+  const ssW=capW*THUMB_SS, ssH=capH*THUMB_SS;
+  thumbInit(ssW,ssH,finalH);
   const savedTime=animTime;
   const savedLoop=animLoop;
   const savedVis=fireflyLayers.map(F=>F.points.visible);
@@ -3741,8 +3845,21 @@ function captureThumbnailAt(sec,trackIndex){
   const savedQuat=fireflyLayers.map(F=>F.points.quaternion.clone());
   const savedColor=fireflyLayers.map(F=>F.color().clone());
   const savedMotion=fireflyLayers.map(F=>F.snapshotMotion());
+  // Show only this track's own contribution. Visibility only — no look params
+  // are touched, so what renders is the layer exactly as it is, minus
+  // everything else that would normally sit on top of it.
+  //
+  // The cloud backdrop counts as scene, not layer: it's a large soft coloured
+  // glow filling most of the frame, so leaving it in made every layer's row
+  // look like the same wash of colour with a few faint dots on it — the rows
+  // were near-indistinguishable however different their particles actually
+  // were. It belongs to the Background/Scene row, which is the track that
+  // owns it.
+  // Applied after thumbSettle below, not here: settling replays the animation,
+  // and applying a phase's scene snapshot calls cloudBg.setVisible() itself —
+  // so anything set beforehand is silently overwritten before the render.
   const isSceneTrack=trackIndex>=fireflyLayers.length;
-  fireflyLayers.forEach((F,i)=>{ F.points.visible=!isSceneTrack&&i===trackIndex; });
+  const savedCloudVis=cloudBg.visible;
 
   // Thumbnails are sampled out of order (per phase, per track — not a
   // monotonic sweep of the clock), which would otherwise trip applyAnimFrame's
@@ -3753,35 +3870,62 @@ function captureThumbnailAt(sec,trackIndex){
   animLoop=false;
   thumbSettle(sec);
 
+  // gl_PointSize is in absolute pixels, so at this smaller resolution every
+  // layer's `size` needs the SAME scale factor as the resolution — then
+  // positions and radii shrink identically and the frame is an exact
+  // miniature. No other factor is applied; see the header comment.
+  // This MUST come after thumbSettle: settling replays the animation, and
+  // applyAnimFrame writes each phase's own `size` straight back over any
+  // value set beforehand — which silently rendered full-size points into a
+  // thumbnail-size frame, i.e. particles several times too big.
+  const pointScale=ssW/liveW;
+  const savedSizes=fireflyLayers.map(F=>F.params.size);
+  fireflyLayers.forEach((F,i)=>F.setParams({size:savedSizes[i]*pointScale}));
+  // Isolation, for the same reason (see above): only now is it safe from the
+  // settle overwriting it. The cloud stays hidden unless this IS the scene
+  // row, and never turns ON a backdrop the preset has switched off.
+  cloudBg.setVisible(isSceneTrack&&savedCloudVis);
+  fireflyLayers.forEach((F,i)=>{ F.points.visible=!isSceneTrack&&i===trackIndex; });
+
   renderer.setRenderTarget(thumbTarget);
   renderer.setClearColor(0x000000,0);
   renderer.render(scene,camera);
-  renderer.readRenderTargetPixels(thumbTarget,0,0,THUMB_W,THUMB_H,thumbPixelBuf);
+  renderer.readRenderTargetPixels(thumbTarget,0,0,ssW,ssH,thumbPixelBuf);
   renderer.setRenderTarget(null);
 
   // WebGL reads bottom-up; flip into the glCanvas
   const data=thumbGlImgData.data;
-  for(let y=0;y<THUMB_H;y++){
-    const s=(THUMB_H-1-y)*THUMB_W*4, d=y*THUMB_W*4;
-    data.set(thumbPixelBuf.subarray(s,s+THUMB_W*4),d);
+  for(let y=0;y<ssH;y++){
+    const s=(ssH-1-y)*ssW*4, d=y*ssW*4;
+    data.set(thumbPixelBuf.subarray(s,s+ssW*4),d);
   }
   thumbGlCtx.putImageData(thumbGlImgData,0,0);
 
+  // Frame the SUBJECT, not the letterbox around it: the camera is very wide
+  // (~2.3) but the cluster only occupies the middle ~2/3 of the frame in both
+  // axes (measured), so showing the whole frame spends most of a ~160x68 slot
+  // on empty backdrop. Both axes are cut by the same fraction, so the aspect
+  // is untouched — a tighter framing, never a stretch. Coordinates are in the
+  // supersampled space; the drawImage below crops and resolves SS->1 in one
+  // step, so core and halo blend into a correctly-coloured dot.
+  const cropX=Math.round((ssW-THUMB_W*THUMB_SS)/2), cropY=Math.round((ssH-finalH*THUMB_SS)/2);
   // The live canvas always clears transparent and relies on a CSS gradient
   // + 'plus-lighter' blending behind it (see applyBackground) — a thumbnail
-  // has no such backdrop, so paint the same background gradient in first,
-  // then composite the additive render on top the same way.
+  // has no such backdrop, so paint the same gradient in first. It has to be
+  // the gradient the CROPPED band would have shown, so shift the full-frame
+  // gradient by the crop: its ends land off-canvas.
   const bottom=mixHex(bgColor,bgColor2,bgGradientAmount);
-  const grad=thumbCtx.createLinearGradient(0,0,0,THUMB_H);
+  const grad=thumbCtx.createLinearGradient(0,-cropY/THUMB_SS,0,(ssH-cropY)/THUMB_SS);
   grad.addColorStop(0,bgColor); grad.addColorStop(1,bottom);
   thumbCtx.globalCompositeOperation='source-over';
   thumbCtx.fillStyle=grad;
-  thumbCtx.fillRect(0,0,THUMB_W,THUMB_H);
+  thumbCtx.fillRect(0,0,THUMB_W,finalH);
   thumbCtx.globalCompositeOperation='lighter';
-  thumbCtx.drawImage(thumbGlCanvas,0,0);
+  thumbCtx.drawImage(thumbGlCanvas,cropX,cropY,THUMB_W*THUMB_SS,finalH*THUMB_SS,0,0,THUMB_W,finalH);
   thumbCtx.globalCompositeOperation='source-over';
 
-  fireflyLayers.forEach((F,i)=>{ F.points.visible=savedVis[i]; });
+  cloudBg.setVisible(savedCloudVis);
+  fireflyLayers.forEach((F,i)=>{ F.points.visible=savedVis[i]; F.setParams({size:savedSizes[i]}); });
   // One real call (not a settle burst) to put the SCENE side back — CLASSIC/
   // glow/bg are plain lerped setters, not accumulators, so they're already
   // exactly right after a single pass. Whatever this same call does to each
@@ -3798,8 +3942,15 @@ function captureThumbnailAt(sec,trackIndex){
     F.restoreMotion(savedMotion[i]);
   });
 
-  return thumbCanvas.toDataURL('image/jpeg',0.72);
+  // These are small, mostly-dark images with a few sharp bright dots — exactly
+  // the case JPEG's block compression handles worst (visible ringing/blur
+  // around each dot). Quality 0.72 was noticeably mushy at this resolution;
+  // the cache is a bounded in-memory Map (THUMB_CACHE_MAX entries), so the
+  // extra few KB per entry from a higher quality is not a real cost.
+  return thumbCanvas.toDataURL('image/jpeg',0.9);
 }
+// Keyed by track AND second — each row previews its own layer in isolation,
+// so the same instant renders differently per row.
 const thumbCache=new Map(); // "trackIndex|second" -> data URL
 let thumbLastTrackCount=-1; // layer add/remove reshuffles what each track index means
 const thumbQueue=[]; // pending {key,sec,trackIndex,el} jobs
@@ -3844,9 +3995,9 @@ function thumbRequest(trackIndex,sec,el){
 // A phase's own content changed (live-edited) without its timing shifting,
 // so its cache key wouldn't naturally miss — clear that track's entries
 // explicitly. Structural changes (resize/insert/delete) shift downstream
-// seconds instead, which already misses the cache on its own.
+// seconds instead, which already miss the cache on their own.
 function thumbInvalidateTrack(trackIndex){
-  for(const key of thumbCache.keys()) if(key.startsWith(trackIndex+'|')) thumbCache.delete(key);
+  for(const key of [...thumbCache.keys()]) if(key.startsWith(trackIndex+'|')) thumbCache.delete(key);
 }
 
 function animate(){

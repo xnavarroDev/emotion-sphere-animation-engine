@@ -1,5 +1,5 @@
 <svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g id="lucide/undo-2">
-<path id="Vector" d="M9 14L4 9L9 4M4 9H14.5C16.1576 9 17.7473 9.65803 18.9194 10.8306C20.092 12.0027 20.75 13.5924 20.75 15.25C20.75 16.9076 20.092 18.4973 18.9194 19.6694C17.7473 20.842 16.1576 21.5 14.5 21.5H11" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector" d="M9 14L4 9L9 4M4 9H14.5C16.1576 9 17.7473 9.65803 18.9194 10.8306C20.092 12.0027 20.75 13.5924 20.75 15.25C20.75 16.9076 20.092 18.4973 18.9194 19.6694C17.7473 20.842 16.1576 21.5 14.5 21.5H11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
 </svg>
