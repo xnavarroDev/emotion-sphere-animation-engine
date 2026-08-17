@@ -1609,6 +1609,36 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // then the Background/Scene track last).
   function allTimelines(){ return [...fireflyLayers.map(F=>F.timeline), sceneTimeline]; }
 
+  // A starting animation for the default sphere: settle -> swell -> settle, so
+  // it loops seamlessly. Built from each track's OWN current snapshot and only
+  // nudging a couple of values, so the sphere at rest still looks exactly like
+  // the default it always did — this seeds something to edit, it does not
+  // redesign the default look. Called once at boot (see the boot block) when
+  // no preset, share-link or emotion has populated the timeline.
+  const DEFAULT_PHASE_SECS=[6,6,6];
+  function seedDefaultTimeline(){
+    allTimelines().forEach((tl,ti)=>{
+      if(tl.length) return;
+      const base=captureSnapshotForTrack(ti);
+      // the swell: a few more particles held slightly wider. Scene/background
+      // has no particle params, so it simply holds — the backdrop shouldn't
+      // pulse unless someone asks it to.
+      const swell=cloneSnapshot(base);
+      if(swell&&swell.params){
+        swell.params.count=Math.round((swell.params.count||0)*1.35);
+        swell.params.radius=(swell.params.radius||1.6)*1.12;
+        swell.params.breath=Math.max(swell.params.breath||0,0.25);
+      }
+      tl.push({duration:DEFAULT_PHASE_SECS[0],snapshot:base,name:null});
+      tl.push({duration:DEFAULT_PHASE_SECS[1],snapshot:swell,name:null});
+      tl.push({duration:DEFAULT_PHASE_SECS[2],snapshot:cloneSnapshot(base),name:null});
+    });
+    // seeded state is the baseline, not an edit: don't mark the preset dirty
+    // or push an undo boundary, or a fresh load would open "unsaved".
+    if(typeof rpRenderTracksHook==='function') rpRenderTracksHook();
+  }
+  window.__seedDefaultTimeline=seedDefaultTimeline; // boot block runs in another scope
+
   // Deep-copy a snapshot so a new phase can start as an independent clone of
   // another one (editing the new phase must never mutate the source).
   function cloneSnapshot(snap){
@@ -3436,6 +3466,19 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   }
   const _startEmotion = _presetParam ? null : _q.get('emotion');
   if(_startEmotion) playAndMark(_startEmotion);
+
+  // ---- Default animation for the default sphere ----
+  // Opening the Animation panel on a fresh load used to show four empty lanes
+  // and "no phases yet", which reads as broken rather than as a starting
+  // point — and gave the placement gesture nothing to measure against. Seed a
+  // gentle breathe built FROM the sphere's own current values, so the default
+  // look is unchanged at rest and every phase is a real, editable starting
+  // point. Only when nothing else has populated the timeline (a ?preset,
+  // ?emotion or a preset card all land before this).
+  if(!_presetParam && !_startEmotion){
+    const empty=[...fireflyLayers.map(F=>F.timeline), sceneTimeline].every(tl=>!tl.length);
+    if(empty && typeof window.__seedDefaultTimeline==='function') window.__seedDefaultTimeline();
+  }
   window.addEventListener('message',(ev)=>{
     const d=ev.data;
     if(d && d.type==='emotion' && d.value) playAndMark(d.value);
