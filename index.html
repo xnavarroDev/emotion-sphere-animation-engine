@@ -1590,13 +1590,20 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
   };
 
-  // Capture the active track's current state into one phase snapshot
-  function captureTrackSnapshot(){
-    return isSceneTrack()
+  // Capture ANY track's current state into one phase snapshot. Adding a phase
+  // fills every track at once (see the add-phase handler), and each one has to
+  // snapshot its own layer — not whichever happens to be focused.
+  function captureSnapshotForTrack(ti){
+    return ti>=fireflyLayers.length
       ? { classic:{...CLASSIC}, glowOpacity:glowUserOpacity, glowColor:glowUserColor,
           bgColor, bgColor2, bgGradientAmount }
-      : { params:{...fireflyLayers[trackActive].params}, colour:ffRgbHex(fireflyLayers[trackActive].color()) };
+      : { params:{...fireflyLayers[ti].params}, colour:ffRgbHex(fireflyLayers[ti].color()) };
   }
+  // Capture the active track's current state into one phase snapshot
+  function captureTrackSnapshot(){ return captureSnapshotForTrack(trackActive); }
+  // Every track's timeline, indexed the same way track rows are (layers first,
+  // then the Background/Scene track last).
+  function allTimelines(){ return [...fireflyLayers.map(F=>F.timeline), sceneTimeline]; }
 
   // Deep-copy a snapshot so a new phase can start as an independent clone of
   // another one (editing the new phase must never mutate the source).
@@ -1893,6 +1900,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   rpLayerName.addEventListener('input',()=>{
     fireflyLayers[ffActive].name=rpLayerName.value.trim()||null;
     if(animLayerSyncHook) animLayerSyncHook();
+    // animLayerSyncHook only refreshes the older animation UI, so the
+    // redesigned timeline kept showing the previous name until something else
+    // happened to rebuild it. Retitle its track label directly — a full
+    // rpRenderTracks() here would rebuild the tree on every keystroke (and
+    // re-run the thumbnail queue), so just set the text.
+    if(rpTracksEl){
+      const lbl=rpTracksEl.querySelectorAll('.rp-track-label')[ffActive];
+      const shown=fireflyLayers[ffActive].name||('Layer '+(ffActive+1));
+      if(lbl&&document.activeElement!==lbl&&lbl.textContent!==shown) lbl.textContent=shown;
+    }
     markDirty();
   });
   document.getElementById('rp-layer-add').addEventListener('click',()=>{
@@ -2363,7 +2380,10 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         delBtn.addEventListener('click',(e)=>{
           e.stopPropagation();
           if(rpEditingPhase===phase){ rpEditingPhase=null; editingPhase=false; }
-          timeline.splice(pi,1);
+          // Removed from every track, matching how phases are added: dropping
+          // the column from one lane only would shift every later phase up an
+          // index there and re-desync the rows.
+          allTimelines().forEach(tl=>{ if(pi<tl.length) tl.splice(pi,1); });
           markDirty();
           rpRenderTracks();
         });
@@ -2388,7 +2408,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         nameEl.addEventListener('blur',()=>{
           const v=nameEl.textContent.trim();
           const next=v||null;
-          if((phase.name||null)!==next){ phase.name=next; markDirty(); rpRenderTracks(); }
+          if((phase.name||null)!==next){
+            // A phase name labels the COLUMN, not one track's copy of it —
+            // "climax" means the same beat in every layer. Writing it to just
+            // this lane left the other rows still reading "Phase 3" for the
+            // very same moment, and broke the cross-track hover-sync (which
+            // groups by label) into separate groups.
+            allTimelines().forEach(tl=>{ if(tl[pi]) tl[pi].name=next; });
+            markDirty(); rpRenderTracks();
+          }
           else nameEl.textContent=shownName;
         });
         labelsRow.appendChild(nameEl);
@@ -2427,12 +2455,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         let seam=null;
         if(pi<timeline.length-1){
           seam=document.createElement('button'); seam.className='rp-seam-add'; seam.type='button';
-          seam.textContent='+'; seam.title='Insert a phase here';
+          seam.textContent='+'; seam.title='Insert a phase here (in every track)';
           seam.style.left=(leftPct+w)+'%'; seam.style.top='13px';
           seam.addEventListener('click',(e)=>{
             e.stopPropagation();
-            const clone=cloneSnapshot(phase.snapshot)||captureTrackSnapshot();
-            timeline.splice(pi+1,0,{duration:Math.max(0.5,phase.duration/2),snapshot:clone});
+            // Inserted into every track at the same index, for the same reason
+            // the add-phase button fills them all: a phase is a shared column,
+            // and inserting into one lane alone re-indexes it against the rest.
+            allTimelines().forEach((tl,tj)=>{
+              const src=tl[pi];
+              const dur=src?Math.max(0.5,src.duration/2):Math.max(0.5,phase.duration/2);
+              tl.splice(pi+1,0,{duration:dur,snapshot:cloneSnapshot(src&&src.snapshot)||captureSnapshotForTrack(tj)});
+            });
             markDirty(); rpRenderTracks();
           });
           lane.appendChild(seam);
@@ -2442,13 +2476,47 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       lane.append(labelsRow,dursRow,bracketsRow,segsRow);
       if(!refLane) refLane=lane; // first track's lane defines the shared x-axis
 
-      // clicking the label focuses this track — the transport's single
-      // "add phase" button (matching Figma, not one button per track) adds
-      // to whichever track was last focused this way
-      label.style.cursor='pointer';
+      // Clicking the label focuses this track (the transport's single "add
+      // phase" button targets whichever was focused last), and for a firefly
+      // layer the label is also the rename field — same affordance as the
+      // phase names above it, so the timeline is editable in place instead of
+      // sending you to the Parameters panel for a name.
       if(trackActive===ti) label.classList.add('focused');
-      label.title='Click to make this the track "add phase" targets';
-      label.addEventListener('click',()=>{ trackActive=ti; rpRenderTracks(); });
+      if(isScene){
+        label.style.cursor='pointer';
+        label.title='Click to make this the track "add phase" targets';
+        label.addEventListener('click',()=>{ trackActive=ti; rpRenderTracks(); });
+      }else{
+        label.classList.add('editable');
+        label.contentEditable='true';
+        label.spellcheck=false;
+        label.title='Click to focus this track · type to rename it';
+        // Focus (not click) sets the active track, and deliberately does NOT
+        // re-render: rpRenderTracks() rebuilds this very element, which would
+        // blow away the caret the moment you clicked in. Move the highlight
+        // in place instead and defer the rebuild to blur.
+        label.addEventListener('focus',()=>{
+          trackActive=ti;
+          rpTracksEl.querySelectorAll('.rp-track-label.focused').forEach(el=>el.classList.remove('focused'));
+          label.classList.add('focused');
+          rpSyncParams();
+        });
+        label.addEventListener('keydown',(e)=>{
+          e.stopPropagation(); // the panel binds single-key shortcuts
+          if(e.key==='Enter'){ e.preventDefault(); label.blur(); }
+          if(e.key==='Escape'){ label.textContent=F.name||'Layer '+(ti+1); label.blur(); }
+        });
+        label.addEventListener('blur',()=>{
+          const next=label.textContent.trim()||null;
+          if((F.name||null)!==next){
+            F.name=next;
+            if(animLayerSyncHook) animLayerSyncHook(); // keep the old anim UI in step
+            markDirty(); rpSyncParams(); rpRenderTracks();
+          }else{
+            label.textContent=F.name||'Layer '+(ti+1); // normalise whitespace-only edits
+          }
+        });
+      }
 
       // per-track "does playback drive this?" switch (regression from v1's
       // On/Off track toggle). Off dims the lane so it reads as inert.
@@ -2554,10 +2622,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // one shared "add phase" (matching Figma — not one button per track);
   // it targets whichever track was last clicked/focused (trackActive)
   document.getElementById('rp-anim-add-phase').addEventListener('click',()=>{
-    const timeline=isSceneTrack()?sceneTimeline:fireflyLayers[trackActive].timeline;
-    const last=timeline[timeline.length-1];
-    const snapshot=cloneSnapshot(last&&last.snapshot)||captureTrackSnapshot();
-    timeline.push({duration:5,snapshot});
+    // A phase is a column across the WHOLE timeline, not something one track
+    // owns. Adding it to just the focused track left every other track a phase
+    // short, so from then on the same beat sat at a different index — and a
+    // different moment — in each row, which is what made phase names and the
+    // cross-track hover-sync line up against the wrong segments.
+    allTimelines().forEach((tl,ti)=>{
+      const last=tl[tl.length-1];
+      // each track continues from its OWN last phase, so a new column starts
+      // as "hold what this layer was already doing" rather than inheriting
+      // some other layer's look
+      tl.push({duration:5,snapshot:cloneSnapshot(last&&last.snapshot)||captureSnapshotForTrack(ti)});
+    });
     markDirty(); rpRenderTracks();
   });
 
