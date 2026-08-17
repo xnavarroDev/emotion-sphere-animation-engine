@@ -415,7 +415,10 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   background: var(--rp-accent); color: var(--rp-white); font-size: 15px;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.rp-icon-btn:hover { background: var(--rp-accent-hover); }
+.rp-icon-btn:hover:not(:disabled) { background: var(--rp-accent-hover); }
+/* Undo is disabled with an empty history — dim it rather than hiding it, so
+   the control keeps its place and reads as "nothing to undo yet". */
+.rp-icon-btn:disabled { opacity: 0.35; cursor: default; }
 .rp-icon-btn-plain { background: transparent; }
 .rp-icon-btn-plain:hover { background: var(--rp-bg-2); }
 .rp-icon-btn:disabled { opacity: 0.35; cursor: default; }

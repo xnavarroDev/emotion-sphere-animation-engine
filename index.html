@@ -96,6 +96,11 @@
   <div class="rp-footer">
     <div class="rp-footer-row">
       <input class="rp-name-input" id="rp-preset-name" type="text" placeholder="Untitled preset" maxlength="60">
+      <!-- One communal undo, in the pinned footer: the history is a single
+           chronological stack over the WHOLE editable state (see performUndo),
+           not one per panel, so it needs one home that stays visible whichever
+           section or panel is open. -->
+      <button class="rp-icon-btn" id="rp-undo-btn" type="button" disabled title="Undo (⌘Z)"><img class="rp-ico rp-ico-18" src="icons/undo-2.svg" alt="undo"></button>
       <button class="rp-icon-btn" id="rp-share-link" type="button" title="Copy a link that plays this exact look live"><img class="rp-ico rp-ico-18" src="icons/link.svg" alt="link"></button>
       <span class="rp-unsaved" id="rp-unsaved">you have unsaved changes!</span>
     </div>
@@ -755,8 +760,7 @@ let rpRenderTracksHook=null; // rebuild the redesigned timeline after a preset l
 let rpPanelReady=false; // true once the redesigned panel's own elements/consts exist —
                           // ffSync() can fire during early setup, before that's true
 
-// ---- Undo (Ctrl+Z; wire a button to #rp-undo-btn's click + disabled state
-// whenever one exists — none is placed in the layout yet) ----
+// ---- Undo (Ctrl+Z, plus the #rp-undo-btn in the pinned footer) ----
 // paramsToText()/applyParamsText() (defined once sphere-core attaches) already
 // serialize and restore the whole editable state — every layer, phase and
 // view setting — for Save/Load/Share. Reusing that as an undo snapshot gives
@@ -3267,6 +3271,18 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     if(rpLoopSyncUI) rpLoopSyncUI();
     if(backgroundCardSyncUI) backgroundCardSyncUI();
     if(typeof rpRenderTracksHook==='function') rpRenderTracksHook();
+    // Loading a preset is a NEW DOCUMENT, so the history before it no longer
+    // describes anything the user can meaningfully go back to: undoing past
+    // the load used to restore the pre-load sphere and silently discard the
+    // whole preset. Reset the stack and make the just-loaded state the
+    // baseline, so the first edit after a load is still undoable.
+    // Skipped while undoRestoring, when this same function IS the undo.
+    if(!undoRestoring){
+      undoStack.length=0;
+      undoBurstActive=false; clearTimeout(undoBurstTimer);
+      if(paramsToTextHook) undoBaseline=paramsToTextHook();
+      undoSyncBtn();
+    }
   }
 
   // Undo (top-level, see the UNDO_MAX block near the other cross-closure
