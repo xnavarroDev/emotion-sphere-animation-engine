@@ -339,7 +339,11 @@ body.watch #dots { display:none !important; }
 #redesign-panel *,
 #anim-canvas-controls *,
 .rp-float-card * { box-sizing: border-box; font-family: inherit; }
-#rp-scroll { flex: 1 1 auto; overflow-y: auto; padding: 9px 15px 16px 14px; }
+/* overflow-x must be stated explicitly: per spec a non-visible value on one
+   axis forces the other to compute to `auto`, so `overflow-y: auto` alone left
+   overflow-x:auto — which paints a permanent horizontal scrollbar wherever the
+   OS is set to always show them (macOS), despite nothing ever overflowing. */
+#rp-scroll { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 9px 15px 16px 14px; }
 #rp-collapse-rail {
   position: fixed; top: 16px; left: 16px; z-index: 41;
   width: 34px; height: 34px; border-radius: 8px; border: none;
@@ -546,7 +550,11 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
   background: var(--rp-bg, #e2e8f0); color: var(--rp-ink, #000);
   font-family: var(--rp-font); display: none;
-  max-height: 46vh; overflow-y: auto;
+  /* overflow-x stated explicitly for the same reason as #rp-scroll: leaving it
+     to compute to `auto` paints a permanent horizontal scrollbar under the
+     timeline on any OS set to always show them. Lanes are percentage-width and
+     always fit, so there is nothing to scroll to horizontally. */
+  max-height: 46vh; overflow-y: auto; overflow-x: hidden;
 }
 #anim-canvas-controls.open { display: block; }
 .rp-transport { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px; }
