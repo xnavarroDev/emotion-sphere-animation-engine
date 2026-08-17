@@ -2216,7 +2216,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // every lane is measured against the SHARED cycle length, never its own
     // total — otherwise a 10s track would stretch to the same width as a 15s
     // one, destroying the "same destination, different pacing" reading
-    const total=getAnimMaxTotal()||1;
+    const total=rpAxisSec||1;
     let acc=0;
     for(const r of recs){
       const w=(r.phase.duration/total)*100;
@@ -2236,7 +2236,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     handle.addEventListener('pointermove',(e)=>{
       if(!dragging) return;
       const laneRect=lane.getBoundingClientRect();
-      const secPerPx=(getAnimMaxTotal()||1)/laneRect.width;
+      const secPerPx=(rpAxisSec||1)/laneRect.width; // visible axis == fixed px/sec
       const delta=edge==='right'?e.movementX:-e.movementX;
       phase.duration=Math.max(0.5,phase.duration+delta*secPerPx);
       rpRelayoutLane(lane); // in-place: never destroys this handle mid-drag
@@ -2276,15 +2276,22 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   let rpPlayheadEl=null;   // the single shared playhead
   let rpRefLane=null;      // first track's lane — defines the shared x-axis
   let rpLaneGeom=null;     // cached {left,width} so the per-frame path never reads layout
-  let rpMaxTotal=1;
+  let rpMaxTotal=1;    // real cycle length (playback wraps on this)
+  let rpAxisSec=1;     // VISIBLE axis length; >= rpMaxTotal so an empty or very
+                       // short timeline still has room to drag a span onto
+  const RP_MIN_AXIS_SEC=20; // never show an axis shorter than this
+  const RP_PX_PER_SEC=34;  // fixed timeline scale — a second is always this wide
+  const RP_LANE_GUTTER=180; // label + toggle + row padding to the left of every lane
   const rpSegmentEls=new Map(); // phase object -> its swatch element (for cheap live-edit recolour)
   const rpPhaseGroups=new Map(); // lowercased phase label -> every element sharing it (hover-sync)
 
   function rpCacheLaneGeom(){
     if(!rpRefLane||!rpTracksEl){ rpLaneGeom=null; return; }
-    const c=rpTracksEl.getBoundingClientRect();
-    const l=rpRefLane.getBoundingClientRect();
-    rpLaneGeom={ left:l.left-c.left, width:l.width };
+    // offsetLeft/offsetWidth, not getBoundingClientRect deltas: #rp-tracks is
+    // now a horizontal scroller, and the playhead is absolutely positioned
+    // inside it, so its offset has to be in CONTENT space. Viewport deltas
+    // would drift by exactly scrollLeft as soon as the timeline was scrolled.
+    rpLaneGeom={ left:rpRefLane.offsetLeft, width:rpRefLane.offsetWidth };
   }
   // A phase's swatch colour: the captured colour blended most of the way
   // toward the panel's pale pill tone, so the strip reads as the soft bands
@@ -2300,7 +2307,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   function rpUpdatePlayhead(){
     if(!rpPlayheadEl||!rpLaneGeom) return;
-    const pct=Math.min(1,(animTime%rpMaxTotal)/rpMaxTotal);
+    const pct=Math.min(1,(animTime%rpMaxTotal)/rpAxisSec);
     rpPlayheadEl.style.left=(rpLaneGeom.left+pct*rpLaneGeom.width)+'px';
     rpTimeEl.textContent=rpFmtTime(animTime%rpMaxTotal)+'/'+rpFmtTime(rpMaxTotal);
   }
@@ -2317,6 +2324,20 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(rpTrackCount()!==thumbLastTrackCount){ thumbCache.clear(); thumbLastTrackCount=rpTrackCount(); }
     const thumbsOn=rpTracksContainer.classList.contains('open'); // don't burn GPU time building filmstrips nobody can see
     const maxTotal=getAnimMaxTotal()||1;
+    // Lanes are measured at a FIXED px-per-second and scroll horizontally,
+    // rather than being squeezed to fit the panel. Fitting made a second worth
+    // a different number of pixels for every timeline length: long ones packed
+    // phases into unreadable slivers, and an empty timeline mapped its whole
+    // width to ~1 second, so dragging a span across it could only ever produce
+    // a fraction of a second. A constant scale means a second is always the
+    // same distance, whatever else is on the timeline. Short timelines still
+    // fill the panel so the lane never floats in empty space.
+    // The axis can be longer than the content: with none, or only a couple of
+    // seconds of phases, there would otherwise be almost no width to drag a
+    // span across (an empty timeline mapped its entire lane to ~1 second).
+    const laneAvail=Math.max(240,(rpTracksEl.clientWidth||900)-RP_LANE_GUTTER);
+    const axisSec=Math.max(maxTotal,RP_MIN_AXIS_SEC,laneAvail/RP_PX_PER_SEC);
+    const laneW=axisSec*RP_PX_PER_SEC;
     const pendingThumbSegs=[]; // {seg,phase,phaseStartSec,ti} — slots built post-layout
     let refLane=null; // the first track's lane — defines the shared x-axis every track's segments align to
     for(let ti=0; ti<rpTrackCount(); ti++){
@@ -2327,6 +2348,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       const label=document.createElement('div'); label.className='rp-track-label';
       label.textContent=isScene?'Background':(F.name||'Layer '+(ti+1));
       const lane=document.createElement('div'); lane.className='rp-track-lane';
+      lane.style.width=laneW+'px'; // fixed scale; the row scrolls horizontally past it
       // Figma stacks these as four separate rows per track: phase-name pill,
       // then duration + easing icon, then a bracket PER PHASE spanning that
       // phase's span, then the segments. Previously name/duration shared one
@@ -2340,7 +2362,8 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         segsRow.textContent='no phases yet — click + to add one';
       }
 
-      const total=maxTotal; // shared time axis across every track (see rpRelayoutLane)
+      const total=axisSec; // shared VISIBLE axis (see rpRelayoutLane) — lane width
+                           // is axisSec*RP_PX_PER_SEC, so a % here is that scale
       const laneRecs=[]; // element refs so a resize drag can re-lay-out in place
       lane._timeline=timeline; lane._segs=laneRecs;
       let acc=0;
@@ -2439,7 +2462,29 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
 
         const durEl=document.createElement('div'); durEl.className='rp-phase-dur';
         durEl.style.left=(leftPct+w/2)+'%';
+        // The duration is type-in editable. Dragging a segment edge already
+        // worked but is undiscoverable and imprecise — there was no way to say
+        // "exactly 6 seconds" after placing a phase.
         const durText=document.createElement('span'); durText.textContent=phase.duration.toFixed(1)+'s';
+        durText.className='rp-dur-edit';
+        durText.contentEditable='true';
+        durText.spellcheck=false;
+        durText.title='Click to type an exact duration';
+        durText.addEventListener('click',(e)=>e.stopPropagation()); // not a phase-select click
+        durText.addEventListener('keydown',(e)=>{
+          e.stopPropagation();
+          if(e.key==='Enter'){ e.preventDefault(); durText.blur(); }
+          if(e.key==='Escape'){ durText.textContent=phase.duration.toFixed(1)+'s'; durText.blur(); }
+        });
+        durText.addEventListener('blur',()=>{
+          const v=parseFloat(durText.textContent.replace(/[^\d.]/g,''));
+          if(isFinite(v)&&v>0&&Math.abs(v-phase.duration)>1e-3){
+            phase.duration=Math.max(RP_MIN_PHASE,v);
+            markDirty(); rpRenderTracks();
+          }else{
+            durText.textContent=phase.duration.toFixed(1)+'s'; // reject junk, restore
+          }
+        });
         const easeIco=document.createElement('img'); easeIco.className='ease-ico'; easeIco.src='icons/spline.svg';
         easeIco.title='Easing: '+(phase.ease||'smootherstep')+' (click to cycle)';
         easeIco.addEventListener('click',(e)=>{
@@ -2534,19 +2579,24 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       tgWrap.appendChild(tg);
       if(!isOn) track.classList.add('off');
 
-      track.append(label,tgWrap,lane);
+      // label + toggle live in one sticky gutter that spans the full track
+      // height. Making them individually sticky left gaps above and below the
+      // name pill, through which the lane scrolled in plain view.
+      const gutter=document.createElement('div'); gutter.className='rp-track-gutter';
+      gutter.append(label,tgWrap);
+      track.append(gutter,lane);
       rpTracksEl.appendChild(track);
     }
     // ONE playhead, spanning every track — not one per lane (that was the
     // bug: each track drew its own marker, reading as scattered arrows
     // instead of a single shared line). Positioned against refLane's x-axis,
     // which every track's segments already share.
-    rpRefLane=refLane; rpMaxTotal=maxTotal; rpPlayheadEl=null;
+    rpRefLane=refLane; rpMaxTotal=maxTotal; rpAxisSec=axisSec; rpPlayheadEl=null;
     if(refLane){
       const ph=document.createElement('div'); ph.className='rp-playhead';
       rpTracksEl.appendChild(ph);
       rpPlayheadEl=ph;
-      wireScrub(ph,refLane,maxTotal);
+      wireScrub(ph,refLane,axisSec);
       rpCacheLaneGeom();
     }
     if(pendingThumbSegs.length) rpBuildThumbSlots(pendingThumbSegs,refLane,maxTotal);
@@ -2639,7 +2689,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(!rpRefLane) return null;
     const r=rpRefLane.getBoundingClientRect();
     if(!r.width) return null;
-    return Math.max(0,Math.min(1,(clientX-r.left)/r.width))*rpMaxTotal;
+    return Math.max(0,Math.min(1,(clientX-r.left)/r.width))*rpAxisSec;
   }
   function rpPlaceEls(){
     if(!rpPlaceGhost){
@@ -2687,10 +2737,10 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
     const span=Math.max(RP_MIN_PHASE,b-a);
     ghost.textContent=rpFmtTime(a)+' → '+rpFmtTime(a+span)+'  ('+span.toFixed(1)+'s)';
-    const r=rpRefLane.getBoundingClientRect(), c=rpTracksEl.getBoundingClientRect();
+    const L=rpRefLane.offsetLeft, W=rpRefLane.offsetWidth; // content space (see rpCacheLaneGeom)
     band.style.display='block';
-    band.style.left=(r.left-c.left+(a/rpMaxTotal)*r.width)+'px';
-    band.style.width=Math.max(2,(span/rpMaxTotal)*r.width)+'px';
+    band.style.left=(L+(a/rpAxisSec)*W)+'px';
+    band.style.width=Math.max(2,(span/rpAxisSec)*W)+'px';
   }
   function rpPlaceClick(e){
     if(!rpPlacing) return;
