@@ -346,7 +346,16 @@ body.watch #dots { display:none !important; }
 #redesign-panel.collapsed { transform: translateX(-100%); }
 #redesign-panel *,
 #anim-canvas-controls *,
-.rp-float-card * { box-sizing: border-box; font-family: inherit; }
+.rp-float-card * { box-sizing: border-box; }
+/* Only form controls need this: they don't inherit font-family by default, so
+   without it they fall back to the UA font (and to the Courier New on body).
+   It used to be set on `*` instead — but `*` adds no specificity, so those
+   selectors scored (1,0,0) on their id alone and silently beat every
+   class-based rule that asks for --rp-font-num. Every number in the UI was
+   rendering in --rp-font as a result, despite explicitly requesting Inter. */
+#redesign-panel :is(input, button, textarea, select),
+#anim-canvas-controls :is(input, button, textarea, select),
+.rp-float-card :is(input, button, textarea, select) { font-family: inherit; }
 /* overflow-x must be stated explicitly: per spec a non-visible value on one
    axis forces the other to compute to `auto`, so `overflow-y: auto` alone left
    overflow-x:auto — which paints a permanent horizontal scrollbar wherever the
