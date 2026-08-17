@@ -624,6 +624,25 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   background: var(--rp-ink); color: var(--rp-white); font: 600 11px/1 var(--rp-font-num);
   padding: 4px 9px; border-radius: 999px; white-space: nowrap;
 }
+/* ---- Placing a phase (click start → drag → click end) ---- */
+/* the sticky rides the cursor, so the whole page keeps a crosshair and nothing
+   else reacts to hover while a phase is in hand */
+body.rp-placing, body.rp-placing * { cursor: crosshair !important; }
+body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
+.rp-place-ghost {
+  position: fixed; z-index: 300; display: none; pointer-events: none;
+  transform: translate(14px, 14px); white-space: nowrap;
+  background: var(--rp-ink); color: var(--rp-bg-2);
+  font: 600 11px/1 var(--rp-font-num); padding: 6px 10px; border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+/* the span that will actually be inserted, spanning every lane so it reads as
+   the shared column it becomes */
+.rp-place-band {
+  position: absolute; top: 0; bottom: 0; z-index: 6; display: none; pointer-events: none;
+  background: rgba(120,170,255,0.18);
+  border-left: 2px solid var(--rp-white); border-right: 2px solid var(--rp-white);
+}
 .rp-segment.editing { outline: 2px solid var(--rp-ink); outline-offset: -2px; }
 .rp-segment .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .rp-segment .resize-handle.left { left: 0; }

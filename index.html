@@ -2621,21 +2621,139 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   });
   // one shared "add phase" (matching Figma — not one button per track);
   // it targets whichever track was last clicked/focused (trackActive)
-  document.getElementById('rp-anim-add-phase').addEventListener('click',()=>{
-    // A phase is a column across the WHOLE timeline, not something one track
-    // owns. Adding it to just the focused track left every other track a phase
-    // short, so from then on the same beat sat at a different index — and a
-    // different moment — in each row, which is what made phase names and the
-    // cross-track hover-sync line up against the wrong segments.
-    allTimelines().forEach((tl,ti)=>{
-      const last=tl[tl.length-1];
-      // each track continues from its OWN last phase, so a new column starts
-      // as "hold what this layer was already doing" rather than inheriting
-      // some other layer's look
-      tl.push({duration:5,snapshot:cloneSnapshot(last&&last.snapshot)||captureSnapshotForTrack(ti)});
-    });
+  // ---- Placing a phase: pick it up off the button, click a start point on the
+  // timeline, drag out the span, click again to drop it. Two clicks rather than
+  // press-drag-release, so the span can be adjusted (and read) before it lands
+  // — and so the gesture survives crossing the whole panel.
+  //
+  // A phase is a column across the WHOLE timeline, not something one track
+  // owns: dropping a span splits every track at the same index and inserts the
+  // same span into each, so lanes cannot drift out of alignment.
+  const RP_MIN_PHASE=0.5;
+  let rpPlacing=null;   // null | {stage:'start'|'end', startSec}
+  let rpPlaceGhost=null, rpPlaceBand=null;
+
+  // Seconds under a client x, measured against the shared reference lane that
+  // every track's segments are laid out on.
+  function rpTimeFromClientX(clientX){
+    if(!rpRefLane) return null;
+    const r=rpRefLane.getBoundingClientRect();
+    if(!r.width) return null;
+    return Math.max(0,Math.min(1,(clientX-r.left)/r.width))*rpMaxTotal;
+  }
+  function rpPlaceEls(){
+    if(!rpPlaceGhost){
+      rpPlaceGhost=document.createElement('div'); rpPlaceGhost.className='rp-place-ghost';
+      document.body.appendChild(rpPlaceGhost);
+    }
+    if(!rpPlaceBand||!rpPlaceBand.isConnected){
+      rpPlaceBand=document.createElement('div'); rpPlaceBand.className='rp-place-band';
+      rpTracksEl.appendChild(rpPlaceBand);
+    }
+    return {ghost:rpPlaceGhost,band:rpPlaceBand};
+  }
+  function rpPlaceCancel(){
+    rpPlacing=null;
+    document.body.classList.remove('rp-placing');
+    if(rpPlaceGhost) rpPlaceGhost.style.display='none';
+    if(rpPlaceBand) rpPlaceBand.style.display='none';
+  }
+  function rpPlaceStart(){
+    if(!rpTracksContainer.classList.contains('open')){
+      rpTracksContainer.classList.add('open');
+      document.querySelector('#rp-animation-row .chev').classList.add('rp-flip-x');
+      if(window.rpLayoutViewport) window.rpLayoutViewport();
+      rpRenderTracks();
+    }
+    rpPlacing={stage:'start',startSec:0};
+    document.body.classList.add('rp-placing');
+    const {ghost,band}=rpPlaceEls();
+    ghost.textContent='click to set the start';
+    ghost.style.display='block';
+    band.style.display='none';
+  }
+  // Live feedback: the sticky follows the cursor, and once a start is set the
+  // band shows exactly the span that will be inserted.
+  function rpPlaceMove(e){
+    if(!rpPlacing) return;
+    const {ghost,band}=rpPlaceEls();
+    ghost.style.left=e.clientX+'px'; ghost.style.top=e.clientY+'px';
+    const t=rpTimeFromClientX(e.clientX);
+    if(t===null) return;
+    if(rpPlacing.stage==='start'){
+      ghost.textContent='start at '+rpFmtTime(t);
+      return;
+    }
+    const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
+    const span=Math.max(RP_MIN_PHASE,b-a);
+    ghost.textContent=rpFmtTime(a)+' → '+rpFmtTime(a+span)+'  ('+span.toFixed(1)+'s)';
+    const r=rpRefLane.getBoundingClientRect(), c=rpTracksEl.getBoundingClientRect();
+    band.style.display='block';
+    band.style.left=(r.left-c.left+(a/rpMaxTotal)*r.width)+'px';
+    band.style.width=Math.max(2,(span/rpMaxTotal)*r.width)+'px';
+  }
+  function rpPlaceClick(e){
+    if(!rpPlacing) return;
+    const t=rpTimeFromClientX(e.clientX);
+    if(t===null) return;
+    e.preventDefault(); e.stopPropagation();
+    if(rpPlacing.stage==='start'){
+      rpPlacing={stage:'end',startSec:t};
+      rpPlaceMove(e);
+      return;
+    }
+    const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
+    rpInsertPhaseSpan(a,Math.max(a+RP_MIN_PHASE,b));
+    rpPlaceCancel();
     markDirty(); rpRenderTracks();
+  }
+  // Split & push: the span carves out its slot at `startSec`, the phase sitting
+  // there is cut in two around it, and everything after shifts along. The cut
+  // point (index + how far into that phase) is decided ONCE on the reference
+  // axis and applied to every track, so all tracks take the same branch and end
+  // up with the same phase count even if their durations have diverged.
+  function rpInsertPhaseSpan(startSec,endSec){
+    const span=Math.max(RP_MIN_PHASE,endSec-startSec);
+    const ref=allTimelines().find(tl=>tl.length)||[];
+    let acc=0, idx=ref.length, frac=0;
+    for(let i=0;i<ref.length;i++){
+      if(startSec<acc+ref[i].duration-1e-6){ idx=i; frac=(startSec-acc)/ref[i].duration; break; }
+      acc+=ref[i].duration;
+    }
+    frac=Math.max(0,Math.min(1,frac));
+    // One branch for every track, chosen from the reference. Landing within a
+    // phase-minimum of an existing boundary snaps to it rather than splitting:
+    // otherwise clicking just inside a phase leaves a sub-half-second sliver
+    // that is unreadable in the strip and impossible to grab.
+    const mode=idx>=ref.length ? 'append'
+      : (frac*ref[idx].duration<=RP_MIN_PHASE ? 'before'
+      : ((1-frac)*ref[idx].duration<=RP_MIN_PHASE ? 'after' : 'split'));
+    allTimelines().forEach((tl,ti)=>{
+      const fallback=()=>captureSnapshotForTrack(ti);
+      if(mode==='append'||idx>=tl.length){
+        const last=tl[tl.length-1];
+        tl.push({duration:span,snapshot:cloneSnapshot(last&&last.snapshot)||fallback()});
+        return;
+      }
+      const host=tl[idx];
+      const made={duration:span,snapshot:cloneSnapshot(host.snapshot)||fallback()};
+      if(mode==='before'){ tl.splice(idx,0,made); return; }
+      if(mode==='after'){ tl.splice(idx+1,0,made); return; }
+      // split: the host keeps its name/ease and its leading part; the trailing
+      // remainder continues after the new phase, holding the same look
+      const cut=Math.max(RP_MIN_PHASE*0.2,host.duration*frac);
+      const rest=Math.max(RP_MIN_PHASE*0.2,host.duration-cut);
+      host.duration=cut;
+      tl.splice(idx+1,0,made,{duration:rest,snapshot:cloneSnapshot(host.snapshot),ease:host.ease});
+    });
+  }
+  document.getElementById('rp-anim-add-phase').addEventListener('click',(e)=>{
+    e.stopPropagation();
+    if(rpPlacing) rpPlaceCancel(); else rpPlaceStart();
   });
+  document.addEventListener('mousemove',rpPlaceMove);
+  document.addEventListener('click',rpPlaceClick,true); // capture: beat the lanes' own click handlers
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&rpPlacing) rpPlaceCancel(); });
 
   // ---- Loop toggle (regression: existed in v1, had no home in the redesign)
   const rpLoopBtn=document.getElementById('rp-anim-loop');
