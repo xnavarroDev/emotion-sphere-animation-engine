@@ -456,6 +456,50 @@ export function createFireflyField(THREE, opts = {}) {
         Math.max(next, target) * 1.18 + uniforms.uCountFade.value + 1)));
       uniforms.uTime.value = t;
     },
+    // Everything update() accumulates rather than sets outright — the
+    // motion clocks, the eased count/fade, the birth clock, and update()'s
+    // own dt bookkeeping. A caller that needs to peek at an arbitrary time
+    // (e.g. rendering an offscreen preview) and hand the field back exactly
+    // as it found it should snapshot/restore this, not just re-set params:
+    // re-seeking by feeding update() a burst of synthetic ticks is the only
+    // way to let uCount/uMt* actually converge, and there's no "set instead
+    // of accumulate" alternative — so without this, that burst would leave
+    // real playback continuing from a corrupted clock/count/rotation state
+    // instead of where it actually was.
+    snapshotMotion() {
+      return {
+        uTime: uniforms.uTime.value,
+        uCount: uniforms.uCount.value,
+        uCountFade: uniforms.uCountFade.value,
+        uSpawnStart: uniforms.uSpawnStart.value,
+        uSpawnWindow: uniforms.uSpawnWindow.value,
+        uMtWander: uniforms.uMtWander.value,
+        uMtOrbit: uniforms.uMtOrbit.value,
+        uMtBlink: uniforms.uMtBlink.value,
+        uMtBreath: uniforms.uMtBreath.value,
+        uMtPulse: uniforms.uMtPulse.value,
+        uMtRipple: uniforms.uMtRipple.value,
+        lastT: this._lastT,
+        fadeRate: this._fadeRate,
+        drawRange: geometry.drawRange.count,
+      };
+    },
+    restoreMotion(snap) {
+      uniforms.uTime.value = snap.uTime;
+      uniforms.uCount.value = snap.uCount;
+      uniforms.uCountFade.value = snap.uCountFade;
+      uniforms.uSpawnStart.value = snap.uSpawnStart;
+      uniforms.uSpawnWindow.value = snap.uSpawnWindow;
+      uniforms.uMtWander.value = snap.uMtWander;
+      uniforms.uMtOrbit.value = snap.uMtOrbit;
+      uniforms.uMtBlink.value = snap.uMtBlink;
+      uniforms.uMtBreath.value = snap.uMtBreath;
+      uniforms.uMtPulse.value = snap.uMtPulse;
+      uniforms.uMtRipple.value = snap.uMtRipple;
+      this._lastT = snap.lastT;
+      this._fadeRate = snap.fadeRate;
+      geometry.setDrawRange(0, snap.drawRange);
+    },
     dispose() {
       geometry.dispose();
       material.dispose();

@@ -1114,7 +1114,7 @@ function updateInnerLayers(t,dt){
 }
 const _ffTargetColor=new THREE.Color();
 const _ffBlendColor=new THREE.Color();
-Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=30')]).then(([fieldMod,ctrlMod,ffMod])=>{
+Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),import('./firefly-field.js?v=31')]).then(([fieldMod,ctrlMod,ffMod])=>{
   const { ParticleField, DEFAULTS }=fieldMod;
   const { SLIDER_DEFS }=ctrlMod;
   const { createFireflyField, FIREFLY_DEFAULTS, FIREFLY_POOL }=ffMod;
@@ -2157,6 +2157,30 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   function rpTrackCount(){ return fireflyLayers.length+1; } // +1 for Background/Scene
   function rpFmtTime(s){ s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
 
+  // ---- Thumbnail hover preview: a "pops out" magnified frame + its second.
+  // .rp-segment/.rp-segments-row both clip overflow (for the rounded-corner
+  // swatches), so a plain CSS transform:scale() on the slot itself would
+  // just get cut off — this floats a single shared element above the whole
+  // page instead, positioned off the hovered slot's own rect.
+  let rpThumbPreviewEl=null;
+  function rpShowThumbPreview(slotEl,sec){
+    if(!rpThumbPreviewEl){
+      rpThumbPreviewEl=document.createElement('div');
+      rpThumbPreviewEl.className='rp-thumb-preview';
+      const img=document.createElement('div'); img.className='rp-thumb-preview-img';
+      const lbl=document.createElement('div'); lbl.className='rp-thumb-preview-sec';
+      rpThumbPreviewEl.append(img,lbl);
+      document.body.appendChild(rpThumbPreviewEl);
+    }
+    const r=slotEl.getBoundingClientRect();
+    rpThumbPreviewEl.firstChild.style.backgroundImage=slotEl.style.backgroundImage||'none';
+    rpThumbPreviewEl.lastChild.textContent=rpFmtTime(sec);
+    rpThumbPreviewEl.style.left=(r.left+r.width/2)+'px';
+    rpThumbPreviewEl.style.top=r.top+'px';
+    rpThumbPreviewEl.style.display='flex';
+  }
+  function rpHideThumbPreview(){ if(rpThumbPreviewEl) rpThumbPreviewEl.style.display='none'; }
+
   // Re-position one lane's segments/labels from its phase durations, without
   // rebuilding any DOM — so a resize drag keeps the pointer capture alive.
   function rpRelayoutLane(lane){
@@ -2256,6 +2280,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
 
   function rpRenderTracks(){
     if(!rpTracksEl) return;
+    rpHideThumbPreview(); // a rebuild can detach the slot mid-hover with no mouseleave firing
     rpTracksEl.innerHTML='';
     rpSegmentEls.clear();
     rpPhaseGroups.clear();
@@ -2316,8 +2341,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
             slot.style.left=(((cursor-phaseStartSec)/phase.duration)*100)+'%';
             slot.style.width=(((sliceEnd-cursor)/phase.duration)*100)+'%';
             slot.className='rp-thumb-slot';
+            const sampleSec=(cursor+sliceEnd)/2;
             slotsWrap.appendChild(slot);
-            thumbRequest(ti,(cursor+sliceEnd)/2,slot);
+            thumbRequest(ti,sampleSec,slot);
+            slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,sampleSec));
+            slot.addEventListener('mouseleave',rpHideThumbPreview);
             cursor=sliceEnd; si++;
           }
           seg.appendChild(slotsWrap);
@@ -3671,6 +3699,22 @@ function thumbInit(){
   thumbCanvas=document.createElement('canvas'); thumbCanvas.width=THUMB_W; thumbCanvas.height=THUMB_H;
   thumbCtx=thumbCanvas.getContext('2d');
 }
+// F.update(t) (in firefly-field.js) is NOT a pure function of time — it's a
+// per-frame integrator: particle count EASES toward its target over real
+// elapsed dt, and per-particle wander/orbit/blink motion accumulates the
+// same way. A single call with whatever tiny dt happened to elapse since the
+// last real animation frame barely nudges count toward the target, so a
+// naive one-shot seek renders whatever count the PREVIOUS capture (or the
+// live view) last settled near — not the count this second actually calls
+// for. Feed it a run of synthetic ticks so it actually converges before the
+// frame gets read back. Advances a private fake clock (never real time, and
+// never rewound) so update()'s own dt math stays sane across calls.
+let thumbFakeClock=0;
+function thumbSettle(toAnimTime,ticks=15){
+  animTime=toAnimTime; animScrubbing=true;
+  for(let i=0;i<ticks;i++){ thumbFakeClock+=0.1; updateInnerLayers(thumbFakeClock,0.1); }
+  animScrubbing=false;
+}
 // Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer
 // (or none, for the Background/Scene track), renders one offscreen frame,
 // reads it back into a small canvas, then restores everything exactly as it
@@ -3680,6 +3724,23 @@ function captureThumbnailAt(sec,trackIndex){
   const savedTime=animTime;
   const savedLoop=animLoop;
   const savedVis=fireflyLayers.map(F=>F.points.visible);
+  // updateInnerLayers() doesn't just set state toward a target each call —
+  // per-layer spin is a permanent rotateOnAxis() on the live points object,
+  // an un-colour-captured phase eases F.color() toward the emotion colour,
+  // and (inside firefly-field.js) the per-particle motion clocks feeding
+  // sin()/cos() in the shader are accumulators too — all of it drifting a
+  // little further with every call rather than snapping to a value for the
+  // given time. thumbSettle's synthetic ticks need MANY calls per capture to
+  // let count actually converge (see its own comment), which used to spin
+  // layers wildly off course and rack up huge motion-clock values (visible,
+  // permanent, on the live sphere — GPU trig on large accumulated floats
+  // gets numerically unstable, which is the "particles go crazy" look, and
+  // it persists because real playback then continues from that corrupted
+  // baseline). Snapshot everything mutable and hard-restore it after, so
+  // however many synthetic calls happen inside, net drift is exactly zero.
+  const savedQuat=fireflyLayers.map(F=>F.points.quaternion.clone());
+  const savedColor=fireflyLayers.map(F=>F.color().clone());
+  const savedMotion=fireflyLayers.map(F=>F.snapshotMotion());
   const isSceneTrack=trackIndex>=fireflyLayers.length;
   fireflyLayers.forEach((F,i)=>{ F.points.visible=!isSceneTrack&&i===trackIndex; });
 
@@ -3690,9 +3751,7 @@ function captureThumbnailAt(sec,trackIndex){
   // entirely without changing the computed frame (animTime here is always
   // < the total anyway, so animTime%total === min(animTime,total)).
   animLoop=false;
-  animTime=sec; animScrubbing=true;
-  updateInnerLayers(clock.getElapsedTime(),0);
-  animScrubbing=false;
+  thumbSettle(sec);
 
   renderer.setRenderTarget(thumbTarget);
   renderer.setClearColor(0x000000,0);
@@ -3723,10 +3782,21 @@ function captureThumbnailAt(sec,trackIndex){
   thumbCtx.globalCompositeOperation='source-over';
 
   fireflyLayers.forEach((F,i)=>{ F.points.visible=savedVis[i]; });
+  // One real call (not a settle burst) to put the SCENE side back — CLASSIC/
+  // glow/bg are plain lerped setters, not accumulators, so they're already
+  // exactly right after a single pass. Whatever this same call does to each
+  // layer's motion state is irrelevant — restoreMotion overwrites it below
+  // with the exact pre-capture snapshot, an exact undo instead of another
+  // easing pass racing to catch back up.
   animTime=savedTime; animScrubbing=true;
   updateInnerLayers(clock.getElapsedTime(),0);
   animScrubbing=false;
   animLoop=savedLoop;
+  fireflyLayers.forEach((F,i)=>{
+    F.points.quaternion.copy(savedQuat[i]);
+    F.color().copy(savedColor[i]);
+    F.restoreMotion(savedMotion[i]);
+  });
 
   return thumbCanvas.toDataURL('image/jpeg',0.72);
 }
@@ -3737,24 +3807,34 @@ let thumbQueueRunning=false;
 // One capture per animation frame — readRenderTargetPixels stalls the GPU
 // pipeline, so batching them all synchronously would freeze the tab exactly
 // when the timeline first opens with lots of phases to fill in.
+let thumbBroken=false; // a capture threw once — stop trying, don't take the panel down with it
 function thumbProcessQueue(){
   if(!thumbQueue.length){ thumbQueueRunning=false; return; }
   thumbQueueRunning=true;
   const job=thumbQueue.shift();
   let url=thumbCache.get(job.key);
   if(url===undefined){
-    if(thumbCache.size>THUMB_CACHE_MAX) thumbCache.clear();
-    url=captureThumbnailAt(job.sec,job.trackIndex);
-    thumbCache.set(job.key,url);
+    try{
+      if(thumbCache.size>THUMB_CACHE_MAX) thumbCache.clear();
+      url=captureThumbnailAt(job.sec,job.trackIndex);
+      thumbCache.set(job.key,url);
+    }catch(err){
+      // Thumbnails are a preview nicety layered over the flat-colour swatch,
+      // never load-bearing — the FIRST job of a batch runs synchronously,
+      // inline, from inside rpRenderTracks() itself (see thumbRequest), so an
+      // uncaught throw here doesn't just skip one frame, it aborts the whole
+      // timeline rebuild. A capture failure should leave slots showing their
+      // swatch colour, not break opening the Animation panel entirely.
+      console.warn('[thumbnails] capture failed, disabling for this session:',err);
+      thumbBroken=true;
+      thumbQueue.length=0;
+    }
   }
-  // Setting the style is harmless even if this element's own rpRenderTracks()
-  // pass hasn't attached it to the DOM yet (the very first request of a batch
-  // is processed synchronously, inline, before its own slot is appended) —
-  // an isConnected guard here would just silently drop that element's image.
-  job.el.style.backgroundImage='url('+url+')';
+  if(url!==undefined) job.el.style.backgroundImage='url('+url+')';
   requestAnimationFrame(thumbProcessQueue);
 }
 function thumbRequest(trackIndex,sec,el){
+  if(thumbBroken) return;
   const key=trackIndex+'|'+sec.toFixed(2);
   const cached=thumbCache.get(key);
   if(cached!==undefined){ el.style.backgroundImage='url('+cached+')'; return; }

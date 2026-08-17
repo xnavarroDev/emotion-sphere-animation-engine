@@ -379,6 +379,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-icon-btn-plain:hover { background: var(--rp-bg-2); }
 .rp-icon-btn:disabled { opacity: 0.35; cursor: default; }
 .rp-icon-btn:disabled:hover { background: transparent; }
+#rp-layer-prev .rp-ico, #rp-layer-next .rp-ico { filter: brightness(0) invert(1); }
 
 /* ---- Lucide icon <img> utility classes (exact SVG exports pulled from Figma) ---- */
 .rp-ico { width: 24px; height: 24px; display: block; }
@@ -559,7 +560,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-track-label.focused { color: var(--rp-ink); font-weight: 700; }
 .rp-track-lane { flex: 1 1 auto; position: relative; }
 .rp-phase-labels { position: relative; height: 28px; }
-.rp-phase-durs { position: relative; height: 20px; }
+.rp-phase-durs { position: relative; height: 20px; margin-top: 14px; }
 .rp-phase-name {
   position: absolute; transform: translateX(-50%); top: 0; background: var(--rp-pill);
   border-radius: 12.5px; padding: 5px 10px; font-size: 15px; font-weight: 600;
@@ -588,7 +589,23 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-thumb-slots { position: absolute; inset: 0; }
 .rp-thumb-slot {
   position: absolute; top: 0; bottom: 0; background-size: cover; background-position: center;
-  border-right: 1px solid rgba(0,0,0,0.08);
+  border-right: 1px solid rgba(0,0,0,0.08); cursor: pointer;
+}
+/* the segment/lane both clip overflow (for the rounded corners), so the
+   "pop out" itself is a separate floating element (.rp-thumb-preview) —
+   this is just the in-place cue that a frame is hovered */
+.rp-thumb-slot:hover { filter: brightness(1.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
+.rp-thumb-preview {
+  position: fixed; z-index: 200; display: none; flex-direction: column; align-items: center;
+  gap: 6px; transform: translate(-50%, calc(-100% - 14px)); pointer-events: none;
+}
+.rp-thumb-preview-img {
+  width: 112px; height: 68px; border-radius: 8px; background: #000 center/cover;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.45); border: 2px solid var(--rp-white);
+}
+.rp-thumb-preview-sec {
+  background: var(--rp-ink); color: var(--rp-white); font: 600 11px/1 var(--rp-font-num);
+  padding: 4px 9px; border-radius: 999px; white-space: nowrap;
 }
 .rp-segment.editing { outline: 2px solid var(--rp-ink); outline-offset: -2px; }
 .rp-segment .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
