@@ -752,10 +752,14 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 /* ---- "All layers" summary strip ---- */
 /* Reads as a summary, not an editable track: quieter caption, a rule beneath
    it separating it from the tracks proper, and no toggle in its gutter. */
-.rp-summary-track { padding-bottom: 6px; border-bottom: 1px solid var(--rp-border); margin-bottom: 4px; }
+/* No rule and no extra margin: the summary row sits in the same rhythm as the
+   tracks, so the gaps above the layers, between them, and before Background
+   are all the base row padding. */
+.rp-summary-track { }
 .rp-summary-gutter { flex: 0 0 auto; }
 .rp-summary-cap {
-  align-self: flex-start; margin-top: 16px;
+  /* centred on the 68px strip, like the layer name pills are on theirs */
+  align-self: flex-start; margin-top: 26px;
   font: 600 12px/1.3 var(--rp-font-num); color: var(--rp-ink-3);
 }
 /* matches .rp-segments-row so the frames are the same shape as the lanes' */
