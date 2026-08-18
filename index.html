@@ -2468,8 +2468,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       if(!down) return;
       down=false;
       try{ lane.releasePointerCapture(e.pointerId); }catch(err){}
-      // let the click handler see the flag, then clear it
-      if(rpLaneDragMoved) setTimeout(()=>{ rpLaneDragMoved=false; },0);
+      if(rpLaneDragMoved){
+        // let the click handler see the flag, then clear it
+        setTimeout(()=>{ rpLaneDragMoved=false; },0);
+      }else{
+        // A plain click moves the playhead to where you clicked. It does not
+        // fight phase selection: clicking a segment still selects it, so one
+        // click both goes to that moment and opens it for editing, which is
+        // what clicking a spot on a timeline is asking for.
+        rpSeekToClientX(e.clientX);
+      }
     };
     lane.addEventListener('pointerup',end);
     lane.addEventListener('pointercancel',end);
@@ -2800,6 +2808,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         label.addEventListener('click',()=>{ trackActive=ti; rpRenderTracks(); });
       }else{
         label.classList.add('editable');
+        label.dataset.fallback='Layer '+(ti+1); // shown while the field is empty
         label.contentEditable='true';
         label.spellcheck=false;
         label.title='Click to focus this track · type to rename it';
