@@ -2855,6 +2855,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       rpCacheLaneGeom();
     }
     if(pendingThumbSegs.length) rpBuildThumbSlots(pendingThumbSegs,refLane,maxTotal);
+    if(thumbsOn) rpBuildSummaryStrip(axisSec,laneW,refLane);
     // restore the scroll the rebuild just discarded (see keepTop/keepLeft above)
     rpTracksEl.scrollTop=keepTop;
     if(keepLeft){
@@ -2910,6 +2911,62 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       }
       seg.appendChild(wrap);
     }
+  }
+
+  // A read-only summary strip above the editable tracks: the COMPOSED sphere,
+  // every layer together, across time. The lanes each show one ingredient in
+  // isolation and the canvas shows the result only at the current instant —
+  // nothing otherwise shows the actual result over time, which is the thing
+  // being authored.
+  //
+  // Deliberately not a track: no phases of its own, no on/off, nothing to
+  // rename. It carries no toggle and a muted caption so it doesn't read as a
+  // fourth layer you can edit.
+  function rpBuildSummaryStrip(axisSec,laneW,refLane){
+    if(!rpTracksEl||!refLane) return;
+    const ref=allTimelines().find(tl=>tl.length);
+    if(!ref) return;
+    const realGutter=rpTracksEl.querySelector('.rp-track-gutter');
+    const row=document.createElement('div'); row.className='rp-track rp-summary-track';
+    const gutter=document.createElement('div'); gutter.className='rp-track-gutter rp-summary-gutter';
+    // Width copied from a REAL gutter rather than assumed: a previous version
+    // sized this from a hard-coded caption width, which was narrower than
+    // label+toggle+padding, so every image sat left of the phase it belonged to.
+    if(realGutter) gutter.style.width=realGutter.offsetWidth+'px';
+    const cap=document.createElement('div'); cap.className='rp-summary-cap'; cap.textContent='All layers';
+    gutter.appendChild(cap);
+    const vp=document.createElement('div'); vp.className='rp-lane-vp';
+    const lane=document.createElement('div'); lane.className='rp-track-lane rp-summary-lane';
+    lane.style.width=laneW+'px';
+    // Same cadence as the lanes below (see rpBuildThumbSlots), so the frames
+    // line up column-for-column instead of reading as a different rhythm. The
+    // strip height has to be READ from a real segments row, not assumed — a
+    // different height gives a different frame width and the columns drift.
+    const realRow=rpTracksEl.querySelector('.rp-segments-row');
+    const stripH=(realRow&&realRow.getBoundingClientRect().height)||68;
+    const pxPerSec=laneW/axisSec;
+    const idealSec=(stripH*thumbAspect())/pxPerSec;
+    let acc=0;
+    ref.forEach((phase)=>{
+      const startSec=acc; acc+=phase.duration;
+      const frames=Math.max(1,Math.round(phase.duration/idealSec));
+      const frameSec=phase.duration/frames;
+      for(let k=0;k<frames;k++){
+        const at=startSec+k*frameSec;
+        const slot=document.createElement('div'); slot.className='rp-thumb-slot rp-summary-slot';
+        slot.style.left=(((at)/axisSec)*100)+'%';
+        slot.style.width=((frameSec/axisSec)*100)+'%';
+        lane.appendChild(slot);
+        thumbRequest(null,at,slot);  // null track = every layer composed
+        slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,at));
+        slot.addEventListener('mouseleave',rpHideThumbPreview);
+      }
+    });
+    vp.appendChild(lane);
+    vp.addEventListener('scroll',()=>rpSyncLaneScroll(vp),{passive:true});
+    row.append(gutter,vp);
+    rpTracksEl.insertBefore(row,rpTracksEl.firstChild);
+    rpLaneVps.push(vp);
   }
 
   const rpPlayIco=document.getElementById('rp-anim-play-ico');
@@ -4455,9 +4512,10 @@ function thumbSettle(toAnimTime,ticks=15){
 // Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer,
 // renders one small offscreen frame, then restores everything exactly as it
 // was — all synchronous, so nothing else ever observes the disturbed state.
-// trackIndex null => the WHOLE scene exactly as it stands right now: no layer
-// isolation and no seek. That is what the preset gallery's card wants (a
-// portrait of the current sphere), as opposed to a filmstrip frame.
+// The two arguments are independent. trackIndex null => the WHOLE composed
+// scene rather than one isolated layer; sec null => the current moment, with no
+// seek. So a lane frame asks for (time, one layer), the summary strip for
+// (time, whole scene), and the gallery card for (now, whole scene).
 function captureThumbnailAt(sec,trackIndex){
   const wholeScene=(trackIndex==null);
   const liveW=Math.max(1,renderer.domElement.width);
@@ -4517,7 +4575,9 @@ function captureThumbnailAt(sec,trackIndex){
   // entirely without changing the computed frame (animTime here is always
   // < the total anyway, so animTime%total === min(animTime,total)).
   animLoop=false;
-  if(!wholeScene){
+  // Gating the seek on !wholeScene made every summary-strip frame a picture of
+  // the current moment instead of its own time — seek whenever one was asked for.
+  if(sec!=null){
     thumbSettle(sec);
     // match what seeking to this moment shows: the spawn-in is part of the
     // state at a time, so an early frame is genuinely sparse rather than the
