@@ -671,9 +671,17 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 .rp-track-label.focused { color: var(--rp-ink); font-weight: 700; }
 /* a layer name is renamed in place, so it has to READ as a field rather than a
    caption — the same pill the name inputs use (.rp-name-input), at track scale */
-.rp-track-label.editable { cursor: text; border-radius: 8px; padding: 4px 8px; margin-left: -8px; transition: background 0.15s, box-shadow 0.15s; }
-.rp-track-label.editable:hover { background: var(--rp-pill); }
-.rp-track-label.editable:focus { outline: none; background: var(--rp-pill); box-shadow: inset 0 0 0 1px var(--rp-accent); color: var(--rp-ink); overflow: visible; text-overflow: clip; }
+/* A layer name is a standing chip, not text that becomes one on hover: it
+   should read as the layer's badge whether or not the cursor is near it, and
+   as something you can type into. Sized to the text rather than the 100px
+   column so short names don't sit in an oversized plate. */
+.rp-track-label.editable {
+  cursor: text; width: auto; max-width: 100px; border-radius: 999px;
+  padding: 5px 10px; margin-left: -10px; background: var(--rp-pill);
+  color: var(--rp-ink); transition: background 0.15s, box-shadow 0.15s;
+}
+.rp-track-label.editable:hover { background: var(--rp-bg-3); }
+.rp-track-label.editable:focus { outline: none; background: var(--rp-bg-3); box-shadow: inset 0 0 0 1px var(--rp-accent); color: var(--rp-ink); overflow: visible; text-overflow: clip; max-width: none; }
 .rp-track-lane { flex: 0 0 auto; position: relative; }
 .rp-phase-labels { position: relative; height: 28px; }
 .rp-phase-durs { position: relative; height: 20px; margin-top: 14px; }
