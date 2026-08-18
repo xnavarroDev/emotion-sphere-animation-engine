@@ -600,7 +600,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
      always fit, so there is nothing to scroll to horizontally. */
   max-height: 46vh; overflow: hidden;
 }
-#anim-canvas-controls.open { display: block; }
+#anim-canvas-controls.open { display: flex; }
 /* The transport pins to the top of the timeline's own scroll area, so the
    playhead time, play/reset and "add phase" stay reachable no matter how many
    tracks you scroll through. #anim-canvas-controls is the scroll container and
@@ -701,7 +701,7 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 .rp-segment { position: absolute; top: 0; height: 68px; cursor: pointer; overflow: hidden; }
 /* a hairline gap in the panel colour keeps adjacent segments readable as
    separate blocks even when they hold the same colour */
-.rp-segment .swatch { box-shadow: inset -2px 0 0 var(--rp-bg); }
+.rp-segment .swatch { box-shadow: inset -2px 0 0 var(--rp-chrome); }
 .rp-segment:first-child { border-radius: 10px 0 0 10px; }
 .rp-segment:last-child { border-radius: 0 10px 10px 0; }
 .rp-segment:last-child .swatch { box-shadow: none; }

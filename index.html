@@ -2480,6 +2480,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   function rpRenderTracks(){
     if(!rpTracksEl) return;
     rpHideThumbPreview(); // a rebuild can detach the slot mid-hover with no mouseleave firing
+    // Every rebuild empties the container, which drops the scroll position with
+    // it — so flipping a track's switch, renaming a phase or typing a duration
+    // all threw you back to the top of a long timeline. Keep both axes and put
+    // them back once the new tree is in place.
+    const keepTop=rpTracksEl.scrollTop, keepLeft=rpLaneScroll;
     rpTracksEl.innerHTML=''; rpLaneVps=[]; rpLaneOverlay=null;
     rpSegmentEls.clear();
     rpPhaseGroups.clear();
@@ -2786,6 +2791,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       rpCacheLaneGeom();
     }
     if(pendingThumbSegs.length) rpBuildThumbSlots(pendingThumbSegs,refLane,maxTotal);
+    // restore the scroll the rebuild just discarded (see keepTop/keepLeft above)
+    rpTracksEl.scrollTop=keepTop;
+    if(keepLeft){
+      rpLaneScroll=keepLeft;
+      for(const vp of rpLaneVps) vp.scrollLeft=keepLeft;
+      if(rpLaneOverlay) rpLaneOverlay.style.left=(rpLaneGeom?rpLaneGeom.left:0)+'px';
+    }
     rpUpdatePlayhead();
   }
 
