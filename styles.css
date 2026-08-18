@@ -633,8 +633,10 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 }
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
 /* per-track "does playback drive this layer" switch, in the timeline */
-/* sits UNDER the name pill, tucked to its right edge (see .rp-track-gutter) */
-.rp-track-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; align-self: flex-end; flex: 0 0 auto; }
+/* Sits directly under the name pill. flex-end pinned it to the gutter's right
+   edge instead, which since the gutter became a fixed 170px column left it
+   stranded away from the pill it belongs to. */
+.rp-track-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; align-self: flex-start; flex: 0 0 auto; }
 .rp-track-toggle .rp-switch { width: 30px; height: 17px; }
 .rp-track-toggle .rp-switch::after { width: 13px; height: 13px; }
 .rp-track-toggle .rp-switch.on::after { transform: translateX(13px); }
