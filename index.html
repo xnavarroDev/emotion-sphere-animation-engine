@@ -206,6 +206,7 @@
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-play" type="button" title="Play/Pause"><img class="rp-ico" src="icons/play.svg" id="rp-anim-play-ico" alt=""></button>
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-reset" type="button" title="Reset"><img class="rp-ico" src="icons/rotate-ccw.svg" alt=""></button>
     <button class="rp-btn-sm" id="rp-anim-add-phase" type="button"><img class="rp-ico rp-ico-18" src="icons/plus.svg" alt="">add phase</button>
+    <button class="rp-btn-sm" id="rp-anim-clear-phases" type="button" title="Remove every phase from every track"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">clear phases</button>
     <span class="rp-loop-row"><span>loop</span><button class="rp-switch on" id="rp-anim-loop" type="button" title="Loop the cycle"></button></span>
   </div>
   <div id="rp-tracks"></div>
@@ -2745,7 +2746,22 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         durText.contentEditable='true';
         durText.spellcheck=false;
         durText.title='Click to type an exact duration';
-        durText.addEventListener('click',(e)=>e.stopPropagation()); // not a phase-select click
+        durText.addEventListener('click',(e)=>{
+          e.stopPropagation(); // not a phase-select click
+          // Select the existing value so typing REPLACES it. Without this a
+          // click just drops a caret wherever the browser puts it, so typing
+          // "9" over "15.0s" inserted mid-string instead of replacing it —
+          // e.g. produced "915". setTimeout(0): the click's own mouseup
+          // collapses the selection to a caret AFTER this handler runs, so
+          // selecting synchronously here would just get overwritten.
+          setTimeout(()=>{
+            const range=document.createRange();
+            range.selectNodeContents(durText);
+            const sel=window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          },0);
+        });
         durText.addEventListener('keydown',(e)=>{
           e.stopPropagation();
           if(e.key==='Enter'){ e.preventDefault(); durText.blur(); }
@@ -3181,8 +3197,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       return;
     }
     const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
-    rpInsertPhaseSpan(a,Math.max(a+RP_MIN_PHASE,b));
+    const landed=rpInsertPhaseSpan(a,Math.max(a+RP_MIN_PHASE,b));
     rpPlaceCancel();
+    // Select what was just placed — the .editing outline (see .rp-segment.editing
+    // in styles.css) is what makes a fresh phase unmistakable instead of just
+    // another unlabelled segment among the rest.
+    if(landed) rpEditingPhase=landed;
     markDirty(); rpRenderTracks();
   }
   // Split & push: the span carves out its slot at `startSec`, the phase sitting
@@ -3190,6 +3210,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // point (index + how far into that phase) is decided ONCE on the reference
   // axis and applied to every track, so all tracks take the same branch and end
   // up with the same phase count even if their durations have diverged.
+  // Returns the phase object landed in the CURRENTLY FOCUSED track (the same
+  // track add-phase already targets), so the caller can select it — a freshly
+  // placed phase should be unmistakable, not just another unlabelled segment.
   function rpInsertPhaseSpan(startSec,endSec){
     const span=Math.max(RP_MIN_PHASE,endSec-startSec);
     const ref=allTimelines().find(tl=>tl.length)||[];
@@ -3206,24 +3229,33 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const mode=idx>=ref.length ? 'append'
       : (frac*ref[idx].duration<=RP_MIN_PHASE ? 'before'
       : ((1-frac)*ref[idx].duration<=RP_MIN_PHASE ? 'after' : 'split'));
+    let landed=null;
+    const focusedTi=Math.max(0,Math.min(trackActive,fireflyLayers.length-(isSceneTrack()?0:1)));
     allTimelines().forEach((tl,ti)=>{
       const fallback=()=>captureSnapshotForTrack(ti);
+      let placed;
       if(mode==='append'||idx>=tl.length){
         const last=tl[tl.length-1];
-        tl.push({duration:span,snapshot:cloneSnapshot(last&&last.snapshot)||fallback()});
-        return;
+        placed=made(cloneSnapshot(last&&last.snapshot)||fallback());
+        tl.push(placed);
+      }else{
+        const host=tl[idx];
+        if(mode==='before'){ placed=made(cloneSnapshot(host.snapshot)||fallback()); tl.splice(idx,0,placed); }
+        else if(mode==='after'){ placed=made(cloneSnapshot(host.snapshot)||fallback()); tl.splice(idx+1,0,placed); }
+        else{
+          // split: the host keeps its name/ease and its leading part; the
+          // trailing remainder continues after the new phase, holding the same look
+          const cut=Math.max(RP_MIN_PHASE*0.2,host.duration*frac);
+          const rest=Math.max(RP_MIN_PHASE*0.2,host.duration-cut);
+          host.duration=cut;
+          placed=made(cloneSnapshot(host.snapshot));
+          tl.splice(idx+1,0,placed,{duration:rest,snapshot:cloneSnapshot(host.snapshot),ease:host.ease});
+        }
       }
-      const host=tl[idx];
-      const made={duration:span,snapshot:cloneSnapshot(host.snapshot)||fallback()};
-      if(mode==='before'){ tl.splice(idx,0,made); return; }
-      if(mode==='after'){ tl.splice(idx+1,0,made); return; }
-      // split: the host keeps its name/ease and its leading part; the trailing
-      // remainder continues after the new phase, holding the same look
-      const cut=Math.max(RP_MIN_PHASE*0.2,host.duration*frac);
-      const rest=Math.max(RP_MIN_PHASE*0.2,host.duration-cut);
-      host.duration=cut;
-      tl.splice(idx+1,0,made,{duration:rest,snapshot:cloneSnapshot(host.snapshot),ease:host.ease});
+      if(ti===focusedTi) landed=placed;
+      function made(snapshot){ return {duration:span,snapshot}; }
     });
+    return landed;
   }
   rpAddPhaseBtn.addEventListener('click',(e)=>{
     e.stopPropagation();
@@ -3233,6 +3265,23 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   document.addEventListener('mousemove',rpPlaceMove);
   document.addEventListener('click',rpPlaceClick,true); // capture: beat the lanes' own click handlers
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&rpPlacing) rpPlaceCancel(); });
+
+  // Wipe every phase from every track in one step. Deleting them one at a
+  // time (the only way before this) was the actual complaint — starting a
+  // preset over meant clicking each phase's own x, once per track.
+  document.getElementById('rp-anim-clear-phases').addEventListener('click',(e)=>{
+    e.stopPropagation();
+    if(rpPlacing) rpPlaceCancel();
+    const total=allTimelines().reduce((n,tl)=>n+tl.length,0);
+    if(!total) return;
+    if(!confirm('Remove all phases from every track? (Undo will bring them back.)')) return;
+    allTimelines().forEach(tl=>{ tl.length=0; });
+    rpEditingPhase=null; editingPhase=false;
+    animTime=0; animPrevGlobalT=0; animSeekHold=null;
+    if(animStop) animStop();
+    rpPlayIco.src='icons/play.svg';
+    markDirty(); rpRenderTracks();
+  });
 
   // ---- Loop toggle (regression: existed in v1, had no home in the redesign)
   const rpLoopBtn=document.getElementById('rp-anim-loop');

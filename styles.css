@@ -728,8 +728,12 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 }
 .rp-phase-dur { position: absolute; transform: translateX(-50%); top: 0; font: 600 12px/1 var(--rp-font-num); color: var(--rp-ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .rp-phase-dur .ease-ico { width: 16.125px; height: 16.125px; cursor: pointer; display: block; }
-.rp-bracket-row { position: relative; height: 8px; }
-.rp-bracket { position: absolute; top: 0; height: 10px; border-left: 2px solid var(--rp-ink-2); border-right: 2px solid var(--rp-ink-2); border-top: 2px solid var(--rp-ink-2); }
+.rp-bracket-row { position: relative; height: 10px; }
+/* --rp-ink-2 at 2px read as barely-there on the dark surface, sandwiched
+   between the pill and the duration text above and the filmstrip below — the
+   exact boundary a bracket exists to show was the hardest line in the row to
+   see. --rp-ink (near-white) at 2.5px so it actually reads as a bracket. */
+.rp-bracket { position: absolute; top: 0; height: 10px; border-left: 2.5px solid var(--rp-ink); border-right: 2.5px solid var(--rp-ink); border-top: 2.5px solid var(--rp-ink); }
 .rp-segments-row { position: relative; height: 68px; display: flex; overflow: hidden; border-radius: 0; }
 .rp-segment { position: absolute; top: 0; height: 68px; cursor: pointer; overflow: hidden; }
 /* a hairline gap in the panel colour keeps adjacent segments readable as
