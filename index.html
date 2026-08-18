@@ -3653,6 +3653,14 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       'bggradient '+bgGradientAmount.toFixed(2),
       'rotate '+(sphereRotate?1:0),
       'rotatespeed '+sphereRotateSpeed.toFixed(3));
+    // The name typed into the footer's "Untitled preset" field was pure UI
+    // state — the redesigned panel's own variable, never read by this
+    // function — so save-to-clipboard and the share link both silently
+    // dropped it. Read the input directly rather than reach across the
+    // closure boundary for the (unused-elsewhere) JS variable that mirrors
+    // it: simpler, and can't go stale relative to what's on screen.
+    const presetName=document.getElementById('rp-preset-name')?.value.trim();
+    if(presetName) lines.push('presetname '+presetName);
     return lines.join('\n');
   }
 
@@ -3665,6 +3673,11 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     // count and phase timings reuses exactly those keys — which is why the
     // filmstrips used to keep showing the previous preset after switching.
     thumbCache.clear();
+    // Cleared unconditionally, not just overwritten when a presetname line is
+    // found below: this text is a full replacement, so a name typed before
+    // loading a built-in preset (none of which carry a presetname line) must
+    // not survive as a stale label on the new look.
+    { const el=document.getElementById('rp-preset-name'); if(el) el.value=''; }
     const coreInputs={};
     document.querySelectorAll('#params-controls .row').forEach(row=>{
       const k=row.querySelector('span')?.textContent.trim();
@@ -3731,6 +3744,18 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       }
       m=line.match(/^emotion\s+(\w+)$/i);
       if(m){ if(typeof switchEmotion==='function') switchEmotion(m[1].toLowerCase()); continue; }
+      m=line.match(/^presetname\s+(.+)$/i);
+      if(m&&section==='view'){
+        // Set the DOM directly rather than the redesigned panel's own
+        // rpPresetName variable, which lives in a closure this function has
+        // no access to (that closure's .then() has already resolved and
+        // returned by the time this one is defined) — going through the
+        // element sidesteps that entirely, the same way rpRenderTracksHook
+        // etc. bridge the other direction via an explicit global instead.
+        const el=document.getElementById('rp-preset-name');
+        if(el) el.value=m[1].trim();
+        continue;
+      }
       m=line.match(/^glowcolor\s+(#[0-9a-fA-F]{6})$/i);
       if(m&&section==='view'){ glowUserColor=m[1]; const el=document.getElementById('glow-color'); if(el) el.value=m[1]; cloudBg.setUserTint(m[1],null); continue; }
       // a glowcolor inside an Anim Scene phase animates the glow's own colour
