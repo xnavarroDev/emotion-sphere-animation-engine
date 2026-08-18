@@ -2378,9 +2378,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       rpRenderTracks(); // resync cycle length, playhead + the other tracks
     });
   }
-  function wireScrub(ph,lane,maxTotal){
-    let dragging=false;
-    function seekFromClientX(clientX){
+  // Seek from a pointer x, measured against the shared lane axis. Shared by the
+  // playhead and by dragging anywhere on a lane.
+  function rpSeekToClientX(clientX){
+    const lane=rpRefLane; if(!lane) return;
+    const maxTotal=rpAxisSec;
       const r=lane.getBoundingClientRect();
       const t=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
       // the visible axis can run past the animation (it has a minimum length),
@@ -2397,10 +2399,45 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       // move the playhead only — rebuilding here would destroy the very
       // element holding this drag's pointer capture, ending the scrub
       rpUpdatePlayhead();
-    }
-    ph.addEventListener('pointerdown',(e)=>{ dragging=true; ph.setPointerCapture(e.pointerId); seekFromClientX(e.clientX); e.stopPropagation(); });
-    ph.addEventListener('pointermove',(e)=>{ if(dragging) seekFromClientX(e.clientX); });
+  }
+  function wireScrub(ph,lane,maxTotal){
+    let dragging=false;
+    ph.addEventListener('pointerdown',(e)=>{ dragging=true; ph.setPointerCapture(e.pointerId); rpSeekToClientX(e.clientX); e.stopPropagation(); });
+    ph.addEventListener('pointermove',(e)=>{ if(dragging) rpSeekToClientX(e.clientX); });
     ph.addEventListener('pointerup',(e)=>{ dragging=false; try{ph.releasePointerCapture(e.pointerId);}catch(err){} });
+  }
+
+  // Dragging anywhere across a lane scrubs. Seeking used to be bound to the
+  // playhead alone, so dragging "the timeline" — the obvious gesture — did
+  // nothing. A click still selects the phase: only movement past a few pixels
+  // counts as a scrub, and that suppresses the click that would otherwise
+  // follow.
+  let rpLaneDragMoved=false;
+  function rpWireLaneScrub(lane){
+    let down=false, startX=0;
+    lane.addEventListener('pointerdown',(e)=>{
+      // leave the lane's own controls alone
+      if(e.target.closest('.resize-handle,.rp-segment-del,.rp-seam-add,.rp-phase-name,.rp-dur-edit,.ease-ico,.rp-playhead')) return;
+      down=true; startX=e.clientX; rpLaneDragMoved=false;
+    });
+    lane.addEventListener('pointermove',(e)=>{
+      if(!down) return;
+      if(!rpLaneDragMoved){
+        if(Math.abs(e.clientX-startX)<4) return;   // still a click, not a drag
+        rpLaneDragMoved=true;
+        try{ lane.setPointerCapture(e.pointerId); }catch(err){}
+      }
+      rpSeekToClientX(e.clientX);
+    });
+    const end=(e)=>{
+      if(!down) return;
+      down=false;
+      try{ lane.releasePointerCapture(e.pointerId); }catch(err){}
+      // let the click handler see the flag, then clear it
+      if(rpLaneDragMoved) setTimeout(()=>{ rpLaneDragMoved=false; },0);
+    };
+    lane.addEventListener('pointerup',end);
+    lane.addEventListener('pointercancel',end);
   }
 
   // ---- Timeline render split into two tiers ----
@@ -2563,6 +2600,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         rpSegmentEls.set(phase,{swatch,isScene,pi}); // so a live edit can recolour just this one
         if(rpEditingPhase===phase) seg.classList.add('editing');
         seg.addEventListener('click',(e)=>{
+          if(rpLaneDragMoved) return; // that was a scrub, not a phase selection
           if(e.target.closest('.resize-handle')||e.target.closest('.rp-segment-del')) return;
           trackActive=ti; // reuse the shared track-selector state
           applyTrackSnapshot(phase.snapshot||captureTrackSnapshot());
@@ -2772,6 +2810,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       // what lets the gutter be fully transparent and therefore identical to
       // the panel: anything opaque enough to hide a lane sliding under it
       // would stack alpha on the panel's own tint and shift the tone.
+      rpWireLaneScrub(lane);
       const laneVp=document.createElement('div'); laneVp.className='rp-lane-vp';
       laneVp.appendChild(lane);
       laneVp.addEventListener('scroll',()=>rpSyncLaneScroll(laneVp),{passive:true});
