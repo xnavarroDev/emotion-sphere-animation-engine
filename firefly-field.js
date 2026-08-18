@@ -466,6 +466,19 @@ export function createFireflyField(THREE, opts = {}) {
     // of accumulate" alternative — so without this, that burst would leave
     // real playback continuing from a corrupted clock/count/rotation state
     // instead of where it actually was.
+    // Jump the visible count straight to its target, skipping the ease.
+    // update()'s count is an integrator (next = prev + (target-prev)*dt*4), so
+    // a caller that advances no time — scrubbing the timeline asks for the
+    // state AT an instant, not a transition toward it — would otherwise leave
+    // the field frozen at whatever count it last settled on.
+    snapCount() {
+      const target = params.count;
+      uniforms.uCount.value = target;
+      this._fadeRate = 0;                 // nothing is moving, so no reveal band
+      uniforms.uCountFade.value = 6;      // the floor update() also uses
+      geometry.setDrawRange(0, Math.ceil(Math.min(FIREFLY_POOL,
+        target * 1.18 + uniforms.uCountFade.value + 1)));
+    },
     snapshotMotion() {
       return {
         uTime: uniforms.uTime.value,

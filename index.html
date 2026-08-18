@@ -2383,9 +2383,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     function seekFromClientX(clientX){
       const r=lane.getBoundingClientRect();
       const t=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
-      animTime=t*maxTotal;
+      // the visible axis can run past the animation (it has a minimum length),
+      // so clamp to the real cycle rather than seeking into empty axis
+      animTime=Math.min(t*maxTotal,rpMaxTotal);
       animScrubbing=true;
       updateInnerLayers(clock.getElapsedTime(),0);
+      // updateInnerLayers only sets each layer's count TARGET; the visible
+      // count eases toward it over elapsed time, and a scrub advances none —
+      // so without this the sphere kept whatever count it last settled on
+      // wherever you dragged to. Scrubbing asks for the state at an instant.
+      fireflyLayers.forEach(F=>F.snapCount&&F.snapCount());
       animScrubbing=false;
       // move the playhead only — rebuilding here would destroy the very
       // element holding this drag's pointer capture, ending the scrub
