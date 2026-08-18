@@ -2372,6 +2372,10 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   //   string. Rebuilding the whole tree at 60fps (the old behaviour) killed
   //   hover states mid-hover, made the seam "+" buttons flicker, and fought
   //   every drag interaction.
+  let rpLaneVps=[];        // one horizontal viewport per track, scrolled in lockstep
+  let rpLaneOverlay=null;  // clipped strip holding the playhead and bands
+  let rpLaneScroll=0;      // shared scrollLeft, in lane content px
+  let rpSyncingLanes=false;
   let rpPlayheadEl=null;   // the single shared playhead
   let rpRefLane=null;      // first track's lane — defines the shared x-axis
   let rpLaneGeom=null;     // cached {left,width} so the per-frame path never reads layout
@@ -2391,23 +2395,36 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   let rpPhaseBand=null;
   function rpShowPhaseBand(seg,lane){
     if(!rpTracksEl) return;
+    if(!rpLaneOverlay) return;
     if(!rpPhaseBand||!rpPhaseBand.isConnected){
       rpPhaseBand=document.createElement('div'); rpPhaseBand.className='rp-phase-band';
-      rpTracksEl.appendChild(rpPhaseBand);
+      rpLaneOverlay.appendChild(rpPhaseBand);
     }
-    rpPhaseBand.style.left=(lane.offsetLeft+seg.offsetLeft)+'px';
+    rpPhaseBand.style.left=(seg.offsetLeft-rpLaneScroll)+'px';
     rpPhaseBand.style.width=seg.offsetWidth+'px';
     rpPhaseBand.style.display='block';
   }
   function rpHidePhaseBand(){ if(rpPhaseBand) rpPhaseBand.style.display='none'; }
 
+  // Every lane scrolls together, so the tracks read as one timeline rather
+  // than N independently scrollable rows.
+  function rpSyncLaneScroll(src){
+    if(rpSyncingLanes) return;
+    rpSyncingLanes=true;
+    rpLaneScroll=src.scrollLeft;
+    for(const vp of rpLaneVps) if(vp!==src) vp.scrollLeft=rpLaneScroll;
+    if(rpLaneOverlay) rpLaneOverlay.style.left=(rpLaneGeom?rpLaneGeom.left:0)+'px';
+    rpUpdatePlayhead();
+    rpSyncingLanes=false;
+  }
   function rpCacheLaneGeom(){
     if(!rpRefLane||!rpTracksEl){ rpLaneGeom=null; return; }
-    // offsetLeft/offsetWidth, not getBoundingClientRect deltas: #rp-tracks is
-    // now a horizontal scroller, and the playhead is absolutely positioned
-    // inside it, so its offset has to be in CONTENT space. Viewport deltas
-    // would drift by exactly scrollLeft as soon as the timeline was scrolled.
-    rpLaneGeom={ left:rpRefLane.offsetLeft, width:rpRefLane.offsetWidth };
+    // `left` is where the lane AREA starts within #rp-tracks (i.e. past the
+    // gutter) — the overlay is pinned there. Everything inside the overlay is
+    // then positioned in lane content space, minus the shared scroll.
+    const vp=rpRefLane.parentElement;
+    rpLaneGeom={ left:(vp?vp.offsetLeft:0), width:rpRefLane.offsetWidth, view:(vp?vp.clientWidth:0) };
+    if(rpLaneOverlay) rpLaneOverlay.style.left=rpLaneGeom.left+'px';
   }
   // A phase's swatch colour: the captured colour blended most of the way
   // toward the panel's pale pill tone, so the strip reads as the soft bands
@@ -2424,14 +2441,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   function rpUpdatePlayhead(){
     if(!rpPlayheadEl||!rpLaneGeom) return;
     const pct=Math.min(1,(animTime%rpMaxTotal)/rpAxisSec);
-    rpPlayheadEl.style.left=(rpLaneGeom.left+pct*rpLaneGeom.width)+'px';
+    // overlay-relative, so subtract the shared scroll rather than the gutter
+    rpPlayheadEl.style.left=(pct*rpLaneGeom.width-rpLaneScroll)+'px';
     rpTimeEl.textContent=rpFmtTime(animTime%rpMaxTotal)+'/'+rpFmtTime(rpMaxTotal);
   }
 
   function rpRenderTracks(){
     if(!rpTracksEl) return;
     rpHideThumbPreview(); // a rebuild can detach the slot mid-hover with no mouseleave firing
-    rpTracksEl.innerHTML='';
+    rpTracksEl.innerHTML=''; rpLaneVps=[]; rpLaneOverlay=null;
     rpSegmentEls.clear();
     rpPhaseGroups.clear();
     // Track indices are cache keys for thumbnails (see thumbRequest) — a
@@ -2706,8 +2724,17 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       // name pill, through which the lane scrolled in plain view.
       const gutter=document.createElement('div'); gutter.className='rp-track-gutter';
       gutter.append(label,tgWrap);
-      track.append(gutter,lane);
+      // The lane scrolls inside its OWN viewport, so the gutter is outside the
+      // scrolling area entirely and never has a lane pass beneath it. That is
+      // what lets the gutter be fully transparent and therefore identical to
+      // the panel: anything opaque enough to hide a lane sliding under it
+      // would stack alpha on the panel's own tint and shift the tone.
+      const laneVp=document.createElement('div'); laneVp.className='rp-lane-vp';
+      laneVp.appendChild(lane);
+      laneVp.addEventListener('scroll',()=>rpSyncLaneScroll(laneVp),{passive:true});
+      track.append(gutter,laneVp);
       rpTracksEl.appendChild(track);
+      rpLaneVps.push(laneVp);
     }
     // ONE playhead, spanning every track — not one per lane (that was the
     // bug: each track drew its own marker, reading as scattered arrows
@@ -2715,8 +2742,14 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // which every track's segments already share.
     rpRefLane=refLane; rpMaxTotal=maxTotal; rpAxisSec=axisSec; rpPlayheadEl=null;
     if(refLane){
+      // The playhead and the hover/placement bands span every track, so they
+      // can't live inside one lane's viewport — but they must still be clipped
+      // to the lane area and travel with its scroll. Give them a shared overlay
+      // pinned over that area, offset by the scroll position.
+      rpLaneOverlay=document.createElement('div'); rpLaneOverlay.className='rp-lane-overlay';
+      rpTracksEl.appendChild(rpLaneOverlay);
       const ph=document.createElement('div'); ph.className='rp-playhead';
-      rpTracksEl.appendChild(ph);
+      rpLaneOverlay.appendChild(ph);
       rpPlayheadEl=ph;
       wireScrub(ph,refLane,axisSec);
       rpCacheLaneGeom();
@@ -2827,7 +2860,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
     if(!rpPlaceBand||!rpPlaceBand.isConnected){
       rpPlaceBand=document.createElement('div'); rpPlaceBand.className='rp-place-band';
-      rpTracksEl.appendChild(rpPlaceBand);
+      (rpLaneOverlay||rpTracksEl).appendChild(rpPlaceBand);
     }
     return {ghost:rpPlaceGhost,band:rpPlaceBand};
   }
@@ -2866,9 +2899,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
     const span=Math.max(RP_MIN_PHASE,b-a);
     ghost.textContent=rpFmtTime(a)+' → '+rpFmtTime(a+span)+'  ('+span.toFixed(1)+'s)';
-    const L=rpRefLane.offsetLeft, W=rpRefLane.offsetWidth; // content space (see rpCacheLaneGeom)
+    const W=rpRefLane.offsetWidth; // overlay space (see rpCacheLaneGeom)
     band.style.display='block';
-    band.style.left=(L+(a/rpAxisSec)*W)+'px';
+    band.style.left=((a/rpAxisSec)*W-rpLaneScroll)+'px';
     band.style.width=Math.max(2,(span/rpAxisSec)*W)+'px';
   }
   function rpPlaceClick(e){

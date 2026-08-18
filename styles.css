@@ -592,13 +592,13 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 #anim-canvas-controls {
   position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
   background: var(--rp-chrome); color: var(--rp-ink, #000);
-  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  display: flex; flex-direction: column;
   font-family: var(--rp-font); display: none;
   /* overflow-x stated explicitly for the same reason as #rp-scroll: leaving it
      to compute to `auto` paints a permanent horizontal scrollbar under the
      timeline on any OS set to always show them. Lanes are percentage-width and
      always fit, so there is nothing to scroll to horizontally. */
-  max-height: 46vh; overflow-y: auto; overflow-x: hidden;
+  max-height: 46vh; overflow: hidden;
 }
 #anim-canvas-controls.open { display: block; }
 /* The transport pins to the top of the timeline's own scroll area, so the
@@ -615,8 +615,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
    stays at the top once the tracks scroll, and above the transport's z-index
    so it is always the thing under the cursor at that edge. */
 #rp-anim-resize {
-  position: sticky; top: 0; z-index: 22; height: 7px; flex: 0 0 auto;
-  background: var(--rp-chrome-solid); cursor: ns-resize;
+  z-index: 22; height: 7px; flex: 0 0 auto;
+  background: transparent; cursor: ns-resize;
 }
 #rp-anim-resize::after {
   content: ''; display: block; width: 46px; height: 3px; margin: 2px auto 0;
@@ -627,9 +627,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; user-select: none; }
 .rp-transport {
   display: flex; align-items: center; justify-content: center; gap: 24px; padding: 4px 18px;
-  position: sticky; top: 7px; z-index: 20; /* 7px clears the resize handle above it */
-  background: var(--rp-chrome-solid);
-  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  flex: 0 0 auto; z-index: 20;
+  background: transparent;   /* nothing scrolls under it any more — see #rp-tracks */
   border-bottom: 1px solid var(--rp-border);
 }
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
@@ -646,16 +645,21 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
    (see RP_PX_PER_SEC) rather than squeezed to fit, so a long animation runs off
    the edge instead of compressing into slivers. Vertical scrolling stays on the
    outer #anim-canvas-controls, so the two axes never fight. */
-#rp-tracks { position: relative; overflow-x: auto; overflow-y: hidden; }
+/* The only scrolling region: vertically through the tracks. Horizontal
+   scrolling belongs to each lane's own viewport (.rp-lane-vp), kept in
+   lockstep, so the gutter can sit outside it. */
+#rp-tracks { position: relative; flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }
+.rp-lane-vp { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.rp-lane-vp::-webkit-scrollbar { height: 0; }  /* one shared bar would be noise on every row */
+/* Clipped strip over the lane area holding the playhead and the hover/placement
+   bands — they span every track, so they cannot live in one lane's viewport. */
+.rp-lane-overlay { position: absolute; top: 0; bottom: 0; right: 0; overflow: hidden; pointer-events: none; }
+.rp-lane-overlay .rp-playhead { pointer-events: auto; }
 .rp-track { display: flex; padding: 10px 20px 10px 0; }
 /* Pinned label column: opaque and FULL height, so the lane scrolling under it
    is covered rather than peeking through the gaps around the name pill. */
-.rp-track-gutter { position: sticky; left: 0; z-index: 9; flex: 0 0 auto;
-  display: flex; background: transparent; padding-left: 20px;
-  /* transparent, NOT --rp-chrome: repainting the parent's tint inside the
-     parent stacks the alpha and renders the gutter darker than the lane it
-     sits beside. The blur is what hides lanes scrolling underneath. */
-  backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px); }
+.rp-track-gutter { flex: 0 0 auto; z-index: 9;
+  display: flex; background: transparent; padding-left: 20px; }
 /* align-self/margin rather than padding-top: as a stretched flex item the
    label box was the full height of the track (~140px), so the editable
    background below painted a big empty slab instead of hugging the name.
