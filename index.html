@@ -4142,7 +4142,17 @@ const innerPosAttr=innerGeo.getAttribute('position');
 // the same composed frame. Isolation is only a visibility toggle — it never
 // touches any look parameter, so the layer is rendered exactly as it really
 // is, just alone.
-const THUMB_W=288, THUMB_CACHE_MAX=400; // stored width; height follows the live aspect
+// Stored width. Sized to cover the widest a frame is ever DISPLAYED (a slot
+// at strip height x THUMB_ASPECT_MAX, and the hover preview) on a 2x screen —
+// below that the browser upscales and the strip goes soft.
+const THUMB_W=400, THUMB_CACHE_MAX=400;
+// A frame's aspect is the live camera's, CLAMPED. The camera follows the
+// canvas, which the timeline resize can squeeze to a letterbox — dragging the
+// panel tall took it to 7.9, which made every frame a 37px-high sliver and
+// stretched a 288px image across a 510px slot. A filmstrip frame has to stay
+// frame-shaped whatever the window is doing, so past these bounds the capture
+// crops to the limit instead of following the camera.
+const THUMB_ASPECT_MIN=1.4, THUMB_ASPECT_MAX=2.4;
 // Fraction of the frame the thumbnail keeps, centred. Measured: the cluster
 // spans ~66% of width and ~68% of height, so 0.72 frames it with a margin.
 // Applied to both axes equally — a tighter crop, never a distortion. The
@@ -4156,9 +4166,9 @@ const THUMB_SUBJECT_FRAC=0.72;
 // a white dot and the orange/yellow of a warm preset disappears entirely.
 // Rendering SS times larger lets core and halo each resolve, and the downscale
 // blends them back into one correctly-coloured dot — the same averaging the
-// eye does looking at the real thing. Only a x3 window is averaged, so unlike
+// eye does looking at the real thing. Only a x2 window is averaged, so unlike
 // shrinking a full-resolution capture this costs almost no peak brightness.
-const THUMB_SS=3;
+const THUMB_SS=2;
 let thumbTarget=null, thumbPixelBuf=null, thumbGlCanvas=null, thumbGlCtx=null, thumbGlImgData=null, thumbCanvas=null, thumbCtx=null;
 let thumbSsW=0, thumbSsH=0, thumbFinalH=0;
 function thumbInit(ssW,ssH,finalH){
@@ -4174,9 +4184,12 @@ function thumbInit(ssW,ssH,finalH){
   thumbCtx=thumbCanvas.getContext('2d');
   thumbCtx.imageSmoothingEnabled=true; thumbCtx.imageSmoothingQuality='high';
 }
-// The aspect every stored thumbnail has — the live canvas's own. The
-// timeline uses it to size slots so a frame is never cropped or squished.
-function thumbAspect(){ return camera.aspect||16/9; }
+// The aspect every stored thumbnail has: the live canvas's, clamped so a frame
+// stays frame-shaped. The timeline sizes slots and the hover preview from this,
+// so all three agree by construction.
+function thumbAspect(){
+  return Math.min(THUMB_ASPECT_MAX,Math.max(THUMB_ASPECT_MIN,camera.aspect||16/9));
+}
 // F.update(t) (in firefly-field.js) is NOT a pure function of time — it's a
 // per-frame integrator: particle count EASES toward its target over real
 // elapsed dt, and per-particle wander/orbit/blink motion accumulates the
@@ -4209,12 +4222,17 @@ function thumbSettle(toAnimTime,ticks=15){
 function captureThumbnailAt(sec,trackIndex){
   const liveW=Math.max(1,renderer.domElement.width);
   const liveH=Math.max(1,renderer.domElement.height);
-  // Full frame at stored scale (the crop below trims it to the subject), then
-  // the whole thing rendered THUMB_SS times larger for supersampling.
-  const capW=Math.max(1,Math.round(THUMB_W/THUMB_SUBJECT_FRAC));
-  const capH=Math.max(1,Math.round(capW*liveH/liveW));
-  const finalH=Math.max(1,Math.round(capH*THUMB_SUBJECT_FRAC));
-  const ssW=capW*THUMB_SS, ssH=capH*THUMB_SS;
+  // Output shape: the clamped aspect, so a frame stays frame-shaped however the
+  // canvas is proportioned. The render still uses the camera's true aspect (it
+  // has to, or the projection would distort); the crop below is what reconciles
+  // the two, trimming the excess width rather than squashing it.
+  const outA=thumbAspect();
+  const finalH=Math.max(1,Math.round(THUMB_W/outA));
+  const cropW=THUMB_W*THUMB_SS, cropH=finalH*THUMB_SS;
+  // Render tall enough that the crop takes THUMB_SUBJECT_FRAC of the height,
+  // and wide enough to hold the crop even on a narrow canvas.
+  const ssH=Math.max(cropH,Math.round(cropH/THUMB_SUBJECT_FRAC));
+  const ssW=Math.max(cropW,Math.round(ssH*liveW/liveH));
   thumbInit(ssW,ssH,finalH);
   const savedTime=animTime;
   const savedLoop=animLoop;
@@ -4299,7 +4317,7 @@ function captureThumbnailAt(sec,trackIndex){
   // is untouched — a tighter framing, never a stretch. Coordinates are in the
   // supersampled space; the drawImage below crops and resolves SS->1 in one
   // step, so core and halo blend into a correctly-coloured dot.
-  const cropX=Math.round((ssW-THUMB_W*THUMB_SS)/2), cropY=Math.round((ssH-finalH*THUMB_SS)/2);
+  const cropX=Math.round((ssW-cropW)/2), cropY=Math.round((ssH-cropH)/2);
   // The live canvas always clears transparent and relies on a CSS gradient
   // + 'plus-lighter' blending behind it (see applyBackground) — a thumbnail
   // has no such backdrop, so paint the same gradient in first. It has to be
@@ -4312,7 +4330,7 @@ function captureThumbnailAt(sec,trackIndex){
   thumbCtx.fillStyle=grad;
   thumbCtx.fillRect(0,0,THUMB_W,finalH);
   thumbCtx.globalCompositeOperation='lighter';
-  thumbCtx.drawImage(thumbGlCanvas,cropX,cropY,THUMB_W*THUMB_SS,finalH*THUMB_SS,0,0,THUMB_W,finalH);
+  thumbCtx.drawImage(thumbGlCanvas,cropX,cropY,cropW,cropH,0,0,THUMB_W,finalH);
   thumbCtx.globalCompositeOperation='source-over';
 
   cloudBg.setVisible(savedCloudVis);
