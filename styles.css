@@ -605,9 +605,23 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
    actually hides the rows scrolling under it (a blurred transparent bar was
    not enough — the phase pills stayed legible through it). z-index clears the
    playhead and the placement band (both 6), in the scrolling content. */
+/* Grab strip along the timeline's top edge. Sticky rather than absolute so it
+   stays at the top once the tracks scroll, and above the transport's z-index
+   so it is always the thing under the cursor at that edge. */
+#rp-anim-resize {
+  position: sticky; top: 0; z-index: 22; height: 7px; flex: 0 0 auto;
+  background: var(--rp-chrome); cursor: ns-resize;
+}
+#rp-anim-resize::after {
+  content: ''; display: block; width: 46px; height: 3px; margin: 2px auto 0;
+  border-radius: 999px; background: var(--rp-ink-3); transition: background 0.15s;
+}
+#rp-anim-resize:hover::after, body.rp-anim-resizing #rp-anim-resize::after { background: var(--rp-ink); }
+/* while dragging, don't let the pointer land on anything else */
+body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; user-select: none; }
 .rp-transport {
   display: flex; align-items: center; justify-content: center; gap: 24px; padding: 4px 18px;
-  position: sticky; top: 0; z-index: 20;
+  position: sticky; top: 7px; z-index: 20; /* 7px clears the resize handle above it */
   background: var(--rp-chrome);
   border-bottom: 1px solid var(--rp-border);
 }

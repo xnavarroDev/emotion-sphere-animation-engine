@@ -198,6 +198,9 @@
 
 <!-- Redesigned Animate multi-track timeline, docked under the canvas -->
 <div id="anim-canvas-controls">
+  <!-- drag the top edge to resize the timeline; sticky so it stays reachable
+       once the tracks scroll (see the resize wiring in the panel script) -->
+  <div id="rp-anim-resize" title="Drag to resize the timeline"></div>
   <div class="rp-transport">
     <span class="time" id="rp-anim-time">0:00/0:00</span>
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-play" type="button" title="Play/Pause"><img class="rp-ico" src="icons/play.svg" id="rp-anim-play-ico" alt=""></button>
@@ -2908,6 +2911,54 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     };
     navigator.clipboard?.writeText(url).then(()=>flashBtn(true)).catch(()=>flashBtn(false));
   });
+
+  // ---- Resize the timeline by dragging its top edge ----
+  // Height is normally left to CSS (grow with content up to max-height). The
+  // first drag switches it to an explicit height, so from then on the panel is
+  // whatever size was asked for rather than however tall the content happens
+  // to be. rpLayoutViewport() runs on every move because the sphere is sized
+  // to the space ABOVE the timeline — without it the canvas would keep its old
+  // height and the sphere would sit behind the panel.
+  (function wireAnimResize(){
+    const grip=document.getElementById('rp-anim-resize');
+    if(!grip||!rpTracksContainer) return;
+    const MIN_H=120;
+    const maxH=()=>Math.round(innerHeight*0.85);
+    let dragging=false, startY=0, startH=0;
+    grip.addEventListener('pointerdown',(e)=>{
+      dragging=true; startY=e.clientY;
+      startH=rpTracksContainer.getBoundingClientRect().height;
+      grip.setPointerCapture(e.pointerId);
+      document.body.classList.add('rp-anim-resizing');
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove',(e)=>{
+      if(!dragging) return;
+      // dragging UP (negative delta) makes the timeline taller
+      const h=Math.max(MIN_H,Math.min(maxH(),startH+(startY-e.clientY)));
+      rpTracksContainer.style.maxHeight='none'; // the CSS cap would fight an explicit height
+      rpTracksContainer.style.height=h+'px';
+      if(window.rpLayoutViewport) window.rpLayoutViewport();
+      rpCacheLaneGeom(); rpUpdatePlayhead();
+    });
+    const end=(e)=>{
+      if(!dragging) return;
+      dragging=false;
+      try{grip.releasePointerCapture(e.pointerId);}catch(err){}
+      document.body.classList.remove('rp-anim-resizing');
+      if(window.rpLayoutViewport) window.rpLayoutViewport();
+      rpRenderTracks(); // lane widths/filmstrips are measured from the new size
+    };
+    grip.addEventListener('pointerup',end);
+    grip.addEventListener('pointercancel',end);
+    // a shorter window must not leave the timeline taller than the screen
+    window.addEventListener('resize',()=>{
+      if(!rpTracksContainer.style.height) return;
+      const h=Math.max(MIN_H,Math.min(maxH(),parseFloat(rpTracksContainer.style.height)));
+      rpTracksContainer.style.height=h+'px';
+      if(window.rpLayoutViewport) window.rpLayoutViewport();
+    });
+  })();
 
   document.getElementById('rp-animation-row').addEventListener('click',()=>{
     rpTracksContainer.classList.toggle('open');
