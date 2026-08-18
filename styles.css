@@ -633,7 +633,8 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 }
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
 /* per-track "does playback drive this layer" switch, in the timeline */
-.rp-track-toggle { display: flex; align-items: center; gap: 6px; padding-top: 48px; margin-right: 10px; flex: 0 0 auto; }
+/* sits UNDER the name pill, tucked to its right edge (see .rp-track-gutter) */
+.rp-track-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; align-self: flex-end; flex: 0 0 auto; }
 .rp-track-toggle .rp-switch { width: 30px; height: 17px; }
 .rp-track-toggle .rp-switch::after { width: 13px; height: 13px; }
 .rp-track-toggle .rp-switch.on::after { transform: translateX(13px); }
@@ -661,12 +662,13 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 /* Pinned label column: opaque and FULL height, so the lane scrolling under it
    is covered rather than peeking through the gaps around the name pill. */
 .rp-track-gutter { flex: 0 0 auto; z-index: 9;
-  display: flex; background: transparent; padding-left: 20px; }
+  display: flex; flex-direction: column; align-items: flex-start; background: transparent; padding-left: 20px; }
 /* align-self/margin rather than padding-top: as a stretched flex item the
    label box was the full height of the track (~140px), so the editable
    background below painted a big empty slab instead of hugging the name.
    Same text position, box only as tall as the text. */
-.rp-track-label { width: 100px; flex: 0 0 auto; align-self: flex-start; margin-top: 48px; font: 600 12px/1.3 var(--rp-font-num); padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-ink-2); }
+/* margin-top lines the pill up with the top of the filmstrip strip */
+.rp-track-label { width: 100px; flex: 0 0 auto; align-self: flex-start; margin-top: 72px; font: 600 12px/1.3 var(--rp-font-num); padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-ink-2); }
 /* which track "add phase" targets — a quiet colour/weight shift, not an underline */
 .rp-track-label.focused { color: var(--rp-ink); font-weight: 700; }
 /* a layer name is renamed in place, so it has to READ as a field rather than a
