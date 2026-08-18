@@ -716,11 +716,6 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 /* the segment/lane both clip overflow (for the rounded corners), so the
    "pop out" itself is a separate floating element (.rp-thumb-preview) —
    this is just the in-place cue that a frame is hovered */
-/* One snapshot per phase, repeated at its natural frame size across the
-   phase's width. `cover` would stretch a single frame over a long phase and
-   distort it; repeating keeps every frame the right shape while still
-   filling the lane. */
-.rp-thumb-lead { background-size: auto 100%; background-repeat: repeat-x; background-position: left center; }
 .rp-thumb-slot:hover { filter: brightness(1.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
 .rp-thumb-preview {
   position: fixed; z-index: 200; display: none; flex-direction: column; align-items: center;
