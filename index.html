@@ -2689,26 +2689,33 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // slot must be at least as wide as the frame is at strip height, or CSS
     // 'cover' crops it; read the height from the DOM so it tracks the CSS
     const stripH=segs[0].seg.getBoundingClientRect().height||68;
-    const stepSec=Math.max(1,Math.ceil((stripH*thumbAspect())/pxPerSec));
+    // How much time a frame WANTS to span: enough width to show itself whole
+    // at strip height. Each phase is then divided into a whole number of
+    // EQUAL frames near that size.
+    //
+    // Frames used to step on a grid of absolute seconds, which the phase
+    // boundaries then chopped: a 6s phase on a 4s grid came out 4.0s + 2.0s,
+    // the next 2.0s + 4.0s, and a frame straddling a boundary was drawn twice
+    // as two odd-sized pieces showing the same instant. Nothing about that
+    // sequence was readable. Dividing each phase on its own means every frame
+    // in a phase is the same width and belongs to exactly one phase, so the
+    // strip reads as "this phase, sampled N times".
+    const idealSec=(stripH*thumbAspect())/pxPerSec;
     for(const {seg,phase,phaseStartSec,ti} of segs){
       const wrap=document.createElement('div'); wrap.className='rp-thumb-slots';
-      const endSec=phaseStartSec+phase.duration;
-      let cursor=phaseStartSec;
-      while(cursor<endSec-1e-6){
-        // step boundaries are absolute (not phase-relative) so every track's
-        // frames line up on the same instants; a phase starting mid-step just
-        // gets a narrower first slot
-        const stepIdx=Math.floor(cursor/stepSec+1e-6);
-        const sliceEnd=Math.min((stepIdx+1)*stepSec,endSec);
+      const frames=Math.max(1,Math.round(phase.duration/idealSec));
+      const frameSec=phase.duration/frames;
+      for(let k=0;k<frames;k++){
         const slot=document.createElement('div'); slot.className='rp-thumb-slot';
-        slot.style.left=(((cursor-phaseStartSec)/phase.duration)*100)+'%';
-        slot.style.width=(((sliceEnd-cursor)/phase.duration)*100)+'%';
-        const sampleSec=stepIdx*stepSec; // the step's own instant, so split slots agree
+        slot.style.left=((k/frames)*100)+'%';
+        slot.style.width=(100/frames)+'%';
+        // sample where the frame BEGINS, so the hover time is the moment the
+        // frame actually depicts (and a phase's first frame is its opening look)
+        const sampleSec=phaseStartSec+k*frameSec;
         wrap.appendChild(slot);
         thumbRequest(ti,sampleSec,slot);
         slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,sampleSec));
         slot.addEventListener('mouseleave',rpHideThumbPreview);
-        cursor=sliceEnd;
       }
       seg.appendChild(wrap);
     }
