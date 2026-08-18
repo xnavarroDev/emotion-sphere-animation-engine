@@ -447,6 +447,9 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
 }
 .rp-card-stub:hover { transform: translateY(-1px); }
+/* which preset you are actually on — a ring rather than a colour change, so it
+   reads over whatever the card's thumbnail happens to be */
+.rp-card-stub.active { box-shadow: 0 0 0 2px var(--rp-ink), 0 0 0 4px var(--rp-chrome); }
 .rp-card-stub:active { transform: translateY(0); }
 .rp-card-stub span {
   position: relative; width: 100%; padding: 4px 8px 5px;

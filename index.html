@@ -1639,6 +1639,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // seeded state is the baseline, not an edit: don't mark the preset dirty
     // or push an undo boundary, or a fresh load would open "unsaved".
     if(typeof rpRenderTracksHook==='function') rpRenderTracksHook();
+    rpCaptureDefaultPreset();
   }
   // Seeding needs BOTH the layers (this scope) and the URL check (the boot
   // block, in the sphere-core chain) — two independent promise chains with
@@ -1878,23 +1879,70 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // presets/thumbs/) — calm/sad's actual climax washes to near-white by
   // design (see GEMINI_PRESET_CONTEXT.md), so those two use a slightly
   // earlier, more color-legible frame instead of the literal peak.
+  let rpDefaultPresetText=null; // the seeded default, for "New preset"
+  let rpActivePreset=null;      // which gallery card is current; null = the new/untitled one
   const RP_BUILTIN_PRESETS=[
     {emo:'calm',  label:'Calm'},
     {emo:'sad',   label:'Sad'},
     {emo:'warm',  label:'Warm'},
     {emo:'anger', label:'Anger'},
   ];
+  // The gallery leads with the preset you are actually on. You always start on
+  // an unsaved one, which previously appeared nowhere — so the row showed four
+  // presets none of which was yours, and nothing indicated which was loaded.
+  const RP_CARDS=[{kind:'new',label:'New preset'},
+                  ...RP_BUILTIN_PRESETS.map(p=>({kind:'preset',...p}))];
   let rpCardsOffset=0;
   const rpCardEls=[...document.querySelectorAll('.rp-cards-row .rp-card-stub')];
+  // The new-preset card is a live portrait of the current sphere rather than a
+  // shipped image, since by definition there isn't one for unsaved work.
+  let rpNewCardThumb=null;
+  function rpRefreshNewCardThumb(){
+    try{ rpNewCardThumb=captureThumbnailAt(null,null); }catch(err){ rpNewCardThumb=null; }
+  }
+  // Recapturing on every keystroke would mean a GL render per edit, so let the
+  // edit burst finish first.
+  let rpNewCardTimer=null;
+  function rpQueueNewCardThumb(){
+    clearTimeout(rpNewCardTimer);
+    rpNewCardTimer=setTimeout(()=>{ rpRefreshNewCardThumb(); rpRenderCards(); },1200);
+  }
+  // The state "New preset" returns to. Deferred and idempotent: paramsToText
+  // attaches in the sphere-core chain, which can land after the panel has
+  // already seeded, so capturing only at seed time left this null and the card
+  // silently dead. Called from both chains; first one with the hook wins.
+  function rpCaptureDefaultPreset(){
+    if(rpDefaultPresetText||!paramsToTextHook) return;
+    rpDefaultPresetText=paramsToTextHook();
+    rpRefreshNewCardThumb(); rpRenderCards();
+  }
+  window.__rpCaptureDefaultPreset=rpCaptureDefaultPreset;
+  function rpStartNewPreset(){
+    if(!rpDefaultPresetText||!applyParamsTextHook) return;
+    if(rpDirty && !confirm('Start a new preset? Your unsaved changes will be lost.')) return;
+    applyParamsTextHook(rpDefaultPresetText);
+    rpPresetName=null; rpPresetNameInput.value='';
+    rpDirty=false; rpUnsavedEl.classList.remove('show');
+    rpActivePreset=null;
+    rpRefreshNewCardThumb(); rpRenderCards();
+  }
   function rpRenderCards(){
     rpCardEls.forEach((el,i)=>{
-      const p=RP_BUILTIN_PRESETS[(rpCardsOffset+i)%RP_BUILTIN_PRESETS.length];
+      const p=RP_CARDS[(rpCardsOffset+i)%RP_CARDS.length];
       el.innerHTML='';
       const label=document.createElement('span'); label.textContent=p.label;
       el.appendChild(label);
-      el.style.backgroundImage="url('presets/thumbs/preset-"+p.emo+".png')";
-      el.title='Load the '+p.label+' preset';
-      el.onclick=()=>window.emotionSphere.play(p.emo).catch(err=>console.warn(err.message));
+      const isNew=p.kind==='new';
+      el.classList.toggle('active', isNew ? rpActivePreset===null : rpActivePreset===p.emo);
+      el.style.backgroundImage=isNew
+        ? (rpNewCardThumb?'url('+rpNewCardThumb+')':'none')
+        : "url('presets/thumbs/preset-"+p.emo+".png')";
+      el.title=isNew?'Your current unsaved preset — click to start over':('Load the '+p.label+' preset');
+      el.onclick=isNew
+        ? rpStartNewPreset
+        : ()=>window.emotionSphere.play(p.emo)
+            .then(()=>{ rpActivePreset=p.emo; rpRenderCards(); })
+            .catch(err=>console.warn(err.message));
     });
   }
   rpRenderCards();
@@ -1924,7 +1972,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   let rpDirty=false;
   const rpUnsavedEl=document.getElementById('rp-unsaved');
   const rpPresetNameInput=document.getElementById('rp-preset-name');
-  function markDirty(){ rpDirty=true; rpUnsavedEl.classList.add('show'); pushUndoBoundary(); }
+  function markDirty(){ rpDirty=true; rpUnsavedEl.classList.add('show'); pushUndoBoundary(); rpQueueNewCardThumb(); }
   rpPresetNameInput.addEventListener('input',()=>{
     rpPresetName=rpPresetNameInput.value.trim()||null;
     markDirty();
@@ -3544,6 +3592,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   // call twice — the panel setup calls it too, because these are separate
   // promise chains and either can finish first (see maybeSeedDefaultTimeline).
   if(typeof window.__maybeSeedDefaultTimeline==='function') window.__maybeSeedDefaultTimeline();
+  if(typeof window.__rpCaptureDefaultPreset==='function') window.__rpCaptureDefaultPreset();
   window.addEventListener('message',(ev)=>{
     const d=ev.data;
     if(d && d.type==='emotion' && d.value) playAndMark(d.value);
@@ -4219,7 +4268,11 @@ function thumbSettle(toAnimTime,ticks=15){
 // Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer,
 // renders one small offscreen frame, then restores everything exactly as it
 // was — all synchronous, so nothing else ever observes the disturbed state.
+// trackIndex null => the WHOLE scene exactly as it stands right now: no layer
+// isolation and no seek. That is what the preset gallery's card wants (a
+// portrait of the current sphere), as opposed to a filmstrip frame.
 function captureThumbnailAt(sec,trackIndex){
+  const wholeScene=(trackIndex==null);
   const liveW=Math.max(1,renderer.domElement.width);
   const liveH=Math.max(1,renderer.domElement.height);
   // Output shape: the clamped aspect, so a frame stays frame-shaped however the
@@ -4267,7 +4320,7 @@ function captureThumbnailAt(sec,trackIndex){
   // Applied after thumbSettle below, not here: settling replays the animation,
   // and applying a phase's scene snapshot calls cloudBg.setVisible() itself —
   // so anything set beforehand is silently overwritten before the render.
-  const isSceneTrack=trackIndex>=fireflyLayers.length;
+  const isSceneTrack=!wholeScene&&trackIndex>=fireflyLayers.length;
   const savedCloudVis=cloudBg.visible;
 
   // Thumbnails are sampled out of order (per phase, per track — not a
@@ -4277,7 +4330,7 @@ function captureThumbnailAt(sec,trackIndex){
   // entirely without changing the computed frame (animTime here is always
   // < the total anyway, so animTime%total === min(animTime,total)).
   animLoop=false;
-  thumbSettle(sec);
+  if(!wholeScene) thumbSettle(sec);
 
   // gl_PointSize is in absolute pixels, so at this smaller resolution every
   // layer's `size` needs the SAME scale factor as the resolution — then
@@ -4293,8 +4346,8 @@ function captureThumbnailAt(sec,trackIndex){
   // Isolation, for the same reason (see above): only now is it safe from the
   // settle overwriting it. The cloud stays hidden unless this IS the scene
   // row, and never turns ON a backdrop the preset has switched off.
-  cloudBg.setVisible(isSceneTrack&&savedCloudVis);
-  fireflyLayers.forEach((F,i)=>{ F.points.visible=!isSceneTrack&&i===trackIndex; });
+  cloudBg.setVisible(wholeScene?savedCloudVis:(isSceneTrack&&savedCloudVis));
+  fireflyLayers.forEach((F,i)=>{ F.points.visible=wholeScene?savedVis[i]:(!isSceneTrack&&i===trackIndex); });
 
   renderer.setRenderTarget(thumbTarget);
   renderer.setClearColor(0x000000,0);
