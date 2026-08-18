@@ -1637,7 +1637,21 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // or push an undo boundary, or a fresh load would open "unsaved".
     if(typeof rpRenderTracksHook==='function') rpRenderTracksHook();
   }
-  window.__seedDefaultTimeline=seedDefaultTimeline; // boot block runs in another scope
+  // Seeding needs BOTH the layers (this scope) and the URL check (the boot
+  // block, in the sphere-core chain) — two independent promise chains with
+  // no ordering guarantee between them. Calling from one side only meant the
+  // seed silently skipped whenever that side finished first: on a fast load
+  // the boot block ran before this function even existed. So make it
+  // self-guarding and idempotent, and call it from both — whichever chain
+  // lands last is the one that actually seeds.
+  function maybeSeedDefaultTimeline(){
+    const q=new URLSearchParams(location.search);
+    if(q.get('preset')||q.get('emotion')) return;   // an explicit look wins
+    if(!fireflyLayers.length) return;               // layers not built yet
+    if(!allTimelines().every(tl=>!tl.length)) return; // already populated
+    seedDefaultTimeline();
+  }
+  window.__maybeSeedDefaultTimeline=maybeSeedDefaultTimeline;
 
   // Deep-copy a snapshot so a new phase can start as an independent clone of
   // another one (editing the new phase must never mutate the source).
@@ -2910,6 +2924,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   window.addEventListener('resize',()=>{ rpCacheLaneGeom(); rpUpdatePlayhead(); });
 
   rpPanelReady=true;
+  maybeSeedDefaultTimeline(); // see its comment: whichever chain lands last seeds
   rpSyncParams();
   tryInitUndoBaseline();
 }).catch(err=>console.error('inner layers failed',err));
@@ -3467,18 +3482,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   const _startEmotion = _presetParam ? null : _q.get('emotion');
   if(_startEmotion) playAndMark(_startEmotion);
 
-  // ---- Default animation for the default sphere ----
-  // Opening the Animation panel on a fresh load used to show four empty lanes
-  // and "no phases yet", which reads as broken rather than as a starting
-  // point — and gave the placement gesture nothing to measure against. Seed a
-  // gentle breathe built FROM the sphere's own current values, so the default
-  // look is unchanged at rest and every phase is a real, editable starting
-  // point. Only when nothing else has populated the timeline (a ?preset,
-  // ?emotion or a preset card all land before this).
-  if(!_presetParam && !_startEmotion){
-    const empty=[...fireflyLayers.map(F=>F.timeline), sceneTimeline].every(tl=>!tl.length);
-    if(empty && typeof window.__seedDefaultTimeline==='function') window.__seedDefaultTimeline();
-  }
+  // Seed the default sphere's starting animation. Self-guarding and safe to
+  // call twice — the panel setup calls it too, because these are separate
+  // promise chains and either can finish first (see maybeSeedDefaultTimeline).
+  if(typeof window.__maybeSeedDefaultTimeline==='function') window.__maybeSeedDefaultTimeline();
   window.addEventListener('message',(ev)=>{
     const d=ev.data;
     if(d && d.type==='emotion' && d.value) playAndMark(d.value);
