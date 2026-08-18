@@ -4690,7 +4690,26 @@ function captureThumbnailAt(sec,trackIndex){
 }
 // Keyed by track AND second — each row previews its own layer in isolation,
 // so the same instant renders differently per row.
-const thumbCache=new Map(); // "trackIndex|second" -> data URL
+// "trackIndex|second" -> data URL, least-recently-used first.
+// Editing a phase's duration shifts every later phase's start, so all the
+// frames downstream of it are re-keyed and their old images become
+// unreachable — the cache fills with stale entries during ordinary editing.
+// It used to clear() wholesale on overflow, which also threw away the frames
+// currently on screen and made the whole strip re-render at once. Evicting
+// the oldest instead means the stale entries go and what you are looking at
+// survives. A Map iterates in insertion order, so "oldest" is its first key;
+// a hit re-inserts to move that entry to the end.
+const thumbCache=new Map();
+function thumbCacheGet(key){
+  const v=thumbCache.get(key);
+  if(v===undefined) return undefined;
+  thumbCache.delete(key); thumbCache.set(key,v); // touch: now most-recent
+  return v;
+}
+function thumbCacheSet(key,url){
+  thumbCache.set(key,url);
+  while(thumbCache.size>THUMB_CACHE_MAX) thumbCache.delete(thumbCache.keys().next().value);
+}
 let thumbLastTrackCount=-1; // layer add/remove reshuffles what each track index means
 const thumbQueue=[]; // pending {key,sec,trackIndex,el} jobs
 let thumbQueueRunning=false;
@@ -4702,12 +4721,11 @@ function thumbProcessQueue(){
   if(!thumbQueue.length){ thumbQueueRunning=false; return; }
   thumbQueueRunning=true;
   const job=thumbQueue.shift();
-  let url=thumbCache.get(job.key);
+  let url=thumbCacheGet(job.key);
   if(url===undefined){
     try{
-      if(thumbCache.size>THUMB_CACHE_MAX) thumbCache.clear();
       url=captureThumbnailAt(job.sec,job.trackIndex);
-      thumbCache.set(job.key,url);
+      thumbCacheSet(job.key,url);
     }catch(err){
       // Thumbnails are a preview nicety layered over the flat-colour swatch,
       // never load-bearing — the FIRST job of a batch runs synchronously,
@@ -4726,7 +4744,7 @@ function thumbProcessQueue(){
 function thumbRequest(trackIndex,sec,el){
   if(thumbBroken) return;
   const key=trackIndex+'|'+sec.toFixed(2);
-  const cached=thumbCache.get(key);
+  const cached=thumbCacheGet(key);
   if(cached!==undefined){ el.style.backgroundImage='url('+cached+')'; return; }
   thumbQueue.push({key,sec,trackIndex,el});
   if(!thumbQueueRunning) thumbProcessQueue();
