@@ -2938,6 +2938,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const vp=document.createElement('div'); vp.className='rp-lane-vp';
     const lane=document.createElement('div'); lane.className='rp-track-lane rp-summary-lane';
     lane.style.width=laneW+'px';
+    rpWireLaneScrub(lane); // drag it like any other lane — it is the one strip
+                           // showing the composed result, so scrubbing it is the
+                           // whole point of having it
     // Same cadence as the lanes below (see rpBuildThumbSlots), so the frames
     // line up column-for-column instead of reading as a different rhythm. The
     // strip height has to be READ from a real segments row, not assumed — a
