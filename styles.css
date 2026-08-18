@@ -675,9 +675,13 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
    should read as the layer's badge whether or not the cursor is near it, and
    as something you can type into. Sized to the text rather than the 100px
    column so short names don't sit in an oversized plate. */
+/* Same pill as the phase names (.rp-phase-name): 15px/600, 12.5px radius,
+   5px 10px padding — a layer name and a phase name are the same kind of
+   editable label, so they should not be two different sizes. */
 .rp-track-label.editable {
-  cursor: text; width: auto; max-width: 100px; border-radius: 999px;
+  cursor: text; width: auto; max-width: 132px; border-radius: 12.5px;
   padding: 5px 10px; margin-left: -10px; background: var(--rp-pill);
+  font-size: 15px; font-weight: 600;
   color: var(--rp-ink); transition: background 0.15s, box-shadow 0.15s;
 }
 .rp-track-label.editable:hover { background: var(--rp-bg-3); }

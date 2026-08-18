@@ -3021,6 +3021,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
   });
   rpResetBtn.addEventListener('click',()=>{
+    animSeekHold=null; // back to the top means the reveal starts over too
     animTime=0;
     if(animStop) animStop();
     rpPlayIco.src='icons/play.svg';
@@ -3811,6 +3812,10 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     angry:  'presets/firefly-anger.txt',
   };
   function startPlayback(){
+    // Release any scrub hold, or the per-frame re-pin keeps the spawn-in frozen
+    // at the moment last seeked to and playback never builds from nothing. The
+    // play button cleared this; every other route into playback did not.
+    animSeekHold=null;
     animTime=0; animPrevGlobalT=0;
     fireflyLayers.forEach(F=>{
       const seq=trackSeq(F.timeline);
