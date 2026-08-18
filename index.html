@@ -4715,11 +4715,23 @@ function captureThumbnailAt(sec,trackIndex){
   cloudBg.setVisible(wholeScene?savedCloudVis:(isSceneTrack&&savedCloudVis));
   fireflyLayers.forEach((F,i)=>{ F.points.visible=wholeScene?savedVis[i]:(!isSceneTrack&&i===trackIndex); });
 
+  // Same class of bug as the point-size one above: the cloud glow's shader
+  // computes screenUv = gl_FragCoord.xy / viewport (cloud-background.js), and
+  // gl_FragCoord is always in the CURRENT render target's own pixel space —
+  // but `viewport` only ever got updated by window resizes, so it still held
+  // the live canvas's size while rendering into the tiny offscreen target.
+  // screenUv came out a factor of (liveW/ssW) too small, which put the glow's
+  // screen-space falloff entirely outside the mask radius for most of the
+  // frame: it was there, just computed as if it were still ~10x larger than
+  // the target it was rendering into. onResize() is the same call the window
+  // resize handler makes, just pointed at the capture size instead.
+  cloudBg.onResize(ssW,ssH);
   renderer.setRenderTarget(thumbTarget);
   renderer.setClearColor(0x000000,0);
   renderer.render(scene,camera);
   renderer.readRenderTargetPixels(thumbTarget,0,0,ssW,ssH,thumbPixelBuf);
   renderer.setRenderTarget(null);
+  cloudBg.onResize(liveW,liveH);
 
   // WebGL reads bottom-up; flip into the glCanvas
   const data=thumbGlImgData.data;
