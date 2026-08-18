@@ -2054,6 +2054,23 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   document.getElementById('rp-layer-add').addEventListener('click',()=>{
     const F=addFireflyLayerFn&&addFireflyLayerFn();
     if(!F) return;
+    // Give the new layer the SAME phase columns the others already have. A
+    // phase is a column across every track, but a layer added after the
+    // timeline exists arrived with none — so it was skipped by playback
+    // (a track needs two phases to animate), skipped by phase rename and
+    // delete, and every later add-phase kept it one short. It looked like a
+    // track while being outside the model.
+    //
+    // Not done inside addFireflyLayerFn: the preset loader uses that too, and
+    // fills the timeline from the file itself.
+    const ref=allTimelines().find(tl=>tl.length);
+    if(ref&&!F.timeline.length){
+      const own=captureSnapshotForTrack(fireflyLayers.length-1); // hold ITS look
+      ref.forEach(ph=>F.timeline.push({
+        duration:ph.duration, name:ph.name||null, ease:ph.ease,
+        snapshot:cloneSnapshot(own),
+      }));
+    }
     ffActive=fireflyLayers.length-1; ffSync(); rpRenderTracks(); markDirty();
   });
   document.getElementById('rp-layer-remove').addEventListener('click',()=>{
