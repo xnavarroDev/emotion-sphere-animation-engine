@@ -952,7 +952,7 @@ let editingPhase=false; // a phase snapshot is loaded on the sliders for editing
 let animTime=0;
 let animPrevGlobalT=0; // master-clock position last frame (loop wrap detection)
 let animLoop=true;
-let animPlayBtn=null, animFill=null, animStop=null;
+let animPlayBtn=null, animFill=null, animStop=null, rpPlayIco=null;
 // The colour the core sphere is currently showing (mirrors sphere-core's
 // colorFromParams), so layers with no override match the active emotion dot.
 function currentEmotionColor(){
@@ -1821,6 +1821,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   animStop=function(){
     animPlaying=false;
     if(animPlayBtn) animPlayBtn.classList.remove('active');
+    // animStop() is the one choke point every stop path already runs through:
+    // the redesigned play button's own pause click, but ALSO applyAnimFrame
+    // calling it unprompted when a non-looping animation reaches its end, or
+    // when nothing is left to play. Those paths flipped animPlaying to false
+    // without updating this icon, so it kept showing "pause" after playback
+    // had already stopped on its own — pressing what looked like pause
+    // actually started it playing again, with no visible change in the icon
+    // either time.
+    if(rpPlayIco) rpPlayIco.src='icons/play.svg';
   };
   animPlayBtn.addEventListener('click',()=>{
     const playable=fireflyLayers.some(F=>F.anim!==false&&trackSeq(F.timeline).length>=2)
@@ -3028,7 +3037,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     rpLaneVps.push(vp);
   }
 
-  const rpPlayIco=document.getElementById('rp-anim-play-ico');
+  rpPlayIco=document.getElementById('rp-anim-play-ico'); // hoisted with animPlayBtn/animStop — see animStop()
   rpPlayBtn.addEventListener('click',()=>{
     rpStopEditingPhase();
     if(!animPlaying){
