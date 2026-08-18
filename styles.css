@@ -791,12 +791,20 @@ body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
   display: none; align-items: center; justify-content: center; cursor: pointer; padding: 0; z-index: 5;
 }
 .rp-segment:hover .rp-segment-del { display: flex; }
+/* The visible line is 2px, but the element is a 16px grab strip centred on it —
+   scrubbing meant hitting a 2px target, which is why dragging the timeline
+   mostly did nothing. The line and the marker are drawn inside it. */
 .rp-playhead {
-  position: absolute; top: 12px; bottom: 0; width: 2px; background: var(--rp-ink-2);
-  z-index: 6; cursor: ew-resize;
+  position: absolute; top: 12px; bottom: 0; width: 16px; margin-left: -7px;
+  background: transparent; z-index: 6; cursor: ew-resize;
+}
+.rp-playhead::after {
+  content:""; position: absolute; top: 0; bottom: 0; left: 7px; width: 2px;
+  background: var(--rp-ink-2);
 }
 .rp-playhead::before {
-  content:""; position: absolute; top: -6px; left: -5px; border-left: 6px solid transparent;
+  content:""; position: absolute; top: -6px; left: 2px; border-left: 6px solid transparent;
   border-right: 6px solid transparent; border-top: 8px solid var(--rp-ink-2);
 }
+.rp-playhead:hover::after, .rp-playhead:hover::before { filter: brightness(1.6); }
 .rp-add-phase-row { padding: 4px 20px 16px; }
