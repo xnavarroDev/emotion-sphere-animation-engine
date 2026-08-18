@@ -1044,6 +1044,10 @@ function lerpSceneSnap(a,b,frac){
   if(backgroundCardSyncUI) backgroundCardSyncUI();
 }
 
+// While parked at a seek, the spawn-in has to be held at that moment: uTime
+// advances every frame, so a one-off setSpawnAge would let the reveal play
+// itself out in real time under a stationary playhead. Null while playing.
+let animSeekHold=null;
 let animScrubbing=false; // true while the redesigned playhead is being dragged —
                           // lets a frame render at the current animTime without
                           // also advancing it (external code sets animTime directly)
@@ -1147,6 +1151,11 @@ function updateInnerLayers(t,dt){
     }
     if(!F._phaseColourActive) F.color().lerp(_ffTargetColor,0.05);
     F.update(t);
+    // re-pin the reveal to the seeked moment (see animSeekHold)
+    if(animSeekHold!=null&&F.setSpawnAge&&F.anim!==false){
+      const seq=trackSeq(F.timeline);
+      if(seq.length>=2) F.setSpawnAge(animSeekHold,Math.min(F.params.spawnSpan,trackTotal(seq)));
+    }
     if(F.params.spin&&F.spinAxis) F.points.rotateOnAxis(F.spinAxis,F.params.spin*F.params.speed*(dt||0));
   }
 }
@@ -2394,7 +2403,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       // count eases toward it over elapsed time, and a scrub advances none —
       // so without this the sphere kept whatever count it last settled on
       // wherever you dragged to. Scrubbing asks for the state at an instant.
-      fireflyLayers.forEach(F=>F.snapCount&&F.snapCount());
+      // Reproduce the spawn-in too, so a seek shows what playback would show at
+      // that moment rather than the fully-settled field: at 0:00 nothing has
+      // been born yet and the sphere builds from nothing, exactly as pressing
+      // play does. Same reveal window playback uses (see the play handler).
+      animSeekHold=animTime;
+      fireflyLayers.forEach(F=>{
+        const seq=trackSeq(F.timeline);
+        if(F.setSpawnAge&&F.anim!==false&&seq.length>=2) F.setSpawnAge(animTime,Math.min(F.params.spawnSpan,trackTotal(seq)));
+        if(F.snapCount) F.snapCount();
+      });
       animScrubbing=false;
       // move the playhead only — rebuilding here would destroy the very
       // element holding this drag's pointer capture, ending the scrub
@@ -2904,6 +2922,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         if(F.anim===false||seq.length<2) return;
         F.respawn&&F.respawn(Math.min(F.params.spawnSpan,trackTotal(seq)));
       });
+      animSeekHold=null; // playing owns the reveal again
       animPlaying=true; rpPlayIco.src='icons/pause.svg';
     }else{
       if(animStop) animStop();
@@ -4498,7 +4517,17 @@ function captureThumbnailAt(sec,trackIndex){
   // entirely without changing the computed frame (animTime here is always
   // < the total anyway, so animTime%total === min(animTime,total)).
   animLoop=false;
-  if(!wholeScene) thumbSettle(sec);
+  if(!wholeScene){
+    thumbSettle(sec);
+    // match what seeking to this moment shows: the spawn-in is part of the
+    // state at a time, so an early frame is genuinely sparse rather than the
+    // fully-settled field. uSpawnStart/uSpawnWindow are both in
+    // snapshotMotion, so this is undone with everything else.
+    fireflyLayers.forEach(F=>{
+      const seq=trackSeq(F.timeline);
+      if(F.setSpawnAge&&F.anim!==false&&seq.length>=2) F.setSpawnAge(sec,Math.min(F.params.spawnSpan,trackTotal(seq)));
+    });
+  }
 
   // gl_PointSize is in absolute pixels, so at this smaller resolution every
   // layer's `size` needs the SAME scale factor as the resolution — then

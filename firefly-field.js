@@ -466,6 +466,14 @@ export function createFireflyField(THREE, opts = {}) {
     // of accumulate" alternative — so without this, that burst would leave
     // real playback continuing from a corrupted clock/count/rotation state
     // instead of where it actually was.
+    // Place the staggered spawn-in at an arbitrary age instead of restarting it
+    // from now. respawn() means "begin the reveal at this moment"; this means
+    // "show the reveal as it looks `age` seconds in", which is what seeking to
+    // a point in the timeline needs — at age 0 nothing has been born yet.
+    setSpawnAge(age, window) {
+      uniforms.uSpawnStart.value = uniforms.uTime.value - Math.max(0, age);
+      uniforms.uSpawnWindow.value = window > 0 ? window : 0;
+    },
     // Jump the visible count straight to its target, skipping the ease.
     // update()'s count is an integrator (next = prev + (target-prev)*dt*4), so
     // a caller that advances no time — scrubbing the timeline asks for the
