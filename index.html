@@ -2816,34 +2816,27 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // slot must be at least as wide as the frame is at strip height, or CSS
     // 'cover' crops it; read the height from the DOM so it tracks the CSS
     const stripH=segs[0].seg.getBoundingClientRect().height||68;
-    // How much time a frame WANTS to span: enough width to show itself whole
-    // at strip height. Each phase is then divided into a whole number of
-    // EQUAL frames near that size.
-    //
-    // Frames used to step on a grid of absolute seconds, which the phase
-    // boundaries then chopped: a 6s phase on a 4s grid came out 4.0s + 2.0s,
-    // the next 2.0s + 4.0s, and a frame straddling a boundary was drawn twice
-    // as two odd-sized pieces showing the same instant. Nothing about that
-    // sequence was readable. Dividing each phase on its own means every frame
-    // in a phase is the same width and belongs to exactly one phase, so the
-    // strip reads as "this phase, sampled N times".
-    const idealSec=(stripH*thumbAspect())/pxPerSec;
-    for(const {seg,phase,phaseStartSec,ti} of segs){
+    // ONE snapshot per phase: the whole sphere as it stands when that phase
+    // begins. A phase is a captured state of the entire look — you build the
+    // sphere, then commit it as a phase — so the thing worth showing is that
+    // state, not a strip sampling one layer in isolation across the phase's
+    // span. Those slices also read as sub-divisions the phase doesn't have.
+    // Whole-scene means every track's row shows the same image for a given
+    // phase, which is correct: they describe one sphere.
+    const frameW=stripH*thumbAspect();
+    for(const {seg,phase,phaseStartSec} of segs){
       const wrap=document.createElement('div'); wrap.className='rp-thumb-slots';
-      const frames=Math.max(1,Math.round(phase.duration/idealSec));
-      const frameSec=phase.duration/frames;
-      for(let k=0;k<frames;k++){
-        const slot=document.createElement('div'); slot.className='rp-thumb-slot';
-        slot.style.left=((k/frames)*100)+'%';
-        slot.style.width=(100/frames)+'%';
-        // sample where the frame BEGINS, so the hover time is the moment the
-        // frame actually depicts (and a phase's first frame is its opening look)
-        const sampleSec=phaseStartSec+k*frameSec;
-        wrap.appendChild(slot);
-        thumbRequest(ti,sampleSec,slot);
-        slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,sampleSec));
-        slot.addEventListener('mouseleave',rpHideThumbPreview);
-      }
+      const slot=document.createElement('div'); slot.className='rp-thumb-slot rp-thumb-lead';
+      // Spans the phase. The image itself keeps its natural frame size and
+      // repeats across the rest (see .rp-thumb-lead) rather than stretching:
+      // one frame at the left with flat tint beside it read as two unrelated
+      // blocks, and stretching a frame across a 15s phase distorts it.
+      slot.style.left='0';
+      slot.style.width='100%';
+      wrap.appendChild(slot);
+      thumbRequest(null,phaseStartSec,slot);
+      slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,phaseStartSec));
+      slot.addEventListener('mouseleave',rpHideThumbPreview);
       seg.appendChild(wrap);
     }
   }
@@ -4390,9 +4383,10 @@ function thumbSettle(toAnimTime,ticks=15){
 // Seeks the shared master clock to `sec`, isolates `trackIndex`'s own layer,
 // renders one small offscreen frame, then restores everything exactly as it
 // was — all synchronous, so nothing else ever observes the disturbed state.
-// trackIndex null => the WHOLE scene exactly as it stands right now: no layer
-// isolation and no seek. That is what the preset gallery's card wants (a
-// portrait of the current sphere), as opposed to a filmstrip frame.
+// trackIndex null => the WHOLE composed scene rather than one isolated layer.
+// sec null => whatever moment the sphere is on right now, with no seek.
+// The timeline wants (phaseStart, null): the whole sphere at a phase's start.
+// The gallery card wants (null, null): the sphere exactly as it stands.
 function captureThumbnailAt(sec,trackIndex){
   const wholeScene=(trackIndex==null);
   const liveW=Math.max(1,renderer.domElement.width);
@@ -4452,7 +4446,7 @@ function captureThumbnailAt(sec,trackIndex){
   // entirely without changing the computed frame (animTime here is always
   // < the total anyway, so animTime%total === min(animTime,total)).
   animLoop=false;
-  if(!wholeScene) thumbSettle(sec);
+  if(sec!=null) thumbSettle(sec); // null => capture the current moment, no seek
 
   // gl_PointSize is in absolute pixels, so at this smaller resolution every
   // layer's `size` needs the SAME scale factor as the resolution — then
@@ -4570,7 +4564,7 @@ function thumbProcessQueue(){
 }
 function thumbRequest(trackIndex,sec,el){
   if(thumbBroken) return;
-  const key=trackIndex+'|'+sec.toFixed(2);
+  const key=trackIndex+'|'+sec.toFixed(2);  // trackIndex is null for whole-scene shots
   const cached=thumbCache.get(key);
   if(cached!==undefined){ el.style.backgroundImage='url('+cached+')'; return; }
   thumbQueue.push({key,sec,trackIndex,el});
