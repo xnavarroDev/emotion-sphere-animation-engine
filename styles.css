@@ -716,11 +716,23 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 /* the segment/lane both clip overflow (for the rounded corners), so the
    "pop out" itself is a separate floating element (.rp-thumb-preview) —
    this is just the in-place cue that a frame is hovered */
-/* One snapshot per phase, repeated at its natural frame size across the
-   phase's width. `cover` would stretch a single frame over a long phase and
-   distort it; repeating keeps every frame the right shape while still
-   filling the lane. */
-.rp-thumb-lead { background-size: auto 100%; background-repeat: repeat-x; background-position: left center; }
+/* ---- Phase shots: the finished sphere at the start of each phase ---- */
+.rp-shots-track { padding-bottom: 4px; }
+.rp-shots-cap {
+  width: 100px; flex: 0 0 auto; align-self: flex-start; margin-top: 20px;
+  font: 600 12px/1.3 var(--rp-font-num); color: var(--rp-ink-3);
+}
+.rp-shots-strip { position: relative; height: 62px; }
+/* Anchored at its phase's start and sized to the frame's own shape, so the
+   image is never stretched — the gap to the next one is simply how long that
+   phase runs. */
+.rp-phase-shot {
+  position: absolute; top: 0; height: 62px; aspect-ratio: 16 / 7;
+  border-radius: 8px; background: var(--rp-pill) center/cover no-repeat;
+  box-shadow: 0 0 0 1px var(--rp-border); cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.rp-phase-shot:hover { box-shadow: 0 0 0 2px var(--rp-ink); transform: translateY(-1px); }
 .rp-thumb-slot:hover { filter: brightness(1.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
 .rp-thumb-preview {
   position: fixed; z-index: 200; display: none; flex-direction: column; align-items: center;

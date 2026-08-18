@@ -2508,7 +2508,6 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     const laneAvail=Math.max(240,(rpTracksEl.clientWidth||900)-RP_LANE_GUTTER);
     const axisSec=Math.max(maxTotal,RP_MIN_AXIS_SEC,laneAvail/RP_PX_PER_SEC);
     const laneW=axisSec*RP_PX_PER_SEC;
-    const pendingThumbSegs=[]; // {seg,phase,phaseStartSec,ti} — slots built post-layout
     let refLane=null; // the first track's lane — defines the shared x-axis every track's segments align to
     for(let ti=0; ti<rpTrackCount(); ti++){
       const isScene=ti===fireflyLayers.length;
@@ -2549,10 +2548,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         const swatch=document.createElement('div'); swatch.className='swatch';
         swatch.style.background=rpSegmentTint(phase,isScene,pi);
         seg.appendChild(swatch);
-        // Slot widths depend on the lane's real pixel width, which can't be
-        // measured until the tree is in the DOM — recorded here, filled in by
-        // rpBuildThumbSlots() after this render completes.
-        if(thumbsOn) pendingThumbSegs.push({seg,phase,phaseStartSec,ti});
+        // No imagery in the lanes: a phase's look is the WHOLE sphere, so it is
+        // shown once in the shots strip above rather than repeated identically
+        // in all four lanes (see rpBuildPhaseShots).
         rpSegmentEls.set(phase,{swatch,isScene,pi}); // so a live edit can recolour just this one
         if(rpEditingPhase===phase) seg.classList.add('editing');
         seg.addEventListener('click',(e)=>{
@@ -2790,7 +2788,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       wireScrub(ph,refLane,axisSec);
       rpCacheLaneGeom();
     }
-    if(pendingThumbSegs.length) rpBuildThumbSlots(pendingThumbSegs,refLane,maxTotal);
+    if(thumbsOn) rpBuildPhaseShots(axisSec,laneW);
     // restore the scroll the rebuild just discarded (see keepTop/keepLeft above)
     rpTracksEl.scrollTop=keepTop;
     if(keepLeft){
@@ -2801,45 +2799,40 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     rpUpdatePlayhead();
   }
 
-  // Fills each segment's filmstrip, once the lane is in the DOM and its true
-  // pixel width is known. A captured frame is a whole screenshot at the live
-  // canvas's aspect (wide), while the strip is only 48px tall — so a frame
-  // needs ~48*aspect px of width to be shown in full. At one frame per second
-  // each slot was only ~32px, so CSS background-size:cover scaled the frame up
-  // to cover that narrow box and cropped ~66% of it away, magnifying whatever
-  // was left in the middle (the "particles look huge" bug). Stepping in whole
-  // seconds large enough to fit a frame shows each one complete instead.
-  function rpBuildThumbSlots(segs,refLane,maxTotal){
-    const laneW=(refLane&&refLane.getBoundingClientRect().width)||0;
-    if(!laneW) return;
-    const pxPerSec=laneW/maxTotal;
-    // slot must be at least as wide as the frame is at strip height, or CSS
-    // 'cover' crops it; read the height from the DOM so it tracks the CSS
-    const stripH=segs[0].seg.getBoundingClientRect().height||68;
-    // ONE snapshot per phase: the whole sphere as it stands when that phase
-    // begins. A phase is a captured state of the entire look — you build the
-    // sphere, then commit it as a phase — so the thing worth showing is that
-    // state, not a strip sampling one layer in isolation across the phase's
-    // span. Those slices also read as sub-divisions the phase doesn't have.
-    // Whole-scene means every track's row shows the same image for a given
-    // phase, which is correct: they describe one sphere.
-    const frameW=stripH*thumbAspect();
-    for(const {seg,phase,phaseStartSec} of segs){
-      const wrap=document.createElement('div'); wrap.className='rp-thumb-slots';
-      const slot=document.createElement('div'); slot.className='rp-thumb-slot rp-thumb-lead';
-      // Spans the phase. The image itself keeps its natural frame size and
-      // repeats across the rest (see .rp-thumb-lead) rather than stretching:
-      // one frame at the left with flat tint beside it read as two unrelated
-      // blocks, and stretching a frame across a 15s phase distorts it.
-      slot.style.left='0';
-      slot.style.width='100%';
-      wrap.appendChild(slot);
-      thumbRequest(null,phaseStartSec,slot);
-      slot.addEventListener('mouseenter',()=>rpShowThumbPreview(slot,phaseStartSec));
-      slot.addEventListener('mouseleave',rpHideThumbPreview);
-      seg.appendChild(wrap);
-    }
+  // A permanent strip of phase images across the top of the timeline: the
+  // finished sphere — every layer combined — as it stands when each phase
+  // begins. It lives once above the lanes rather than inside them, because a
+  // phase describes ONE sphere; drawing the same picture in all four lanes said
+  // nothing extra and made each lane look sub-divided.
+  function rpBuildPhaseShots(axisSec,laneW){
+    if(!rpTracksEl) return;
+    const ref=allTimelines().find(tl=>tl.length);
+    if(!ref) return;
+    const row=document.createElement('div'); row.className='rp-track rp-shots-track';
+    const gutter=document.createElement('div'); gutter.className='rp-track-gutter';
+    const cap=document.createElement('div'); cap.className='rp-shots-cap'; cap.textContent='Phases';
+    gutter.appendChild(cap);
+    const vp=document.createElement('div'); vp.className='rp-lane-vp';
+    const strip=document.createElement('div'); strip.className='rp-shots-strip';
+    strip.style.width=laneW+'px';
+    let acc=0;
+    ref.forEach((phase,pi)=>{
+      const startSec=acc; acc+=phase.duration;
+      const shot=document.createElement('div'); shot.className='rp-phase-shot';
+      shot.style.left=((startSec/axisSec)*100)+'%';
+      shot.title=(phase.name||(pi===0?'Starting':'Phase '+(pi+1)))+' — '+rpFmtTime(startSec);
+      strip.appendChild(shot);
+      thumbRequest(null,startSec,shot); // null track = the whole composed sphere
+      shot.addEventListener('mouseenter',()=>rpShowThumbPreview(shot,startSec));
+      shot.addEventListener('mouseleave',rpHideThumbPreview);
+    });
+    vp.appendChild(strip);
+    vp.addEventListener('scroll',()=>rpSyncLaneScroll(vp),{passive:true});
+    row.append(gutter,vp);
+    rpTracksEl.insertBefore(row,rpTracksEl.firstChild);
+    rpLaneVps.push(vp);
   }
+
 
   const rpPlayIco=document.getElementById('rp-anim-play-ico');
   rpPlayBtn.addEventListener('click',()=>{
