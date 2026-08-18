@@ -653,7 +653,9 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 .rp-lane-vp::-webkit-scrollbar { height: 0; }  /* one shared bar would be noise on every row */
 /* Clipped strip over the lane area holding the playhead and the hover/placement
    bands — they span every track, so they cannot live in one lane's viewport. */
-.rp-lane-overlay { position: absolute; top: 0; bottom: 0; right: 0; overflow: hidden; pointer-events: none; }
+/* height is set in JS from the last track (see rpCacheLaneGeom): bottom:0 would
+   resolve against the visible box of the scroller, not the full track stack */
+.rp-lane-overlay { position: absolute; top: 0; right: 0; overflow: hidden; pointer-events: none; }
 .rp-lane-overlay .rp-playhead { pointer-events: auto; }
 .rp-track { display: flex; padding: 10px 20px 10px 0; }
 /* Pinned label column: opaque and FULL height, so the lane scrolling under it

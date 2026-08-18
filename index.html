@@ -2534,7 +2534,18 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // then positioned in lane content space, minus the shared scroll.
     const vp=rpRefLane.parentElement;
     rpLaneGeom={ left:(vp?vp.offsetLeft:0), width:rpRefLane.offsetWidth, view:(vp?vp.clientWidth:0) };
-    if(rpLaneOverlay) rpLaneOverlay.style.left=rpLaneGeom.left+'px';
+    if(rpLaneOverlay){
+      rpLaneOverlay.style.left=rpLaneGeom.left+'px';
+      // Height is set explicitly rather than left to top:0/bottom:0. #rp-tracks
+      // scrolls, and an absolutely positioned child resolves those against the
+      // VISIBLE box, so the playhead stopped at the bottom of the viewport
+      // instead of running the full stack of tracks (measured 364px against
+      // 735px of content). Measured off the last track rather than
+      // scrollHeight, which the overlay itself would feed back into.
+      const tracks=rpTracksEl.querySelectorAll('.rp-track');
+      const last=tracks[tracks.length-1];
+      rpLaneOverlay.style.height=(last?last.offsetTop+last.offsetHeight:rpTracksEl.clientHeight)+'px';
+    }
   }
   // A phase's swatch colour: the captured colour blended most of the way
   // toward the panel's pale pill tone, so the strip reads as the soft bands
@@ -2873,6 +2884,9 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
     if(pendingThumbSegs.length) rpBuildThumbSlots(pendingThumbSegs,refLane,maxTotal);
     if(thumbsOn) rpBuildSummaryStrip(axisSec,laneW,refLane);
+    // re-measure AFTER the summary strip is inserted: it goes in at the top, so
+    // an overlay sized before it exists is short by exactly that row's height
+    rpCacheLaneGeom();
     // restore the scroll the rebuild just discarded (see keepTop/keepLeft above)
     rpTracksEl.scrollTop=keepTop;
     if(keepLeft){
