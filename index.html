@@ -3095,9 +3095,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
     return {ghost:rpPlaceGhost,band:rpPlaceBand};
   }
+  const rpAddPhaseBtn=document.getElementById('rp-anim-add-phase');
   function rpPlaceCancel(){
     rpPlacing=null;
     document.body.classList.remove('rp-placing');
+    // the button is the only thing on screen that says the gesture is live
+    // while the cursor is off the timeline, so it has to un-arm here too
+    if(rpAddPhaseBtn) rpAddPhaseBtn.classList.remove('armed');
     if(rpPlaceGhost) rpPlaceGhost.style.display='none';
     if(rpPlaceBand) rpPlaceBand.style.display='none';
   }
@@ -3110,6 +3114,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
     rpPlacing={stage:'start',startSec:0};
     document.body.classList.add('rp-placing');
+    if(rpAddPhaseBtn) rpAddPhaseBtn.classList.add('armed');
     const {ghost,band}=rpPlaceEls();
     ghost.textContent='click to set the start';
     ghost.style.display='block';
@@ -3137,6 +3142,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   function rpPlaceClick(e){
     if(!rpPlacing) return;
+    // Only clicks ON THE TRACKS place a point. This runs in the capture phase
+    // and reads clientX alone, so without this test any click anywhere — the
+    // "add phase" button itself included — counted as placing a point: a
+    // second click on the button set the END rather than cancelling, and the
+    // gesture could not be dismissed from the control that started it.
+    if(!(e.target instanceof Element)||!e.target.closest('#rp-tracks')) return;
     const t=rpTimeFromClientX(e.clientX);
     if(t===null) return;
     e.preventDefault(); e.stopPropagation();
@@ -3190,10 +3201,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       tl.splice(idx+1,0,made,{duration:rest,snapshot:cloneSnapshot(host.snapshot),ease:host.ease});
     });
   }
-  document.getElementById('rp-anim-add-phase').addEventListener('click',(e)=>{
+  rpAddPhaseBtn.addEventListener('click',(e)=>{
     e.stopPropagation();
     if(rpPlacing) rpPlaceCancel(); else rpPlaceStart();
   });
+  rpAddPhaseBtn.title='Click, then drag a span on the timeline (Esc to cancel)';
   document.addEventListener('mousemove',rpPlaceMove);
   document.addEventListener('click',rpPlaceClick,true); // capture: beat the lanes' own click handlers
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&rpPlacing) rpPlaceCancel(); });

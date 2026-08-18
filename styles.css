@@ -747,6 +747,14 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 /* ---- Placing a phase (click start → drag → click end) ---- */
 /* the sticky rides the cursor, so the whole page keeps a crosshair and nothing
    else reacts to hover while a phase is in hand */
+/* Armed: the gesture is live and waiting for a click on the timeline. Without
+   this the button looked identical whether or not it was armed, so clicking it
+   appeared to do nothing until the cursor happened to be over a lane. */
+#rp-anim-add-phase.armed {
+  background: var(--rp-ink); color: var(--rp-on-ink);
+  box-shadow: 0 0 0 2px var(--rp-ink-2);
+}
+#rp-anim-add-phase.armed .rp-ico { filter: invert(1); }
 body.rp-placing, body.rp-placing * { cursor: crosshair !important; }
 body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
 .rp-place-ghost {
