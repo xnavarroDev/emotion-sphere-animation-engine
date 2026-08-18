@@ -342,14 +342,45 @@ const smoothstep=t=>t*t*(3-2*t);
 const smootherstep=t=>t*t*t*(t*(t*6-15)+10);
 // Per-phase easing curves for animation transitions (default: smootherstep).
 // expoout = fast burst then decelerate (an explosion reaching out).
+const _c1=1.70158, _c2=_c1*1.525, _c3=_c1+1;
+// Per-phase easing curves for animation transitions (default: smootherstep).
+// The `ease*`/`expo*` spellings are kept as-is because saved presets store the
+// key by name — renaming them would silently reset every phase that used one.
+//
+// NOTE on `back`: it deliberately leaves the 0..1 range, which is the point
+// visually but means an interpolated parameter briefly goes past its target —
+// a count below zero, a negative radius. setParams pins count to the pool, but
+// treat it as expressive rather than safe on every slider.
 const EASINGS={
   smootherstep,
   linear:t=>t,
-  expoout:t=>t>=1?1:1-Math.pow(2,-10*t),
-  expoin:t=>t<=0?0:Math.pow(2,10*(t-1)),
-  easeout:t=>1-(1-t)*(1-t),
+  // quadratic — the plain "ease"
+  easeinout:t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2,
   easein:t=>t*t,
+  easeout:t=>1-(1-t)*(1-t),
+  // sine — the gentlest; barely reads as a curve, just takes the edge off
+  sineinout:t=>-(Math.cos(Math.PI*t)-1)/2,
+  sinein:t=>1-Math.cos((t*Math.PI)/2),
+  sineout:t=>Math.sin((t*Math.PI)/2),
+  // exponential — hardest acceleration of the non-overshooting families
+  expoinout:t=>t<=0?0:t>=1?1:t<0.5?Math.pow(2,20*t-10)/2:(2-Math.pow(2,-20*t+10))/2,
+  expoin:t=>t<=0?0:Math.pow(2,10*t-10),
+  expoout:t=>t>=1?1:1-Math.pow(2,-10*t),
+  // back — a small overshoot past the target, then settles
+  backinout:t=>t<0.5?(Math.pow(2*t,2)*((_c2+1)*2*t-_c2))/2:(Math.pow(2*t-2,2)*((_c2+1)*(t*2-2)+_c2)+2)/2,
+  backin:t=>_c3*t*t*t-_c1*t*t,
+  backout:t=>1+_c3*Math.pow(t-1,3)+_c1*Math.pow(t-1,2),
 };
+// Menu order/labels. Grouped by family so the list reads as a set of choices
+// rather than 20 flat names.
+const EASING_MENU=[
+  ['Basic',      [['smootherstep','Smootherstep (default)'],['linear','Linear']]],
+  ['Ease',       [['easeinout','Ease in out'],['easein','Ease in'],['easeout','Ease out']]],
+  ['Sine',       [['sineinout','Sine in out'],['sinein','Sine in'],['sineout','Sine out']]],
+  ['Exponential',[['expoinout','Exponential in out'],['expoin','Exponential in'],['expoout','Exponential out']]],
+  ['Back',       [['backinout','Back in out'],['backin','Back in'],['backout','Back out']]],
+];
+const EASING_LABEL=Object.fromEntries(EASING_MENU.flatMap(([,items])=>items));
 const HARD_CYCLE_SEGMENTS={'purple-red':true,'yellow-blue':true};
 const logLerp=(a,b,t)=>Math.exp(Math.log(Math.max(a,1e-6))*(1-t)+Math.log(Math.max(b,1e-6))*t);
 
@@ -2626,13 +2657,13 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
           }
         });
         const easeIco=document.createElement('img'); easeIco.className='ease-ico'; easeIco.src='icons/spline.svg';
-        easeIco.title='Easing: '+(phase.ease||'smootherstep')+' (click to cycle)';
+        const curEase=phase.ease||'smootherstep';
+        easeIco.title='Easing: '+(EASING_LABEL[curEase]||curEase)+' — click to change';
+        // A menu, not a cycle: with 20 curves, stepping one at a time to reach
+        // the one you want (and past 18 you don't) is unusable.
         easeIco.addEventListener('click',(e)=>{
           e.stopPropagation();
-          const opts=Object.keys(EASINGS);
-          const cur=opts.indexOf(phase.ease||'smootherstep');
-          phase.ease=opts[(cur+1)%opts.length];
-          markDirty(); rpRenderTracks();
+          rpOpenEaseMenu(easeIco,phase);
         });
         durEl.append(durText,easeIco);
         dursRow.appendChild(durEl);
@@ -2833,6 +2864,52 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   });
   // one shared "add phase" (matching Figma — not one button per track);
   // it targets whichever track was last clicked/focused (trackActive)
+  // ---- Easing menu ----
+  // One shared popup rather than one per phase: the timeline can hold dozens of
+  // phases, and only ever one menu is open.
+  let rpEaseMenuEl=null, rpEaseMenuPhase=null;
+  function rpCloseEaseMenu(){
+    if(rpEaseMenuEl) rpEaseMenuEl.style.display='none';
+    rpEaseMenuPhase=null;
+  }
+  function rpOpenEaseMenu(anchor,phase){
+    if(!rpEaseMenuEl){
+      rpEaseMenuEl=document.createElement('div');
+      rpEaseMenuEl.className='rp-ease-menu';
+      document.body.appendChild(rpEaseMenuEl);
+      rpEaseMenuEl.addEventListener('click',(e)=>e.stopPropagation());
+    }
+    // toggle off if the same phase's icon is clicked again
+    if(rpEaseMenuPhase===phase && rpEaseMenuEl.style.display==='block'){ rpCloseEaseMenu(); return; }
+    rpEaseMenuPhase=phase;
+    const cur=phase.ease||'smootherstep';
+    rpEaseMenuEl.innerHTML='';
+    for(const [group,items] of EASING_MENU){
+      const h=document.createElement('div'); h.className='rp-ease-group'; h.textContent=group;
+      rpEaseMenuEl.appendChild(h);
+      for(const [key,label] of items){
+        const b=document.createElement('button'); b.type='button';
+        b.className='rp-ease-item'+(key===cur?' on':'');
+        b.textContent=label;
+        b.addEventListener('click',()=>{
+          phase.ease=key;
+          rpCloseEaseMenu();
+          markDirty(); rpRenderTracks();
+        });
+        rpEaseMenuEl.appendChild(b);
+      }
+    }
+    rpEaseMenuEl.style.display='block';
+    // place it above or below the icon depending on which way there's room
+    const r=anchor.getBoundingClientRect();
+    const mh=rpEaseMenuEl.offsetHeight, mw=rpEaseMenuEl.offsetWidth;
+    const below=r.bottom+6, above=r.top-mh-6;
+    rpEaseMenuEl.style.top=((below+mh<innerHeight)?below:Math.max(6,above))+'px';
+    rpEaseMenuEl.style.left=Math.max(6,Math.min(innerWidth-mw-6,r.left+r.width/2-mw/2))+'px';
+  }
+  document.addEventListener('click',rpCloseEaseMenu);
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') rpCloseEaseMenu(); });
+
   // ---- Placing a phase: pick it up off the button, click a start point on the
   // timeline, drag out the span, click again to drop it. Two clicks rather than
   // press-drag-release, so the span can be adjusted (and read) before it lands
