@@ -4889,11 +4889,15 @@ animate();
 // under the timeline. Called on resize and whenever a panel opens/closes.
 function layoutViewport(){
   const panel=document.getElementById('redesign-panel');
-  const timeline=document.getElementById('anim-canvas-controls');
   const left=(panel&&!panel.classList.contains('collapsed'))?panel.offsetWidth:0;
-  const bottom=(timeline&&timeline.classList.contains('open'))?timeline.offsetHeight:0;
+  // The timeline's height is deliberately NOT subtracted. It used to be, so
+  // opening or dragging the panel resized the canvas — which changed the
+  // camera aspect and re-rendered the sphere at a different size and framing
+  // every time the panel moved. The sphere now keeps one full-height viewport
+  // and the timeline floats over it (translucently, see --rp-chrome), so
+  // resizing the panel changes what covers the sphere, never the sphere.
   const w=Math.max(1,innerWidth-left);
-  const h=Math.max(1,innerHeight-bottom);
+  const h=Math.max(1,innerHeight);
   camera.aspect=w/h;
   camera.updateProjectionMatrix();
   renderer.setSize(w,h);

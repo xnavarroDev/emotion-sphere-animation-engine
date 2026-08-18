@@ -334,16 +334,17 @@ body.watch #dots { display:none !important; }
      translucent, so any fixed value could only approximate it, and would
      drift the moment the theme changed. Anything that must be opaque (the
      surface. */
-  /* One OPAQUE surface for both chrome panels. They used to be 50%
-     translucent, which meant neither had a colour of its own: both showed
-     the sphere's background gradient through them, and because the left
-     panel spans the full height while the timeline sits at the bottom, each
-     picked up a different part of that gradient and rendered a visibly
-     different tone (measured 23,22,25 vs 16,15,17). No shared value could
-     fix that while either stayed see-through. Opaque also lets the pinned
-     transport and the sticky track gutter actually hide the rows scrolling
-     underneath them. Tone matches what the panel already rendered as. */
-  --rp-chrome: #17161a;
+  /* Both chrome panels share one translucent surface, so the sphere reads
+     through them. Two tones, because translucency and pinning pull against
+     each other: --rp-chrome is the panel body, while --rp-chrome-solid backs
+     the pinned transport and sticky track gutter, which have to hide the rows
+     scrolling underneath rather than let them show through.
+     Both carry a heavy backdrop blur (see the panels), which is what keeps
+     them reading as one material despite sitting over different parts of the
+     backdrop — an earlier attempt at plain 50% alpha with no blur made the
+     two panels visibly different tones. */
+  --rp-chrome: rgba(23,22,26,0.60);
+  --rp-chrome-solid: rgba(23,22,26,0.93);
   /* Foreground for anything painted ON an --rp-ink surface. --rp-ink is the
      high-contrast INK colour, which in a dark theme is near-white — so
      --rp-white text on it is invisible. That caught the seam + button and
@@ -356,6 +357,7 @@ body.watch #dots { display:none !important; }
 #redesign-panel {
   position: fixed; top: 0; left: 0; width: 339px; height: 100%;
   background: var(--rp-chrome); color: var(--rp-ink);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
   font-family: var(--rp-font); font-weight: 600;
   display: flex; flex-direction: column;
   overflow: hidden; z-index: 40;
@@ -590,6 +592,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 #anim-canvas-controls {
   position: fixed; z-index: 30; left: 339px; right: 0; bottom: 0;
   background: var(--rp-chrome); color: var(--rp-ink, #000);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
   font-family: var(--rp-font); display: none;
   /* overflow-x stated explicitly for the same reason as #rp-scroll: leaving it
      to compute to `auto` paints a permanent horizontal scrollbar under the
@@ -613,7 +616,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
    so it is always the thing under the cursor at that edge. */
 #rp-anim-resize {
   position: sticky; top: 0; z-index: 22; height: 7px; flex: 0 0 auto;
-  background: var(--rp-chrome); cursor: ns-resize;
+  background: var(--rp-chrome-solid); cursor: ns-resize;
 }
 #rp-anim-resize::after {
   content: ''; display: block; width: 46px; height: 3px; margin: 2px auto 0;
@@ -625,7 +628,8 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 .rp-transport {
   display: flex; align-items: center; justify-content: center; gap: 24px; padding: 4px 18px;
   position: sticky; top: 7px; z-index: 20; /* 7px clears the resize handle above it */
-  background: var(--rp-chrome);
+  background: var(--rp-chrome-solid);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
   border-bottom: 1px solid var(--rp-border);
 }
 .rp-loop-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--rp-ink); }
@@ -647,7 +651,11 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 /* Pinned label column: opaque and FULL height, so the lane scrolling under it
    is covered rather than peeking through the gaps around the name pill. */
 .rp-track-gutter { position: sticky; left: 0; z-index: 9; flex: 0 0 auto;
-  display: flex; background: var(--rp-chrome); padding-left: 20px; }
+  display: flex; background: transparent; padding-left: 20px;
+  /* transparent, NOT --rp-chrome: repainting the parent's tint inside the
+     parent stacks the alpha and renders the gutter darker than the lane it
+     sits beside. The blur is what hides lanes scrolling underneath. */
+  backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px); }
 /* align-self/margin rather than padding-top: as a stretched flex item the
    label box was the full height of the track (~140px), so the editable
    background below painted a big empty slab instead of hugging the name.
