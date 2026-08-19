@@ -2869,14 +2869,27 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
 
       // per-track "does playback drive this?" switch (regression from v1's
       // On/Off track toggle). Off dims the lane so it reads as inert.
-      const isOn=isScene?(sceneAnim!==false):(F.anim!==false);
+      // For the Background/scene track this is the ONLY switch on the row
+      // (the separate glow switch was removed as a duplicate of the one in
+      // Parameters > Background), so it doubles as visibility: flipping it
+      // also drives cloudBg.setVisible(), same call the Background card's
+      // own Glow switch makes, kept in sync in both directions.
+      const isOn=isScene?(cloudBg.visible!==false):(F.anim!==false);
       const tgWrap=document.createElement('div'); tgWrap.className='rp-track-toggle';
       const tg=document.createElement('button'); tg.type='button';
       tg.className='rp-switch'+(isOn?' on':'');
-      tg.title=isOn?'Animation drives this track — click to disable':'This track is static — click to animate it';
+      tg.title=isScene
+        ? (isOn?'Background glow is visible — click to hide it':'Background glow is hidden — click to show it')
+        : (isOn?'Animation drives this track — click to disable':'This track is static — click to animate it');
       tg.addEventListener('click',(e)=>{
         e.stopPropagation();
-        if(isScene) sceneAnim=sceneAnim===false;
+        if(isScene){
+          const on=!(cloudBg.visible!==false);
+          cloudBg.setVisible(on);
+          sceneAnim=on;
+          document.getElementById('rp-glow-toggle')?.classList.toggle('on',on);
+          document.getElementById('toggle-glow')?.classList.toggle('active',on);
+        }
         else F.anim=F.anim===false;
         markDirty(); rpRenderTracks();
       });
