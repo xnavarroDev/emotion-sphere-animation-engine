@@ -701,6 +701,10 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 .rp-phase-name:focus { box-shadow: inset 0 0 0 2px var(--rp-accent); background: var(--rp-surface); }
 /* hover-sync: everything sharing a phase label lights up at once */
 .rp-phase-name.hl { background: var(--rp-accent); color: var(--rp-white); }
+/* Persistent version of .hl for whichever phase is actually selected — .hl
+   itself clears on mouseleave, so without this the grey fill vanished the
+   instant you moved off the pill to go adjust a slider. */
+.rp-phase-name.editing { background: var(--rp-accent); color: var(--rp-white); }
 .rp-segment.hl { box-shadow: inset 0 0 0 2px var(--rp-accent); z-index: 2; }
 /* The hovered phase as a column down every track. It sits OVER the lanes: a
    band behind them would be hidden by each segment's own swatch/filmstrip, so

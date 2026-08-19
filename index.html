@@ -2728,6 +2728,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         const shownName=phase.name||(pi===0?'Starting':'Phase '+(pi+1));
         nameEl.textContent=shownName;
         nameEl.style.left=(leftPct+w/2)+'%';
+        // Same grey fill .hl uses on hover, but persistent — .hl clears on
+        // mouseleave, so it vanished the moment you moved off the pill to
+        // go adjust a slider, leaving no visible trace of which phase was
+        // actually selected once you weren't hovering it anymore.
+        if(rpEditingPhase===phase) nameEl.classList.add('editing');
         // click to rename: "build-up"/"climax" beats "Phase 2" for anyone
         // reading the timeline cold. Enter or blur commits; empty reverts
         // to the automatic label.
