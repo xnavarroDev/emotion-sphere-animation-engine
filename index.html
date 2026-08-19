@@ -2100,10 +2100,22 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     ffSync(); markDirty();
   });
   document.getElementById('rp-layer-zero-all').addEventListener('click',()=>{
-    if(!confirm('This clears all '+fireflyLayers.length+' layers — continue?')) return;
+    const phaseTotal=allTimelines().reduce((n,tl)=>n+tl.length,0);
+    const msg=phaseTotal
+      ? 'This clears all '+fireflyLayers.length+' layers and removes every phase from every track — continue? (Undo will bring it back.)'
+      : 'This clears all '+fireflyLayers.length+' layers — continue?';
+    if(!confirm(msg)) return;
+    if(rpPlacing) rpPlaceCancel();
     const patch={};
     for(const [key,min] of FF_SLIDERS) patch[key]=min;
     for(const F of fireflyLayers){ F.setParams(patch); F.idle={...F.params}; }
+    if(phaseTotal){
+      allTimelines().forEach(tl=>{ tl.length=0; });
+      rpEditingPhase=null; editingPhase=false;
+      animTime=0; animPrevGlobalT=0; animSeekHold=null;
+      if(animStop) animStop();
+      rpPlayIco.src='icons/play.svg';
+    }
     ffSync(); rpRenderTracks(); markDirty();
   });
 
