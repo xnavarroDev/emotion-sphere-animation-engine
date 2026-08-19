@@ -640,6 +640,7 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 .rp-track-toggle .rp-switch { width: 30px; height: 17px; }
 .rp-track-toggle .rp-switch::after { width: 13px; height: 13px; }
 .rp-track-toggle .rp-switch.on::after { transform: translateX(13px); }
+.rp-track-toggle-label { font: 500 11px/1 var(--rp-font); color: var(--rp-ink-3); text-transform: uppercase; letter-spacing: 0.03em; }
 .rp-track.off .rp-track-lane { opacity: 0.4; }
 .rp-transport .time { font: 600 16px/1 var(--rp-font-num); font-variant-numeric: tabular-nums; }
 .rp-transport button.rp-icon-btn { background: transparent; color: var(--rp-ink); }
