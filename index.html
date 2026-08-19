@@ -3181,29 +3181,61 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     document.body.classList.add('rp-placing');
     if(rpAddPhaseBtn) rpAddPhaseBtn.classList.add('armed');
     const {ghost,band}=rpPlaceEls();
+    ghost.classList.remove('typing');
     ghost.textContent='click to set the start';
     ghost.style.display='block';
     band.style.display='none';
   }
   // Live feedback: the sticky follows the cursor, and once a start is set the
-  // band shows exactly the span that will be inserted.
-  function rpPlaceMove(e){
-    if(!rpPlacing) return;
+  // band shows exactly the span that will be inserted — either by mouse
+  // position, or by typing a number of seconds directly (see the keydown
+  // handler below), which is why the duration reads as a little pill rather
+  // than plain text: it's the same "this is editable" cue as .rp-dur-edit.
+  function rpPlaceRenderEnd(t){
     const {ghost,band}=rpPlaceEls();
-    ghost.style.left=e.clientX+'px'; ghost.style.top=e.clientY+'px';
-    const t=rpTimeFromClientX(e.clientX);
-    if(t===null) return;
-    if(rpPlacing.stage==='start'){
-      ghost.textContent='start at '+rpFmtTime(t);
-      return;
+    const startSec=rpPlacing.startSec;
+    let a,span;
+    if(rpPlacing.typedDur!=null){
+      a=startSec;
+      span=Math.max(RP_MIN_PHASE,parseFloat(rpPlacing.typedDur)||0);
+    }else{
+      if(t===null) return;
+      a=Math.min(startSec,t);
+      span=Math.max(RP_MIN_PHASE,Math.max(startSec,t)-a);
     }
-    const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
-    const span=Math.max(RP_MIN_PHASE,b-a);
-    ghost.textContent=rpFmtTime(a)+' → '+rpFmtTime(a+span)+'  ('+span.toFixed(1)+'s)';
+    rpPlacing.lastA=a; rpPlacing.lastB=a+span;
+    ghost.classList.toggle('typing',rpPlacing.typedDur!=null);
+    ghost.innerHTML=rpFmtTime(a)+' → '+rpFmtTime(a+span)+'  <span class="rp-place-dur-val">'+span.toFixed(1)+'s</span>'
+      +(rpPlacing.typedDur==null?'<span class="rp-place-hint">type + ⏎</span>':'');
     const W=rpRefLane.offsetWidth; // overlay space (see rpCacheLaneGeom)
     band.style.display='block';
     band.style.left=((a/rpAxisSec)*W-rpLaneScroll)+'px';
     band.style.width=Math.max(2,(span/rpAxisSec)*W)+'px';
+  }
+  function rpPlaceMove(e){
+    if(!rpPlacing) return;
+    const {ghost}=rpPlaceEls();
+    ghost.style.left=e.clientX+'px'; ghost.style.top=e.clientY+'px';
+    const t=rpTimeFromClientX(e.clientX);
+    if(rpPlacing.stage==='start'){
+      if(t===null) return;
+      ghost.textContent='start at '+rpFmtTime(t);
+      return;
+    }
+    rpPlacing.lastT=t;
+    rpPlaceRenderEnd(t);
+  }
+  // Shared by both a finishing click and pressing Enter after typing a
+  // duration — rpPlaceRenderEnd already kept lastA/lastB current either way.
+  function rpPlaceFinish(){
+    const {lastA,lastB}=rpPlacing;
+    const landed=rpInsertPhaseSpan(lastA,Math.max(lastA+RP_MIN_PHASE,lastB));
+    rpPlaceCancel();
+    // Select what was just placed — the .editing outline (see .rp-segment.editing
+    // in styles.css) is what makes a fresh phase unmistakable instead of just
+    // another unlabelled segment among the rest.
+    if(landed) rpEditingPhase=landed;
+    markDirty(); rpRenderTracks();
   }
   function rpPlaceClick(e){
     if(!rpPlacing) return;
@@ -3217,18 +3249,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     if(t===null) return;
     e.preventDefault(); e.stopPropagation();
     if(rpPlacing.stage==='start'){
-      rpPlacing={stage:'end',startSec:t};
+      rpPlacing={stage:'end',startSec:t,typedDur:null};
       rpPlaceMove(e);
       return;
     }
-    const a=Math.min(rpPlacing.startSec,t), b=Math.max(rpPlacing.startSec,t);
-    const landed=rpInsertPhaseSpan(a,Math.max(a+RP_MIN_PHASE,b));
-    rpPlaceCancel();
-    // Select what was just placed — the .editing outline (see .rp-segment.editing
-    // in styles.css) is what makes a fresh phase unmistakable instead of just
-    // another unlabelled segment among the rest.
-    if(landed) rpEditingPhase=landed;
-    markDirty(); rpRenderTracks();
+    // Recompute against the click position (unless a typed duration is
+    // driving it, in which case the click just confirms that typed value —
+    // once you've typed a number, where you happen to click stops mattering).
+    rpPlaceRenderEnd(t);
+    rpPlaceFinish();
   }
   // Split & push: the span carves out its slot at `startSec`, the phase sitting
   // there is cut in two around it, and everything after shifts along. The cut
@@ -3286,10 +3315,38 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     e.stopPropagation();
     if(rpPlacing) rpPlaceCancel(); else rpPlaceStart();
   });
-  rpAddPhaseBtn.title='Click, then drag a span on the timeline (Esc to cancel)';
+  rpAddPhaseBtn.title='Click, then drag a span (or type a number of seconds) on the timeline (Esc to cancel)';
   document.addEventListener('mousemove',rpPlaceMove);
   document.addEventListener('click',rpPlaceClick,true); // capture: beat the lanes' own click handlers
-  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&rpPlacing) rpPlaceCancel(); });
+  document.addEventListener('keydown',(e)=>{
+    if(!rpPlacing) return;
+    if(e.key==='Escape'){ rpPlaceCancel(); return; }
+    if(rpPlacing.stage!=='end') return;
+    // Don't hijack digits meant for some other focused field (rare, but
+    // nothing stops you clicking one while a placement is still armed).
+    const ae=document.activeElement;
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable)) return;
+    if(e.key>='0'&&e.key<='9'){
+      rpPlacing.typedDur=(rpPlacing.typedDur||'')+e.key;
+      e.preventDefault();
+      rpPlaceRenderEnd(rpPlacing.lastT??null);
+    }else if(e.key==='.'&&!(rpPlacing.typedDur||'').includes('.')){
+      rpPlacing.typedDur=(rpPlacing.typedDur||'0')+'.';
+      e.preventDefault();
+      rpPlaceRenderEnd(rpPlacing.lastT??null);
+    }else if(e.key==='Backspace'){
+      if(rpPlacing.typedDur){
+        rpPlacing.typedDur=rpPlacing.typedDur.slice(0,-1)||null;
+        e.preventDefault();
+        rpPlaceRenderEnd(rpPlacing.lastT??null);
+      }
+    }else if(e.key==='Enter'){
+      if(rpPlacing.lastA!=null&&rpPlacing.lastB!=null){
+        e.preventDefault();
+        rpPlaceFinish();
+      }
+    }
+  });
 
   // Wipe every phase from every track in one step. Deleting them one at a
   // time (the only way before this) was the actual complaint — starting a

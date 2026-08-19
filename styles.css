@@ -788,6 +788,19 @@ body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
   font: 600 11px/1 var(--rp-font-num); padding: 6px 10px; border-radius: 999px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
+/* The duration reads as its own little field — same "you can type here" cue
+   as .rp-dur-edit — because you can: typing digits while placing overrides
+   the mouse-driven span (see the keydown handler in rpPlaceStart's closure). */
+.rp-place-dur-val {
+  display: inline-block; margin-left: 3px; padding: 1px 6px; border-radius: 6px;
+  background: rgba(255,255,255,0.16); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+}
+.rp-place-ghost.typing .rp-place-dur-val::after {
+  content: ""; display: inline-block; width: 1px; height: 10px; margin-left: 2px;
+  background: currentColor; vertical-align: -1px; animation: rp-place-caret 1s step-end infinite;
+}
+@keyframes rp-place-caret { 50% { opacity: 0; } }
+.rp-place-hint { margin-left: 6px; opacity: 0.55; font-weight: 500; }
 /* the span that will actually be inserted, spanning every lane so it reads as
    the shared column it becomes */
 .rp-place-band {
