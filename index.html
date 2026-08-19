@@ -2743,9 +2743,17 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         nameEl.addEventListener('mouseenter',()=>hl(true));
         nameEl.addEventListener('mouseleave',()=>hl(false));
 
-        // one bracket per phase, spanning exactly that phase's range
+        // one bracket per phase, spanning exactly that phase's range. Its own
+        // ends are draggable — same resize as the segment's edge handles
+        // (wireSegmentResize is shared), just on the wider, easier-to-grab
+        // bracket instead of the thin strip on the thumbnail itself.
         const pbracket=document.createElement('div'); pbracket.className='rp-bracket';
         pbracket.style.left=leftPct+'%'; pbracket.style.width=w+'%';
+        const brL=document.createElement('div'); brL.className='rp-bracket-handle left'; brL.title='Drag to change when this phase starts';
+        const brR=document.createElement('div'); brR.className='rp-bracket-handle right'; brR.title='Drag to change how long this phase lasts';
+        pbracket.append(brL,brR);
+        wireSegmentResize(brL,phase,lane,'left');
+        wireSegmentResize(brR,phase,lane,'right');
         bracketsRow.appendChild(pbracket);
 
         const durEl=document.createElement('div'); durEl.className='rp-phase-dur';

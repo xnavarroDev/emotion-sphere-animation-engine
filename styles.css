@@ -717,6 +717,19 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
    exact boundary a bracket exists to show was the hardest line in the row to
    see. --rp-ink (near-white) at 2.5px so it actually reads as a bracket. */
 .rp-bracket { position: absolute; top: 0; height: 10px; border-left: 2.5px solid var(--rp-ink); border-right: 2.5px solid var(--rp-ink); border-top: 2.5px solid var(--rp-ink); }
+/* Wider than the bracket's own 2.5px edge and taller than its 10px row —
+   the visible bracket is the affordance, but a 2.5px-wide hitbox would be
+   nearly unhittable; extends past the row's own bounds (no overflow:hidden
+   on .rp-bracket-row, so this isn't clipped). Stays flush with left:0/
+   right:0 — INWARD into this phase's own bracket, never past its edge —
+   because adjacent phases touch with zero gap: a handle that extended
+   outward would overlap the next phase's own handle at that shared
+   boundary, and DOM order (not which one you're pointing at) would decide
+   which one actually received the click. Same left:0/right:0 containment
+   the segment's own .resize-handle already uses, for the same reason. */
+.rp-bracket-handle { position: absolute; top: -4px; bottom: -4px; width: 10px; cursor: ew-resize; z-index: 1; }
+.rp-bracket-handle.left { left: 0; }
+.rp-bracket-handle.right { right: 0; }
 .rp-segments-row { position: relative; height: 68px; display: flex; overflow: hidden; border-radius: 0; }
 .rp-segment { position: absolute; top: 0; height: 68px; cursor: pointer; overflow: hidden; }
 /* a hairline gap in the panel colour keeps adjacent segments readable as
