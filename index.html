@@ -2883,35 +2883,11 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       tgWrap.appendChild(tg);
       if(!isOn) track.classList.add('off');
 
-      // Glow visibility is a global scene setting, not a phase property (see
-      // captureSnapshotForTrack — visible isn't in the snapshot), so this is a
-      // second, independent switch rather than reusing the animate-enable one
-      // above. Mirrors the same on/off the floating Background card drives.
-      let glowWrap=null;
-      if(isScene){
-        const glowOn=()=>cloudBg.visible!==false;
-        const glowTg=document.createElement('button'); glowTg.type='button';
-        glowTg.className='rp-switch'+(glowOn()?' on':'');
-        glowTg.title=glowOn()?'Glow is visible — click to hide it':'Glow is hidden — click to show it';
-        glowTg.addEventListener('click',(e)=>{
-          e.stopPropagation();
-          const on=!glowOn();
-          cloudBg.setVisible(on);
-          document.getElementById('rp-glow-toggle')?.classList.toggle('on',on);
-          document.getElementById('toggle-glow')?.classList.toggle('active',on);
-          markDirty(); rpRenderTracks();
-        });
-        const glowLbl=document.createElement('span'); glowLbl.className='rp-track-toggle-label'; glowLbl.textContent='glow';
-        glowWrap=document.createElement('div'); glowWrap.className='rp-track-toggle';
-        glowWrap.append(glowLbl,glowTg);
-      }
-
       // label + toggle live in one sticky gutter that spans the full track
       // height. Making them individually sticky left gaps above and below the
       // name pill, through which the lane scrolled in plain view.
       const gutter=document.createElement('div'); gutter.className='rp-track-gutter';
       gutter.append(label,tgWrap);
-      if(glowWrap) gutter.appendChild(glowWrap);
       // The lane scrolls inside its OWN viewport, so the gutter is outside the
       // scrolling area entirely and never has a lane pass beneath it. That is
       // what lets the gutter be fully transparent and therefore identical to
