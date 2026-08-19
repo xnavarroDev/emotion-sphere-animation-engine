@@ -2479,13 +2479,15 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       if(rpLaneDragMoved){
         // let the click handler see the flag, then clear it
         setTimeout(()=>{ rpLaneDragMoved=false; },0);
-      }else{
-        // A plain click moves the playhead to where you clicked. It does not
-        // fight phase selection: clicking a segment still selects it, so one
-        // click both goes to that moment and opens it for editing, which is
-        // what clicking a spot on a timeline is asking for.
-        rpSeekToClientX(e.clientX);
       }
+      // A plain (non-drag) click used to ALSO seek to the exact pixel
+      // clicked, on top of the segment's own click handler selecting the
+      // phase — meant as "one click both goes to that moment and opens it
+      // for editing," but a phase can span several seconds/sub-frame
+      // thumbnails, and landing the playhead at whatever precise instant you
+      // happened to click made picking a phase feel like it "broke it up
+      // into intervals" instead of just selecting it. Only an actual drag
+      // scrubs now; a plain click selects only.
     };
     lane.addEventListener('pointerup',end);
     lane.addEventListener('pointercancel',end);
