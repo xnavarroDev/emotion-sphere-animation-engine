@@ -167,7 +167,7 @@ gl_FragColor.a*=vis*0.9;`
     // didn't ease in. Ramps once from creation time, not from every later
     // setUserTint/setVisible call, so switching presets or toggling Glow
     // afterward stays instant as before.
-    const INTRO_FADE_MS = 1800;
+    const INTRO_FADE_MS = 4000;
     const introStartAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     function introFactor() {
       const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -309,8 +309,17 @@ gl_FragColor.a*=vis*0.9;`
     }
 
     return {
-      update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix, yellowMix) {
+      // skipIntro: pass true while rendering a deterministic frame (a
+      // thumbnail capture, or a scrub) instead of live playback — those
+      // should always show the settled, fully-faded-in glow, not whatever
+      // fraction of the real-world page-load fade happens to be in progress
+      // at the exact wall-clock moment the offscreen render runs. Otherwise
+      // a thumbnail captured within the intro window would bake in a dim
+      // glow forever, never matching what's actually on screen once the
+      // real fade finishes.
+      update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix, yellowMix, skipIntro) {
         const t = time || 0;
+        const intro = skipIntro ? 1 : introFactor();
         applyCloudPalette(redMix, purpleMix, blueMix, yellowMix);
         uniforms.cloudTint.value.multiply(userTintColor);
         uniforms.cloudTintDeep.value.multiply(userTintColor);
@@ -370,7 +379,7 @@ gl_FragColor.a*=vis*0.9;`
           const op = m.opacityBase + Math.sin(t * m.pulseSp * 0.9 + m.ph2) * m.opacityPulse;
           c.material.opacity = Math.max(0.04, op);
           applyAutoStir(c, m, t, r, gph);
-          c.material.opacity = Math.max(0, c.material.opacity * userOpacity * introFactor());
+          c.material.opacity = Math.max(0, c.material.opacity * userOpacity * intro);
         }
       },
       onResize(w, h) {

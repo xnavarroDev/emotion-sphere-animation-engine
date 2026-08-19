@@ -215,7 +215,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="cloud-background.js?v=6"></script>
+<script src="cloud-background.js?v=7"></script>
 <script>
 // Show runtime errors on-screen (helps when the canvas is blank)
 (function(){
@@ -5412,7 +5412,7 @@ function animate(){
   const cloudPurpleMix=emotionPick(cwCloud,'purple');
   const cloudBlueMix=emotionPick(cwCloud,'blue');
   const cloudYellowMix=emotionPick(cwCloud,'yellow');
-  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix);
+  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix, animScrubbing);
 
   if(sphereCore&&sphereCore.sprite.visible){
     if(cycleOn) sphereCore.setCycleBlend(cycleSegment);
