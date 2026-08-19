@@ -3241,12 +3241,16 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   }
   function rpPlaceClick(e){
     if(!rpPlacing) return;
-    // Only clicks ON THE TRACKS place a point. This runs in the capture phase
-    // and reads clientX alone, so without this test any click anywhere — the
-    // "add phase" button itself included — counted as placing a point: a
-    // second click on the button set the END rather than cancelling, and the
-    // gesture could not be dismissed from the control that started it.
-    if(!(e.target instanceof Element)||!e.target.closest('#rp-tracks')) return;
+    // Only clicks ON THE TRACKS place a point; everything else CANCELS —
+    // getting stuck in placement mode with no obvious way out (Escape,
+    // discoverable only by luck) was a real complaint. The add-phase button
+    // is excluded here since it already toggles cancel/start on its own
+    // (bubble-phase) listener below; cancelling it here too just meant a
+    // click on it cancelled AND immediately restarted a fresh placement.
+    if(!(e.target instanceof Element)||!e.target.closest('#rp-tracks')){
+      if(!(e.target instanceof Element)||!e.target.closest('#rp-anim-add-phase')) rpPlaceCancel();
+      return;
+    }
     const t=rpTimeFromClientX(e.clientX);
     if(t===null) return;
     e.preventDefault(); e.stopPropagation();
