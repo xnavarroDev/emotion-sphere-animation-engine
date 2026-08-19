@@ -299,12 +299,12 @@ body.watch #dots { display:none !important; }
    ================================================================ */
 :root {
   /* Defined on :root (not #redesign-panel) so these cascade to EVERY
-     element regardless of DOM nesting — .rp-float-card and
-     #anim-canvas-controls are siblings of #redesign-panel, not
-     descendants, so scoping these vars to #redesign-panel alone silently
-     dropped every var(--rp-*) declaration inside them (invalid at
-     computed-value time), which is why they were rendering in the old
-     dark theme's Courier New / blue accents instead of this one. */
+     element regardless of DOM nesting — #anim-canvas-controls and other
+     siblings of #redesign-panel are not descendants of it, so scoping
+     these vars to #redesign-panel alone silently dropped every
+     var(--rp-*) declaration inside them (invalid at computed-value
+     time), which is why they were rendering in the old dark theme's
+     Courier New / blue accents instead of this one. */
   --rp-bg: rgba(22,22,24,0.5);
   --rp-bg-2: #232326;
   --rp-bg-3: #2b2b2f;
@@ -365,8 +365,7 @@ body.watch #dots { display:none !important; }
 }
 #redesign-panel.collapsed { transform: translateX(-100%); }
 #redesign-panel *,
-#anim-canvas-controls *,
-.rp-float-card * { box-sizing: border-box; }
+#anim-canvas-controls * { box-sizing: border-box; }
 /* Only form controls need this: they don't inherit font-family by default, so
    without it they fall back to the UA font (and to the Courier New on body).
    It used to be set on `*` instead — but `*` adds no specificity, so those
@@ -374,8 +373,7 @@ body.watch #dots { display:none !important; }
    class-based rule that asks for --rp-font-num. Every number in the UI was
    rendering in --rp-font as a result, despite explicitly requesting Inter. */
 #redesign-panel :is(input, button, textarea, select),
-#anim-canvas-controls :is(input, button, textarea, select),
-.rp-float-card :is(input, button, textarea, select) { font-family: inherit; }
+#anim-canvas-controls :is(input, button, textarea, select) { font-family: inherit; }
 /* overflow-x must be stated explicitly: per spec a non-visible value on one
    axis forces the other to compute to `auto`, so `overflow-y: auto` alone left
    overflow-x:auto — which paints a permanent horizontal scrollbar wherever the
@@ -544,21 +542,6 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-unsaved.show { display: inline; }
 .rp-unsaved:not(.show) { display: none; }
 
-/* ---- floating Background card ---- */
-.rp-float-card {
-  position: fixed; z-index: 60; width: 260px; background: var(--rp-surface);
-  border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.55);
-  border: 1px solid var(--rp-border); color: var(--rp-ink);
-  font-family: var(--rp-font); overflow: hidden; display: none;
-}
-.rp-float-card.open { display: block; }
-.rp-float-titlebar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px; background: var(--rp-bg-2); cursor: grab; font-size: 12.5px; font-weight: 600;
-}
-.rp-float-titlebar:active { cursor: grabbing; }
-.rp-float-close { border: none; background: none; font-size: 15px; color: var(--rp-ink-2); cursor: pointer; }
-.rp-float-body { padding: 14px 14px 16px; }
 .rp-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .rp-toggle-row span { font-size: 12.5px; font-weight: 600; }
 .rp-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--rp-bg-3); border: none; cursor: pointer; }

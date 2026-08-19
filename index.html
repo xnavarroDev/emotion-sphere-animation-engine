@@ -89,7 +89,6 @@
   </div>
 
   <div class="rp-pinned-rows" id="rp-pinned-rows">
-    <div class="rp-pinned-row" id="rp-background-row">Background <span class="chev"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
     <div class="rp-pinned-row" id="rp-animation-row">Animation <span class="chev"><img class="rp-ico" src="icons/chevrons-right.svg" alt=""></span></div>
   </div>
 
@@ -108,13 +107,16 @@
   </div>
 </div>
 
-<!-- Floating Background card -->
-<div class="rp-float-card" id="rp-bg-card">
-  <div class="rp-float-titlebar" id="rp-bg-titlebar">
+<!-- Background group — moved here from a separate floating card so it's a
+     fifth accordion body alongside Look/Motion/Breathing/Shape; JS relocates
+     this node into #rp-groups (see rpGroupsEl.appendChild(rpBgGroup)) so it
+     lands after Shape without needing RP_GROUPS' per-layer slider plumbing. -->
+<div class="rp-group" id="rp-bg-group">
+  <div class="rp-group-head" id="rp-bg-group-head">
     <span>Background</span>
-    <button class="rp-float-close" id="rp-bg-close" type="button">×</button>
+    <span class="chev"><img class="rp-ico rp-ico-18" src="icons/chevron-down.svg" alt=""></span>
   </div>
-  <div class="rp-float-body">
+  <div class="rp-group-body">
     <div class="rp-toggle-row">
       <span>Glow</span>
       <button class="rp-switch" id="rp-glow-toggle" type="button"></button>
@@ -2203,8 +2205,24 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     wrap.append(head,body);
     rpGroupsEl.appendChild(wrap);
   });
-  // All four groups start COLLAPSED, matching the Figma source — an
-  // expanded Look pushed Background/Animation below the fold.
+  // All groups start COLLAPSED, matching the Figma source — an expanded
+  // Look pushed everything below it off screen.
+
+  // Background used to be its own draggable floating card, reachable only
+  // from a separate pinned row — inconsistent with the other four param
+  // groups for no real reason, and the actual cause of "I can't find the
+  // glow toggle" complaints. It's now a fifth accordion body, relocated
+  // here (after the JS-built groups) so it lands last without needing
+  // RP_GROUPS' per-layer slider plumbing, which doesn't apply to it
+  // (it's scene-wide, not per-layer).
+  const rpBgGroup=document.getElementById('rp-bg-group');
+  const rpBgGroupHead=document.getElementById('rp-bg-group-head');
+  const rpBgGroupChev=rpBgGroupHead.querySelector('.chev');
+  rpBgGroupHead.addEventListener('click',()=>{
+    const open=rpBgGroup.classList.toggle('open');
+    rpBgGroupChev.classList.toggle('rp-flip-y',open);
+  });
+  rpGroupsEl.appendChild(rpBgGroup);
 
   function rpSyncParams(){
     const F=fireflyLayers[ffActive];
@@ -2249,39 +2267,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     editingPhase=false;
   }
 
-  // ---- Background floating card ----
-  const rpBgCard=document.getElementById('rp-bg-card');
-  const rpBgTitlebar=document.getElementById('rp-bg-titlebar');
-  const rpBgChev=document.querySelector('#rp-background-row .chev');
-  const rpSyncBgChevron=()=>{ if(rpBgChev) rpBgChev.classList.toggle('rp-flip-x',rpBgCard.classList.contains('open')); };
-  document.getElementById('rp-bg-close').addEventListener('click',()=>{ rpBgCard.classList.remove('open'); rpSyncBgChevron(); });
-  document.getElementById('rp-background-row').addEventListener('click',()=>{
-    rpBgCard.classList.toggle('open');
-    rpSyncBgChevron();
-    if(rpBgCard.classList.contains('open')&&!rpBgCard.style.left){
-      rpBgCard.style.left='360px'; rpBgCard.style.top='80px';
-    }
-  });
-  (function makeDraggable(handle,target){
-    let dragging=false,dx=0,dy=0;
-    handle.addEventListener('pointerdown',(e)=>{
-      // Controls living in the titlebar (the close ×) must keep their own
-      // clicks: starting a drag here calls setPointerCapture on the titlebar,
-      // which retargets the following pointerup away from the button — so the
-      // click event never completes and the card can't be closed.
-      if(e.target.closest('button')) return;
-      dragging=true; handle.setPointerCapture(e.pointerId);
-      const r=target.getBoundingClientRect();
-      dx=e.clientX-r.left; dy=e.clientY-r.top;
-    });
-    handle.addEventListener('pointermove',(e)=>{
-      if(!dragging) return;
-      target.style.left=Math.max(0,e.clientX-dx)+'px';
-      target.style.top=Math.max(0,e.clientY-dy)+'px';
-    });
-    handle.addEventListener('pointerup',(e)=>{ dragging=false; try{handle.releasePointerCapture(e.pointerId);}catch(err){} });
-  })(rpBgTitlebar,rpBgCard);
-
+  // ---- Background group's controls (glow + gradient) ----
   const rpGlowToggle=document.getElementById('rp-glow-toggle');
   const rpGlowColor=document.getElementById('rp-glow-color');
   const rpGlowOpacity=document.getElementById('rp-glow-opacity');
@@ -2681,7 +2667,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
           trackActive=ti; // reuse the shared track-selector state
           applyTrackSnapshot(phase.snapshot||captureTrackSnapshot());
           rpEditingPhase=phase;
-          if(isScene){ rpBgCard.classList.add('open'); rpSyncBgChevron(); }
+          if(isScene){
+            document.getElementById('rp-params-section').classList.remove('collapsed');
+            document.querySelector('#rp-params-head .chev').classList.add('rp-flip-y');
+            rpBgGroup.classList.add('open');
+            rpBgGroupChev.classList.add('rp-flip-y');
+          }
           rpRenderTracks();
         });
         const rL=document.createElement('div'); rL.className='resize-handle left';
