@@ -208,7 +208,7 @@
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-play" type="button" title="Play/Pause"><img class="rp-ico" src="icons/play.svg" id="rp-anim-play-ico" alt=""></button>
     <button class="rp-icon-btn rp-icon-btn-plain" id="rp-anim-reset" type="button" title="Reset"><img class="rp-ico" src="icons/rotate-ccw.svg" alt=""></button>
     <button class="rp-btn-sm" id="rp-anim-add-phase" type="button"><img class="rp-ico rp-ico-18" src="icons/plus.svg" alt="">add phase</button>
-    <button class="rp-btn-sm" id="rp-anim-clear-phases" type="button" title="Remove every phase from every track"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">clear phases</button>
+    <button class="rp-btn-sm" id="rp-anim-clear-phases" type="button" title="Remove every phase from the focused track"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">clear track</button>
     <span class="rp-loop-row"><span>loop</span><button class="rp-switch on" id="rp-anim-loop" type="button" title="Loop the cycle"></button></span>
   </div>
   <div id="rp-tracks"></div>
@@ -3354,20 +3354,23 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
   });
 
-  // Wipe every phase from every track in one step. Deleting them one at a
-  // time (the only way before this) was the actual complaint — starting a
-  // preset over meant clicking each phase's own x, once per track.
+  // Wipe every phase from just the FOCUSED track (whichever one "add phase"
+  // targets — see activeTimeline). This used to clear every track at once,
+  // but the only thing that left behind was whatever look the sliders
+  // happened to be at, not a curated base — not a real workflow. Redoing one
+  // track's timing without touching the others is: you keep tuning a layer,
+  // its choreography stops fitting, and you want to replace just that
+  // track's phases, one click instead of each phase's own x.
   document.getElementById('rp-anim-clear-phases').addEventListener('click',(e)=>{
     e.stopPropagation();
     if(rpPlacing) rpPlaceCancel();
-    const total=allTimelines().reduce((n,tl)=>n+tl.length,0);
-    if(!total) return;
-    if(!confirm('Remove all phases from every track? (Undo will bring them back.)')) return;
-    allTimelines().forEach(tl=>{ tl.length=0; });
-    rpEditingPhase=null; editingPhase=false;
-    animTime=0; animPrevGlobalT=0; animSeekHold=null;
-    if(animStop) animStop();
-    rpPlayIco.src='icons/play.svg';
+    const tl=activeTimeline();
+    if(!tl.length) return;
+    const label=isSceneTrack()?'Background':(fireflyLayers[trackActive].name||'Layer '+(trackActive+1));
+    if(!confirm('Remove all phases from '+label+'? (Undo will bring them back.)')) return;
+    if(rpEditingPhase&&tl.includes(rpEditingPhase)){ rpEditingPhase=null; editingPhase=false; }
+    tl.length=0;
+    thumbInvalidateTrack(trackActive);
     markDirty(); rpRenderTracks();
   });
 
