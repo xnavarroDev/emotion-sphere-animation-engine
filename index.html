@@ -72,6 +72,10 @@
           <button class="rp-btn-sm" id="rp-layer-clear" type="button"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">clear layer</button>
           <button class="rp-btn-sm" id="rp-layer-zero-all" type="button"><img class="rp-ico rp-ico-18" src="icons/trash.svg" alt="">zero all</button>
         </div>
+        <div class="rp-btn-row">
+          <button class="rp-btn-sm" id="rp-layer-copy" type="button" title="Copy this layer's look"><img class="rp-ico rp-ico-18" src="icons/copy.svg" alt="">copy</button>
+          <button class="rp-btn-sm" id="rp-layer-paste" type="button" title="Paste the copied look onto this layer" disabled><img class="rp-ico rp-ico-18" src="icons/clipboard.svg" alt="">paste</button>
+        </div>
         <div class="rp-groups" id="rp-groups"></div>
         <div class="rp-sphere-row" id="rp-sphere-row">
           <div class="rp-toggle-row">
@@ -2118,6 +2122,29 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       if(animStop) animStop();
       rpPlayIco.src='icons/play.svg';
     }
+    ffSync(); rpRenderTracks(); markDirty();
+  });
+
+  // ---- Copy/paste a layer's look (params + its current colour override)
+  // onto another layer, without retyping every slider. Stays copied across
+  // layer switches so one copy can be pasted onto several layers.
+  let rpCopiedLayerLook=null;
+  const rpLayerPasteBtn=document.getElementById('rp-layer-paste');
+  document.getElementById('rp-layer-copy').addEventListener('click',()=>{
+    const F=fireflyLayers[ffActive];
+    rpCopiedLayerLook={ params:{...F.params}, colorOverride:F.overrides[activeEmotion]||null };
+    rpLayerPasteBtn.disabled=false;
+  });
+  rpLayerPasteBtn.addEventListener('click',()=>{
+    if(!rpCopiedLayerLook) return;
+    const F=fireflyLayers[ffActive];
+    F.setParams(rpCopiedLayerLook.params);
+    F.idle={...F.params};
+    if(rpCopiedLayerLook.colorOverride){
+      F.overrides[activeEmotion]=rpCopiedLayerLook.colorOverride;
+      F.setColor(rpCopiedLayerLook.colorOverride);
+    }
+    rpLiveEditCommit();
     ffSync(); rpRenderTracks(); markDirty();
   });
 

@@ -412,7 +412,8 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   padding: 8px 16px; border: none; border-radius: 7.5px; background: var(--rp-accent);
   color: var(--rp-white); font-size: 12px; font-weight: 600; cursor: pointer;
 }
-.rp-btn-sm:hover { background: var(--rp-accent-hover); }
+.rp-btn-sm:hover:not(:disabled) { background: var(--rp-accent-hover); }
+.rp-btn-sm:disabled { opacity: 0.4; cursor: default; }
 .rp-btn-sm.rp-btn-danger { background: var(--rp-bg-3); color: var(--rp-danger); }
 .rp-btn-row { display: flex; gap: 12px; margin-bottom: 12px; }
 .rp-icon-btn {
