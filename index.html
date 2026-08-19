@@ -3205,8 +3205,10 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     }
     rpPlacing.lastA=a; rpPlacing.lastB=a+span;
     ghost.classList.toggle('typing',rpPlacing.typedDur!=null);
-    ghost.innerHTML=rpFmtTime(a)+' → '+rpFmtTime(a+span)+'  <span class="rp-place-dur-val">'+span.toFixed(1)+'s</span>'
-      +(rpPlacing.typedDur==null?'<span class="rp-place-hint">type + ⏎</span>':'');
+    // The end time is the part you can type over, so it gets its own solid
+    // pill nested in the outer one — same look as a layer-name pill — rather
+    // than a separate "(5.0s)" suffix tacked on after plain text.
+    ghost.innerHTML=rpFmtTime(a)+' → <span class="rp-place-dur-val">'+rpFmtTime(a+span)+'</span>';
     const W=rpRefLane.offsetWidth; // overlay space (see rpCacheLaneGeom)
     band.style.display='block';
     band.style.left=((a/rpAxisSec)*W-rpLaneScroll)+'px';

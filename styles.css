@@ -782,32 +782,29 @@ body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; u
 body.rp-placing, body.rp-placing * { cursor: crosshair !important; }
 body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
 .rp-place-ghost {
-  position: fixed; z-index: 300; display: none; pointer-events: none;
+  position: fixed; z-index: 300; pointer-events: none;
   transform: translate(14px, 14px); white-space: nowrap;
   background: var(--rp-ink); color: var(--rp-on-ink);
-  font: 600 11px/1 var(--rp-font-num); padding: 6px 10px; border-radius: 999px;
+  font: 700 15px/1 var(--rp-font-num); padding: 8px 8px 8px 16px; border-radius: 999px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
-/* The duration reads as its own little field — same "you can type here" cue
-   as .rp-dur-edit and the layer-name pill — because you can: typing digits
-   while placing overrides the mouse-driven span (see the keydown handler in
-   rpPlaceStart's closure). The ghost itself is a LIGHT pill (--rp-ink, near
-   white), so this needs its own white fill + dark border to read as a
-   distinct field rather than a subtle tint that vanishes against it. */
+/* The end time is what you can type over, so it gets its own solid capsule
+   nested in the outer one — same pill-in-pill language as the layer-name
+   field — rather than plain text or a separate "(5.0s)" suffix. Typing
+   digits while placing overrides the mouse-driven span (see the keydown
+   handler in rpPlaceStart's closure). */
 .rp-place-dur-val {
-  display: inline-block; margin: 0 2px 0 5px; padding: 2px 7px; border-radius: 7px;
-  background: #fff; box-shadow: inset 0 0 0 1.5px rgba(23,22,26,0.45);
-  font-weight: 700;
+  display: inline-block; margin-left: 8px; padding: 4px 12px; border-radius: 999px;
+  background: #fff; color: var(--rp-on-ink); box-shadow: 0 1px 2px rgba(0,0,0,0.25);
 }
 .rp-place-ghost.typing .rp-place-dur-val {
-  box-shadow: inset 0 0 0 1.5px var(--rp-accent);
+  box-shadow: 0 0 0 2px var(--rp-accent);
 }
 .rp-place-ghost.typing .rp-place-dur-val::after {
-  content: ""; display: inline-block; width: 1px; height: 10px; margin-left: 2px;
-  background: currentColor; vertical-align: -1px; animation: rp-place-caret 1s step-end infinite;
+  content: ""; display: inline-block; width: 1.5px; height: 12px; margin-left: 2px;
+  background: currentColor; vertical-align: -2px; animation: rp-place-caret 1s step-end infinite;
 }
 @keyframes rp-place-caret { 50% { opacity: 0; } }
-.rp-place-hint { margin-left: 8px; opacity: 0.55; font-weight: 500; }
 /* the span that will actually be inserted, spanning every lane so it reads as
    the shared column it becomes */
 .rp-place-band {
