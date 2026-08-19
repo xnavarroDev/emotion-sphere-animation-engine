@@ -215,7 +215,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="cloud-background.js?v=8"></script>
+<script src="cloud-background.js?v=11"></script>
 <script>
 // Show runtime errors on-screen (helps when the canvas is blank)
 (function(){
@@ -4662,12 +4662,8 @@ const innerPosAttr=innerGeo.getAttribute('position');
 // below that the browser upscales and the strip goes soft.
 const THUMB_W=400, THUMB_CACHE_MAX=400;
 // Raised only while captureThumbnailAt is isolating the Background/scene
-// track — see cloudBg.update's opacityBoost param for why.
+// track — see cloudBg.refreshOpacity's opacityBoost param for why.
 let thumbGlowBoost=1;
-// [scale,worldR,redMix,purpleMix,blueMix,yellowMix] from the most recent
-// live cloudBg.update() call, so captureThumbnailAt can reuse them for its
-// own render-time call (see the comment where this is set, in animate()).
-let lastCloudUpdateArgs=[1,1.5,0,0,0,0];
 // A frame's aspect is the live camera's, CLAMPED. The camera follows the
 // canvas, which the timeline resize can squeeze to a letterbox — dragging the
 // panel tall took it to 7.9, which made every frame a 37px-high sliver and
@@ -4874,12 +4870,12 @@ function captureThumbnailAt(sec,trackIndex){
   cloudBg.onResize(ssW,ssH);
   // thumbSettle's ticks never reach cloudBg.update() (it's only ever called
   // from animate()), so without this the glow's opacity/boost here would
-  // just be whatever the live loop last happened to leave it at — this is
-  // the render-defining call, with skipIntro and the boost set above. The
-  // time value only drives the glow's own slow drift/pulse, so any recent
-  // clock reading is fine for one static frame.
-  const [cuScale,cuWorldR,cuRed,cuPurple,cuBlue,cuYellow]=lastCloudUpdateArgs;
-  cloudBg.update(group,cuScale,cuWorldR,clock.getElapsedTime(),cuRed,cuPurple,cuBlue,cuYellow,true,thumbGlowBoost);
+  // just be whatever the live loop last happened to leave it at. Uses
+  // refreshOpacity(), not update() — update() also drives rotation/stir
+  // simulation with real per-call side effects (accumulating += and
+  // exponential smoothing), so calling it this extra time per thumbnail was
+  // silently drifting the LIVE glow's motion state on every capture.
+  cloudBg.refreshOpacity(true,thumbGlowBoost);
   renderer.setRenderTarget(thumbTarget);
   renderer.setClearColor(0x000000,0);
   renderer.render(scene,camera);
@@ -5432,13 +5428,10 @@ function animate(){
   const cloudPurpleMix=emotionPick(cwCloud,'purple');
   const cloudBlueMix=emotionPick(cwCloud,'blue');
   const cloudYellowMix=emotionPick(cwCloud,'yellow');
-  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix, animScrubbing, thumbGlowBoost);
-  // Cached so captureThumbnailAt can give the offscreen render its own
-  // up-to-date cloudBg.update() call — thumbSettle/updateInnerLayers never
-  // reach this one (it's animate()-only), so without this a thumbnail baked
-  // in whatever opacity this live loop happened to last leave behind,
-  // completely uncoupled from skipIntro/opacityBoost.
-  lastCloudUpdateArgs=[sphere.scale,worldR,cloudRedMix,cloudPurpleMix,cloudBlueMix,cloudYellowMix];
+  // Never passes thumbGlowBoost here — that's only for captureThumbnailAt's
+  // own refreshOpacity() call, isolating the Background track's glow at
+  // thumbnail scale. The live sphere always renders at boost 1 (default).
+  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix, animScrubbing);
 
   if(sphereCore&&sphereCore.sprite.visible){
     if(cycleOn) sphereCore.setCycleBlend(cycleSegment);

@@ -388,7 +388,28 @@ gl_FragColor.a*=vis*0.9;`
           const op = m.opacityBase + Math.sin(t * m.pulseSp * 0.9 + m.ph2) * m.opacityPulse;
           c.material.opacity = Math.max(0.04, op);
           applyAutoStir(c, m, t, r, gph);
+          // Stash the pre-multiplier value so refreshOpacity() (used by a
+          // thumbnail capture) can redo just the intro/boost math against
+          // THIS frame's simulated result, without re-running any of the
+          // stateful stuff above — rotation accumulates via +=, stir smooths
+          // exponentially, rotateZ is relative: calling this whole method an
+          // extra time per thumbnail was silently drifting the live glow's
+          // simulation state every time a thumbnail got captured.
+          c.userData.baseOpacity = c.material.opacity;
           c.material.opacity = Math.min(1, Math.max(0, c.material.opacity * userOpacity * intro * boost));
+        }
+      },
+      // Safe to call as many extra times as needed (e.g. once per thumbnail
+      // capture) — only touches material.opacity, from whatever the last
+      // real update() call simulated, so it can't drift position/rotation.
+      refreshOpacity(skipIntro, opacityBoost) {
+        const intro = skipIntro ? 1 : introFactor();
+        const boost = opacityBoost || 1;
+        for (let i = 0; i < cloudMeshes.length; i++) {
+          const c = cloudMeshes[i];
+          const base = c.userData.baseOpacity;
+          if (base == null) continue;
+          c.material.opacity = Math.min(1, Math.max(0, base * userOpacity * intro * boost));
         }
       },
       onResize(w, h) {
