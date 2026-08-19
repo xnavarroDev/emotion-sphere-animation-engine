@@ -2270,6 +2270,12 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   // gets overwritten with the live state on every edit — no separate Capture.
   let rpEditingPhase=null; // the {duration,snapshot,ease} object being live-edited, or null
   let thumbLiveEditTimer=null;
+  function rpFlashSaved(el){
+    if(!el) return;
+    el.classList.remove('rp-save-flash');
+    void el.offsetWidth; // force reflow so re-adding mid-flash restarts the animation
+    el.classList.add('rp-save-flash');
+  }
   function rpLiveEditCommit(){
     if(!rpEditingPhase) return;
     rpEditingPhase.snapshot=captureTrackSnapshot();
@@ -2285,8 +2291,17 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     // than re-rendering the filmstrip on every pixel of the drag too
     thumbInvalidateTrack(trackActive);
     clearTimeout(thumbLiveEditTimer);
+    const savingPhase=rpEditingPhase;
     thumbLiveEditTimer=setTimeout(()=>{
       if(rpTracksContainer.classList.contains('open')) rpRenderTracks();
+      // Live-write has no separate save step — it's already saved the
+      // instant you touch a slider — but that's invisible, and "is this
+      // actually sticking?" was a direct complaint. One flash per settle
+      // (not per tick of the drag), on whatever element rpSegmentEls
+      // currently has for this phase — re-read after the render above,
+      // since that call can replace the element the flash would land on.
+      const freshEl=rpSegmentEls.get(savingPhase);
+      if(freshEl) rpFlashSaved(freshEl.swatch);
     },600);
   }
   function rpStopEditingPhase(){
