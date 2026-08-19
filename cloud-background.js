@@ -317,9 +317,18 @@ gl_FragColor.a*=vis*0.9;`
       // a thumbnail captured within the intro window would bake in a dim
       // glow forever, never matching what's actually on screen once the
       // real fade finishes.
-      update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix, yellowMix, skipIntro) {
+      // opacityBoost: the 18 cloud sprites are individually faint (each
+      // 0.14-0.28 base opacity) by design — they only read as one solid
+      // blob once enough of them overlap on a big, full-canvas render. A
+      // Background-track thumbnail isolates the glow with nothing else in
+      // frame at a fraction of the resolution, so the same sprites read as
+      // a scatter of faint dots instead. Boosting just for that one capture
+      // (rather than lowering the live look everywhere) keeps the live
+      // sphere untouched.
+      update(sphereGroupRef, sphereScale, worldRadius, time, redMix, purpleMix, blueMix, yellowMix, skipIntro, opacityBoost) {
         const t = time || 0;
         const intro = skipIntro ? 1 : introFactor();
+        const boost = opacityBoost || 1;
         applyCloudPalette(redMix, purpleMix, blueMix, yellowMix);
         uniforms.cloudTint.value.multiply(userTintColor);
         uniforms.cloudTintDeep.value.multiply(userTintColor);
@@ -379,7 +388,7 @@ gl_FragColor.a*=vis*0.9;`
           const op = m.opacityBase + Math.sin(t * m.pulseSp * 0.9 + m.ph2) * m.opacityPulse;
           c.material.opacity = Math.max(0.04, op);
           applyAutoStir(c, m, t, r, gph);
-          c.material.opacity = Math.max(0, c.material.opacity * userOpacity * intro);
+          c.material.opacity = Math.min(1, Math.max(0, c.material.opacity * userOpacity * intro * boost));
         }
       },
       onResize(w, h) {

@@ -215,7 +215,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="cloud-background.js?v=7"></script>
+<script src="cloud-background.js?v=8"></script>
 <script>
 // Show runtime errors on-screen (helps when the canvas is blank)
 (function(){
@@ -4661,6 +4661,13 @@ const innerPosAttr=innerGeo.getAttribute('position');
 // at strip height x THUMB_ASPECT_MAX, and the hover preview) on a 2x screen —
 // below that the browser upscales and the strip goes soft.
 const THUMB_W=400, THUMB_CACHE_MAX=400;
+// Raised only while captureThumbnailAt is isolating the Background/scene
+// track — see cloudBg.update's opacityBoost param for why.
+let thumbGlowBoost=1;
+// [scale,worldR,redMix,purpleMix,blueMix,yellowMix] from the most recent
+// live cloudBg.update() call, so captureThumbnailAt can reuse them for its
+// own render-time call (see the comment where this is set, in animate()).
+let lastCloudUpdateArgs=[1,1.5,0,0,0,0];
 // A frame's aspect is the live camera's, CLAMPED. The camera follows the
 // canvas, which the timeline resize can squeeze to a letterbox — dragging the
 // panel tall took it to 7.9, which made every frame a 37px-high sliver and
@@ -4802,6 +4809,10 @@ function captureThumbnailAt(sec,trackIndex){
   // so anything set beforehand is silently overwritten before the render.
   const isSceneTrack=!wholeScene&&trackIndex>=fireflyLayers.length;
   const savedCloudVis=cloudBg.visible;
+  // Isolated (nothing else in frame, small render target), so the glow's
+  // normally-subtle sprites need a boost to read as a blob instead of a
+  // scatter of faint dots — see cloudBg.update's opacityBoost comment.
+  thumbGlowBoost=isSceneTrack?2.2:1;
   // Same leak as savedParams above, on the Scene track's side: lerpSceneSnap
   // (called by the same applyAnimFrame ticks, for the Background/Scene row
   // whenever it has phases) writes straight into these globals — CLASSIC[k]=,
@@ -4861,6 +4872,14 @@ function captureThumbnailAt(sec,trackIndex){
   // the target it was rendering into. onResize() is the same call the window
   // resize handler makes, just pointed at the capture size instead.
   cloudBg.onResize(ssW,ssH);
+  // thumbSettle's ticks never reach cloudBg.update() (it's only ever called
+  // from animate()), so without this the glow's opacity/boost here would
+  // just be whatever the live loop last happened to leave it at — this is
+  // the render-defining call, with skipIntro and the boost set above. The
+  // time value only drives the glow's own slow drift/pulse, so any recent
+  // clock reading is fine for one static frame.
+  const [cuScale,cuWorldR,cuRed,cuPurple,cuBlue,cuYellow]=lastCloudUpdateArgs;
+  cloudBg.update(group,cuScale,cuWorldR,clock.getElapsedTime(),cuRed,cuPurple,cuBlue,cuYellow,true,thumbGlowBoost);
   renderer.setRenderTarget(thumbTarget);
   renderer.setClearColor(0x000000,0);
   renderer.render(scene,camera);
@@ -4900,6 +4919,7 @@ function captureThumbnailAt(sec,trackIndex){
   thumbCtx.globalCompositeOperation='source-over';
 
   cloudBg.setVisible(savedCloudVis);
+  thumbGlowBoost=1;
   fireflyLayers.forEach((F,i)=>{ F.points.visible=savedVis[i]; F.setParams({size:savedSizes[i]}); });
   // One real call (not a settle burst) so the inner "classic" emotion-colour
   // system — unrelated to phases, ticks every frame regardless — stays in
@@ -5412,7 +5432,13 @@ function animate(){
   const cloudPurpleMix=emotionPick(cwCloud,'purple');
   const cloudBlueMix=emotionPick(cwCloud,'blue');
   const cloudYellowMix=emotionPick(cwCloud,'yellow');
-  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix, animScrubbing);
+  cloudBg.update(group, sphere.scale, worldR, t, cloudRedMix, cloudPurpleMix, cloudBlueMix, cloudYellowMix, animScrubbing, thumbGlowBoost);
+  // Cached so captureThumbnailAt can give the offscreen render its own
+  // up-to-date cloudBg.update() call — thumbSettle/updateInnerLayers never
+  // reach this one (it's animate()-only), so without this a thumbnail baked
+  // in whatever opacity this live loop happened to last leave behind,
+  // completely uncoupled from skipIntro/opacityBoost.
+  lastCloudUpdateArgs=[sphere.scale,worldR,cloudRedMix,cloudPurpleMix,cloudBlueMix,cloudYellowMix];
 
   if(sphereCore&&sphereCore.sprite.visible){
     if(cycleOn) sphereCore.setCycleBlend(cycleSegment);
