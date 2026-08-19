@@ -161,6 +161,20 @@ gl_FragColor.a*=vis*0.9;`
     let userTintColor = new THREE.Color(1, 1, 1);
     let userOpacity = 1.0;
 
+    // The glow used to just pop in at full opacity the instant the page
+    // loaded, while the firefly particles already had their own spawn-in
+    // reveal (see setSpawnAge) — the background was the one thing that
+    // didn't ease in. Ramps once from creation time, not from every later
+    // setUserTint/setVisible call, so switching presets or toggling Glow
+    // afterward stays instant as before.
+    const INTRO_FADE_MS = 1800;
+    const introStartAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    function introFactor() {
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const t = Math.min(1, Math.max(0, (now - introStartAt) / INTRO_FADE_MS));
+      return t * t * (3 - 2 * t); // smoothstep
+    }
+
     function mixCloudColor(out, orange, red, purple, cyan, yellow, wO, wR, wP, wB, wY) {
       const s = Math.max(0.001, wO + wR + wP + wB + wY);
       out.setRGB(
@@ -356,7 +370,7 @@ gl_FragColor.a*=vis*0.9;`
           const op = m.opacityBase + Math.sin(t * m.pulseSp * 0.9 + m.ph2) * m.opacityPulse;
           c.material.opacity = Math.max(0.04, op);
           applyAutoStir(c, m, t, r, gph);
-          c.material.opacity = Math.max(0, c.material.opacity * userOpacity);
+          c.material.opacity = Math.max(0, c.material.opacity * userOpacity * introFactor());
         }
       },
       onResize(w, h) {
