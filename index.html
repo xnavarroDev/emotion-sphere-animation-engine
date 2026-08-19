@@ -2751,6 +2751,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
         // bracket instead of the thin strip on the thumbnail itself.
         const pbracket=document.createElement('div'); pbracket.className='rp-bracket';
         pbracket.style.left=leftPct+'%'; pbracket.style.width=w+'%';
+        if(rpEditingPhase===phase) pbracket.classList.add('editing');
         const brL=document.createElement('div'); brL.className='rp-bracket-handle left'; brL.title='Drag to change when this phase starts';
         const brR=document.createElement('div'); brR.className='rp-bracket-handle right'; brR.title='Drag to change how long this phase lasts';
         pbracket.append(brL,brR);

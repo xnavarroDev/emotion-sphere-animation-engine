@@ -850,7 +850,14 @@ body.rp-placing .rp-thumb-slot:hover { filter: none; box-shadow: none; }
 /* the one in use — a dot rather than a tick, to stay quiet in a long list */
 .rp-ease-item.on { color: var(--rp-ink); }
 .rp-ease-item.on::before { content: '● '; color: var(--rp-accent-hover); }
-.rp-segment.editing { outline: 2px solid var(--rp-ink); outline-offset: -2px; }
+/* Needed to visibly beat .rp-thumb-slot:hover's brightness(1.35) + inset
+   border — that's meant to mark which single frame the magnified popup
+   preview is showing, not a selection, but at a thin 2px outline it read
+   as MORE prominent than the phase actually being selected/edited. A
+   thicker outline plus a soft glow keeps winning regardless of which
+   frame within it happens to be hovered. */
+.rp-segment.editing { outline: 3px solid var(--rp-ink); outline-offset: -3px; box-shadow: 0 0 0 1px var(--rp-ink), 0 0 14px 2px rgba(255,255,255,0.55); z-index: 3; }
+.rp-bracket.editing { box-shadow: 0 0 8px 1px rgba(255,255,255,0.55); }
 .rp-segment .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .rp-segment .resize-handle.left { left: 0; }
 .rp-segment .resize-handle.right { right: 0; }
