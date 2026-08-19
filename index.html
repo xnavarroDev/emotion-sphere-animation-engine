@@ -980,20 +980,25 @@ function emotionCoreColor(name){
 }
 // ---- Per-track animation playback ----
 const trackSeq=(tl)=>tl.filter(p=>p.snapshot);
-// Total = every set phase's duration. The final phase's duration is a HOLD:
-// the track sits on its last captured look for that long before it ends or
-// wraps (trackLerp clamps to the final snapshot past the last transition).
+// Total = every set phase's duration.
 const trackTotal=(seq)=>seq.reduce((s,p)=>s+p.duration,0);
 // Walk one track's segments and hand the surrounding snapshots + eased
-// fraction to `apply`.
-function trackLerp(seq,t,apply){
+// fraction to `apply`. Each phase's OWN duration is the time it takes to
+// arrive at that phase's OWN values — i.e. what you dial in for phase N is
+// the look the track reaches by the end of phase N's segment, not the start
+// of it. The transition source is the previous phase in the cycle — except
+// phase 0, which builds in from `zeroSnapshot` (nothing) instead of
+// wrapping from the last phase, so every loop starts a track's rise from
+// empty rather than smearing in from wherever the last phase left off.
+function trackLerp(seq,t,apply,zeroSnapshot){
   let acc=0;
-  for(let i=0;i<seq.length-1;i++){
+  for(let i=0;i<seq.length;i++){
     const dur=seq[i].duration;
-    if(t<acc+dur||i===seq.length-2){
-      // the source phase's `ease` shapes its outgoing transition
+    if(t<acc+dur||i===seq.length-1){
+      const prev=(i===0&&zeroSnapshot)?zeroSnapshot:seq[(i-1+seq.length)%seq.length].snapshot;
+      // the arriving phase's own `ease` shapes the transition into it
       const ease=(seq[i].ease&&EASINGS[seq[i].ease])||smootherstep;
-      apply(seq[i].snapshot,seq[i+1].snapshot,ease(Math.min(1,(t-acc)/dur)));
+      apply(prev,seq[i].snapshot,ease(Math.min(1,(t-acc)/dur)));
       return;
     }
     acc+=dur;
@@ -1117,7 +1122,11 @@ function applyAnimFrame(dt){
     animPrevGlobalT=t;
   }else t=Math.min(animTime,maxTotal);
   for(const {F,seq,total} of tracks){
-    trackLerp(seq,Math.min(t,total),(a,b,frac)=>lerpFireflySnap(F,a,b,frac));
+    // "nothing" for a firefly layer = its own phase-1 look with count zeroed —
+    // every other param (colour, intensity, etc.) already matches phase 1, so
+    // only the particle count actually builds in from empty.
+    const zero={params:{...seq[0].snapshot.params,count:0},colour:seq[0].snapshot.colour};
+    trackLerp(seq,Math.min(t,total),(a,b,frac)=>lerpFireflySnap(F,a,b,frac),zero);
   }
   if(sceneSeq) trackLerp(sceneSeq,Math.min(t,sceneTotal),lerpSceneSnap);
   if(fireflyFieldSyncUI) fireflyFieldSyncUI();
@@ -5517,12 +5526,15 @@ animate();
 function layoutViewport(){
   const panel=document.getElementById('redesign-panel');
   const left=(panel&&!panel.classList.contains('collapsed'))?panel.offsetWidth:0;
-  // The timeline's height is deliberately NOT subtracted. It used to be, so
-  // opening or dragging the panel resized the canvas — which changed the
-  // camera aspect and re-rendered the sphere at a different size and framing
-  // every time the panel moved. The sphere now keeps one full-height viewport
-  // and the timeline floats over it (translucently, see --rp-chrome), so
-  // resizing the panel changes what covers the sphere, never the sphere.
+  // The timeline's height is deliberately NOT subtracted from the canvas
+  // itself. It used to be, so opening or dragging the panel resized the
+  // canvas — which changed the camera aspect and re-rendered the sphere at a
+  // different size and framing every time the panel moved. The sphere keeps
+  // one full-height viewport and the timeline floats over it (translucently,
+  // see --rp-chrome) — but a phase whose particles spread out enough was
+  // animating down behind that overlay with nothing keeping it clear of it.
+  // updateSphereViewOffset (below) handles that separately, by shifting
+  // WHERE the same full render lands on screen rather than resizing it.
   const w=Math.max(1,innerWidth-left);
   const h=Math.max(1,innerHeight);
   camera.aspect=w/h;
@@ -5531,6 +5543,19 @@ function layoutViewport(){
   renderer.domElement.style.left=left+'px';
   renderer.domElement.style.top='0px';
   cloudBg.onResize(w,h);
+  updateSphereViewOffset(w,h);
+}
+// Shifts the RENDERED FRAME up within the same full-height canvas (a
+// lens-shift, via setViewOffset — not a camera move, so nothing about how a
+// phase actually looks changes) so the sphere sits centred in the area the
+// timeline overlay actually leaves visible, rather than centred in the full
+// window and spilling down behind the timeline once a phase's particles
+// spread out enough to reach that low.
+function updateSphereViewOffset(w,h){
+  const timeline=document.getElementById('anim-canvas-controls');
+  const timelineH=(timeline&&timeline.classList.contains('open'))?timeline.getBoundingClientRect().height:0;
+  if(timelineH>0) camera.setViewOffset(w,h+timelineH,0,timelineH,w,h);
+  else camera.clearViewOffset();
 }
 window.rpLayoutViewport=layoutViewport; // called by the panel/timeline toggles
 window.addEventListener('resize',layoutViewport);
