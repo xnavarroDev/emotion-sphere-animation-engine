@@ -2307,12 +2307,22 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   const rpGradientThumb=document.getElementById('rp-gradient-thumb');
   const rpGradientToggle=document.getElementById('rp-gradient-toggle');
   let rpLastGradientAmount=1;
+  let rpLastGlowOpacity=1;
 
+  // Glow "off" is opacity 0, not a separate on/off switch — glowOpacity is
+  // already captured per phase and interpolated (see captureSnapshotForTrack/
+  // lerpSceneSnap), so tying visibility to it makes glow on/off animate per
+  // phase for free, the same way the gradient toggle already remembers and
+  // restores bgGradientAmount. cloudBg.visible stays fixed true — it's used
+  // elsewhere for a different purpose (thumbnail capture isolation) and by
+  // the legacy toggle-glow control, neither of which this touches.
   rpGlowToggle.addEventListener('click',()=>{
-    const on=!rpGlowToggle.classList.contains('on');
-    rpGlowToggle.classList.toggle('on',on);
-    cloudBg.setVisible(on);
-    document.getElementById('toggle-glow')?.classList.toggle('active',on);
+    if(glowUserOpacity>0){ rpLastGlowOpacity=glowUserOpacity; glowUserOpacity=0; }
+    else glowUserOpacity=rpLastGlowOpacity||1;
+    cloudBg.setUserTint(null,glowUserOpacity);
+    rpGlowOpacity.value=glowUserOpacity;
+    rpGlowOpacityVal.textContent=glowUserOpacity.toFixed(2);
+    rpGlowToggle.classList.toggle('on',glowUserOpacity>0);
     rpLiveEditCommit(); markDirty();
   });
   rpGlowColor.addEventListener('input',()=>{
@@ -2349,7 +2359,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
     rpGradientThumb.addEventListener('pointerup',(e)=>{ dragging=false; try{rpGradientThumb.releasePointerCapture(e.pointerId);}catch(err){} });
   })();
   function rpSyncBgCard(){
-    rpGlowToggle.classList.toggle('on', cloudBg.visible!==false);
+    rpGlowToggle.classList.toggle('on', glowUserOpacity>0);
     if(document.activeElement!==rpGlowColor) rpGlowColor.value=glowUserColor;
     if(document.activeElement!==rpGlowOpacity) rpGlowOpacity.value=glowUserOpacity;
     rpGlowOpacityVal.textContent=(+glowUserOpacity).toFixed(2);
@@ -2911,28 +2921,21 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
       }
 
       // per-track "does playback drive this?" switch (regression from v1's
-      // On/Off track toggle). Off dims the lane so it reads as inert.
-      // For the Background/scene track this is the ONLY switch on the row
-      // (the separate glow switch was removed as a duplicate of the one in
-      // Parameters > Background), so it doubles as visibility: flipping it
-      // also drives cloudBg.setVisible(), same call the Background card's
-      // own Glow switch makes, kept in sync in both directions.
-      const isOn=isScene?(cloudBg.visible!==false):(F.anim!==false);
+      // On/Off track toggle). Off dims the lane so it reads as inert. This
+      // used to also double as the Background track's glow visibility (the
+      // only switch on that row at the time) — reverted: glow on/off is now
+      // just glowOpacity 0/remembered (see the Parameters > Background Glow
+      // switch), which is captured per phase and animates like everything
+      // else, instead of a single global switch that fought with per-phase
+      // editing and had nothing to do with "does this track animate."
+      const isOn=isScene?(sceneAnim!==false):(F.anim!==false);
       const tgWrap=document.createElement('div'); tgWrap.className='rp-track-toggle';
       const tg=document.createElement('button'); tg.type='button';
       tg.className='rp-switch'+(isOn?' on':'');
-      tg.title=isScene
-        ? (isOn?'Background glow is visible — click to hide it':'Background glow is hidden — click to show it')
-        : (isOn?'Animation drives this track — click to disable':'This track is static — click to animate it');
+      tg.title=isOn?'Animation drives this track — click to disable':'This track is static — click to animate it';
       tg.addEventListener('click',(e)=>{
         e.stopPropagation();
-        if(isScene){
-          const on=!(cloudBg.visible!==false);
-          cloudBg.setVisible(on);
-          sceneAnim=on;
-          document.getElementById('rp-glow-toggle')?.classList.toggle('on',on);
-          document.getElementById('toggle-glow')?.classList.toggle('active',on);
-        }
+        if(isScene) sceneAnim=sceneAnim===false;
         else F.anim=F.anim===false;
         markDirty(); rpRenderTracks();
       });
