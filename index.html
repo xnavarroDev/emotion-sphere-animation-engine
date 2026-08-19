@@ -4695,6 +4695,19 @@ function captureThumbnailAt(sec,trackIndex){
   const savedQuat=fireflyLayers.map(F=>F.points.quaternion.clone());
   const savedColor=fireflyLayers.map(F=>F.color().clone());
   const savedMotion=fireflyLayers.map(F=>F.snapshotMotion());
+  // thumbSettle's ticks run applyAnimFrame for real, which — for EVERY layer
+  // with phases, not just the one being captured — calls lerpFireflySnap, and
+  // that calls F.setParams(...) directly: it doesn't touch a uniform, it
+  // overwrites the plain F.params object the Parameters sliders themselves
+  // read and write. Nothing here was saving that (only `size` was, for the
+  // point-scale hack below), so every background thumbnail render silently
+  // reverted count/radius/intensity/etc. on every animated layer to whatever
+  // that phase specified — permanently, whether or not that layer's own row
+  // was the one being captured. Confirmed live: manually zeroing every
+  // layer's params, then letting captures run, brought them back within
+  // ~1.5s with no user action. Same fix as quaternion/color/motion above,
+  // just for the object trackLerp actually writes into.
+  const savedParams=fireflyLayers.map(F=>({...F.params}));
   // Show only this track's own contribution. Visibility only — no look params
   // are touched, so what renders is the layer exactly as it is, minus
   // everything else that would normally sit on top of it.
@@ -4710,6 +4723,15 @@ function captureThumbnailAt(sec,trackIndex){
   // so anything set beforehand is silently overwritten before the render.
   const isSceneTrack=!wholeScene&&trackIndex>=fireflyLayers.length;
   const savedCloudVis=cloudBg.visible;
+  // Same leak as savedParams above, on the Scene track's side: lerpSceneSnap
+  // (called by the same applyAnimFrame ticks, for the Background/Scene row
+  // whenever it has phases) writes straight into these globals — CLASSIC[k]=,
+  // bgColor via setBgColor(), etc. — not into a restorable uniform. Confirmed
+  // live: manually setting bgColor, then letting 20 captures run with no
+  // playback at all, silently reverted it back to the phase's own colour.
+  const savedClassic={...CLASSIC};
+  const savedGlowOpacity=glowUserOpacity, savedGlowColor=glowUserColor;
+  const savedBgColor=bgColor, savedBgColor2=bgColor2, savedBgGradientAmount=bgGradientAmount;
 
   // Thumbnails are sampled out of order (per phase, per track — not a
   // monotonic sweep of the clock), which would otherwise trip applyAnimFrame's
@@ -4800,16 +4822,29 @@ function captureThumbnailAt(sec,trackIndex){
 
   cloudBg.setVisible(savedCloudVis);
   fireflyLayers.forEach((F,i)=>{ F.points.visible=savedVis[i]; F.setParams({size:savedSizes[i]}); });
-  // One real call (not a settle burst) to put the SCENE side back — CLASSIC/
-  // glow/bg are plain lerped setters, not accumulators, so they're already
-  // exactly right after a single pass. Whatever this same call does to each
-  // layer's motion state is irrelevant — restoreMotion overwrites it below
-  // with the exact pre-capture snapshot, an exact undo instead of another
-  // easing pass racing to catch back up.
+  // One real call (not a settle burst) so the inner "classic" emotion-colour
+  // system — unrelated to phases, ticks every frame regardless — stays in
+  // its normal rhythm rather than skipping a beat. This call ALSO re-runs
+  // applyAnimFrame at savedTime, which is exactly the mutation this function
+  // exists to undo (see savedParams/savedClassic above) — an earlier version
+  // relied on that replay landing back on the pre-capture values, which only
+  // holds if the timeline's own state at savedTime happened to match them
+  // already. Directly restoring the saved values below the call, rather than
+  // trusting the replay, is correct regardless of what was live before the
+  // capture — measured or manually set, mid-drag or not.
   animTime=savedTime; animScrubbing=true;
   updateInnerLayers(clock.getElapsedTime(),0);
   animScrubbing=false;
   animLoop=savedLoop;
+  fireflyLayers.forEach((F,i)=>F.setParams(savedParams[i]));
+  Object.assign(CLASSIC,savedClassic);
+  if(classicSyncUI) classicSyncUI();
+  glowUserOpacity=savedGlowOpacity; glowUserColor=savedGlowColor;
+  cloudBg.setUserTint(savedGlowColor,savedGlowOpacity);
+  const goEl=document.getElementById('glow-opacity'); if(goEl&&document.activeElement!==goEl) goEl.value=savedGlowOpacity;
+  const gcEl=document.getElementById('glow-color'); if(gcEl&&document.activeElement!==gcEl) gcEl.value=savedGlowColor;
+  setBgColor(savedBgColor); setBgColor2(savedBgColor2); setBgGradientAmount(savedBgGradientAmount);
+  if(backgroundCardSyncUI) backgroundCardSyncUI();
   fireflyLayers.forEach((F,i)=>{
     F.points.quaternion.copy(savedQuat[i]);
     F.color().copy(savedColor[i]);
