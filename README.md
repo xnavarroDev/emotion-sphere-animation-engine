@@ -157,7 +157,17 @@ save/load glue in **`index.html`**.
 
 ## Deployment
 
-Deployed on Vercel (project `lost-in-space-light`):
+Deployed on Vercel, connected directly to **this repo**
+(`emotion-sphere-animation-engine`) with **`colour-switch` as the production
+branch** — every push to `colour-switch` auto-deploys to
+https://lost-in-space-light.vercel.app, no manual step needed.
+
+(This wasn't always the case: the Vercel project used to be connected to a
+different repo, `lost-in-space-light`, which is why old commit messages or
+docs might reference it. If a push isn't showing up on the live site, check
+Vercel → Project → Settings → Git to confirm it's still pointed at this repo.)
+
+Manual/local deploy is still available if needed:
 
 ```bash
 npx vercel --prod
