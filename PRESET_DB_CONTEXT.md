@@ -10,22 +10,22 @@ spots to them.
 
 ## 1. Current state (what's real vs. stubbed)
 
-- **"save to presets" button** (`#rp-save-btn`, [index.html:102](index.html#L102),
-  handler at [index.html:1780](index.html#L1780)) — currently just copies the
+- **"save to presets" button** (`#rp-save-btn`, [index.html:110](index.html#L110),
+  handler at [index.html:2059](index.html#L2059)) — currently just copies the
   preset text to the clipboard. Does not persist anywhere.
 - **"Browse saved presets" button** (`#rp-browse-btn`, [index.html:39](index.html#L39))
   — `disabled`, title says "Saving and browsing your own custom presets isn't
   built yet". No browse UI exists yet at all.
 - **The 3 cards + arrow row** (`.rp-card-stub` x3, `.rp-cards-arrow`,
   [index.html:41-44](index.html#L41-L44), wired at
-  [index.html:1730-1752](index.html#L1730-L1752)) — currently cycle through
+  [index.html:1953-2032](index.html#L1953-L2032)) — currently cycle through
   the 4 **built-in** emotion presets (calm/sad/warm/anger) via
   `window.emotionSphere.play(emo)`. This is a quick-load shortcut for the
   built-ins, not the saved-presets browser — leave this behavior alone and
   build saved-preset browsing as its own thing (see §4).
-- **Preset name field** (`#rp-preset-name`, [index.html:98](index.html#L98)) —
+- **Preset name field** (`#rp-preset-name`, [index.html:101](index.html#L101)) —
   already tracks a name + dirty state (`rpPresetName`, `rpDirty`,
-  [index.html:1771-1778](index.html#L1771-L1778)). Reuse this as the name for
+  [index.html:2050-2056](index.html#L2050-L2056)). Reuse this as the name for
   a saved preset.
 - The 4 built-in presets live as static files in `presets/*.txt` and are
   **not** what you're building — those stay as shipped files. You're adding
@@ -36,8 +36,8 @@ spots to them.
 A preset is a single opaque plain-text blob (the exact format described in
 `GEMINI_PRESET_CONTEXT.md` §3, if you want the grammar — you don't need to
 parse it, just store/retrieve it as text). It's produced by `paramsToText()`
-([index.html:2608](index.html#L2608)) and consumed by
-`window.emotionSphere.applyPreset(text)` ([index.html:2886](index.html#L2886)).
+([index.html:3759](index.html#L3759)) and consumed by
+`window.emotionSphere.applyPreset(text)` ([index.html:4099](index.html#L4099)).
 
 Treat it as a string. Don't parse or validate its internal structure — that's
 the tool's job, not the DB layer's.
@@ -87,8 +87,8 @@ DELETE /api/presets/:id
 Keep your footprint in `index.html` small — write your logic in a new module
 (e.g. `presets-store.js`, dynamically imported the same way
 `field.js`/`firefly-field.js`/`sphere-core.js` already are, see
-[index.html:1034](index.html#L1034) and
-[index.html:2568](index.html#L2568)) exposing something like:
+[index.html:1194](index.html#L1194) and
+[index.html:3719](index.html#L3719)) exposing something like:
 
 ```js
 export async function listPresets() { ... }        // GET /api/presets
@@ -99,13 +99,13 @@ export async function deletePreset(id) { ... }       // DELETE /api/presets/:id
 
 Then in `index.html`:
 
-1. **Save**: in the `#rp-save-btn` handler ([index.html:1780](index.html#L1780)),
+1. **Save**: in the `#rp-save-btn` handler ([index.html:2059](index.html#L2059)),
    call `savePreset(rpPresetName, paramsToText())` alongside (or instead of)
    the clipboard copy.
 2. **Browse**: enable `#rp-browse-btn` (drop `disabled`, update the title),
-   wire it to open a list (new small panel/modal — match the existing
-   `.rp-float-card` pattern used for Background/Animation, e.g.
-   [index.html:107](index.html#L107)) populated from `listPresets()`.
+   wire it to open a list (new small panel/modal — there's no existing
+   float-card/modal component to copy, so build a minimal one styled to
+   match the panel's existing `.rp-*` classes) populated from `listPresets()`.
    Clicking an entry: `loadPreset(id)` then
    `window.emotionSphere.applyPreset(text)` — same entry point the Gemini
    integration uses, so this is the shared "apply a preset" seam.
@@ -115,5 +115,16 @@ Then in `index.html`:
    ([index.html:46](index.html#L46)).
 
 Leave `RP_BUILTIN_PRESETS` / the cards-row quick-load
-([index.html:1730-1752](index.html#L1730-L1752)) untouched — that's a
+([index.html:1953-2032](index.html#L1953-L2032)) untouched — that's a
 separate, already-finished feature for the 4 shipped emotions.
+
+---
+
+## 6. Shared groundwork with the Gemini feature
+
+The "Describe a feeling" AI generator needs the same Vercel serverless
+setup described in §3 (and has the same "no key in the browser" constraint).
+If you're building both, do the `api/` groundwork once — see
+[`docs/GEMINI_INTEGRATION.md`](docs/GEMINI_INTEGRATION.md). Both features
+also converge on the same apply seam,
+`window.emotionSphere.applyPreset(text)`.

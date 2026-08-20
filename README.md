@@ -10,6 +10,16 @@ to help children explore and reflect their emotional state.
 
 Live: https://lost-in-space-light.vercel.app
 
+**Docs:**
+- [User guide](docs/USER_GUIDE.md) — UI controls, every parameter, easing curves
+- [Preset format reference](GEMINI_PRESET_CONTEXT.md) — the `.txt` grammar, for hand-editing or generating presets
+
+**Not built yet — implementation specs for whoever picks these up:**
+- [Gemini integration](docs/GEMINI_INTEGRATION.md) — wiring up "Describe a feeling"
+- [Saved-presets database](PRESET_DB_CONTEXT.md) — real save/browse/delete
+
+Both need a backend (`api/` serverless functions); neither exists today.
+
 ---
 
 ## Two ways to use it
@@ -101,11 +111,17 @@ references, not wired into the runtime.
 
 1. Open the tuning tool (`index.html`, no params).
 2. Adjust the sliders / animation phases for a layer.
-3. Click **COPY** to copy the full preset text, or **SAVE**.
+3. Click **save to presets** to copy the full preset text to your clipboard
+   (despite the label, there's no saved-preset library yet — it's a
+   clipboard copy). The older toolbar's **Save** button downloads it as a
+   `.txt` file instead.
 4. Paste it into the matching file in `presets/` and redeploy.
 
-You can also **LOAD** a preset by copying its text and clicking LOAD (it reads
-from the clipboard).
+You can also reload a preset by copying its text and clicking the older
+toolbar's **Load** button (it reads from the clipboard).
+
+For the full walkthrough of every control, parameter, and easing curve, see
+[`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
 ---
 
@@ -151,13 +167,18 @@ preset files at that path).
 ## Project structure
 
 ```
-index.html            App: tuning UI + playback engine + kiosk runtime
-firefly-field.js      The particle renderer (createFireflyField)
-cloud-background.js   Background glow (procedural, self-contained)
-sphere-core.js        Core sphere helpers
-presets/              Emotion presets (editable source of truth)
-  firefly-calm.txt      calm
-  firefly-sad.txt       sad
-  firefly-warm.txt      warm
-  firefly-anger.txt     anger
+index.html               App: tuning UI + playback engine + kiosk runtime
+firefly-field.js         The particle renderer (createFireflyField)
+cloud-background.js      Background glow (procedural, self-contained)
+sphere-core.js           Core sphere helpers
+presets/                 Emotion presets (editable source of truth)
+  firefly-calm.txt         calm
+  firefly-sad.txt          sad
+  firefly-warm.txt         warm
+  firefly-anger.txt        anger
+docs/
+  USER_GUIDE.md           Full UI/parameter/easing walkthrough
+  GEMINI_INTEGRATION.md   Spec: wiring "Describe a feeling" to Gemini (unbuilt)
+GEMINI_PRESET_CONTEXT.md  Preset .txt format grammar + parameter reference
+PRESET_DB_CONTEXT.md      Spec: saved-presets database (unbuilt)
 ```
