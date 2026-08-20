@@ -24,6 +24,10 @@ every screen is built yet, and implementation may diverge in small ways.
 
 Both need a backend (`api/` serverless functions); neither exists today.
 
+**New to this repo?** Start with [`docs/HANDOFF.md`](docs/HANDOFF.md) — an
+honest assessment of what's built, what's dead weight, and what to work on
+first.
+
 ---
 
 ## Two ways to use it
@@ -110,6 +114,14 @@ The runtime maps an emotion name → preset file in `index.html` (the
 `PRESET_FILES` object). Other files in `presets/`
 (`firefly-bloom-reference.txt`, `firefly-anger-calm.txt`) are earlier drafts /
 references, not wired into the runtime.
+
+### Making a preset — no code required
+
+Anyone on the team can design a look and share it, with zero code and zero
+git: open the tuning tool, drag the sliders / build an animation, then click
+the **link icon** — it copies a URL that plays back exactly that look. Send
+that link to anyone. Turning it into one of the shipped defaults above still
+needs an engineer (see below), but making and sharing a look doesn't.
 
 ### Editing a preset
 
