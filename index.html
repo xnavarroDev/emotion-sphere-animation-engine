@@ -1129,7 +1129,14 @@ function applyAnimFrame(dt){
     trackLerp(seq,Math.min(t,total),(a,b,frac)=>lerpFireflySnap(F,a,b,frac),zero);
   }
   if(sceneSeq) trackLerp(sceneSeq,Math.min(t,sceneTotal),lerpSceneSnap);
-  if(fireflyFieldSyncUI) fireflyFieldSyncUI();
+  // Never during thumbnail generation: thumbSettle drives this same function
+  // many times per capture, on a fake clock, isolating one layer/instant at
+  // a time — syncing the VISIBLE Parameters sliders to that transient state
+  // was overwriting whatever phase you'd actually selected with whatever the
+  // last thumbnail capture in the batch happened to be simulating the moment
+  // it finished. F.params itself was always correct (captureThumbnailAt
+  // saves/restores it) — only this UI sync was leaking past that isolation.
+  if(fireflyFieldSyncUI&&!thumbCapturing) fireflyFieldSyncUI();
   if(animFill) animFill.style.width=(Math.min(t/maxTotal,1)*100)+'%';
   if(!animLoop&&animTime>=maxTotal){ animTime=maxTotal; if(animStop) animStop(); }
 }
@@ -4737,6 +4744,9 @@ const THUMB_W=400, THUMB_CACHE_MAX=400;
 // Raised only while captureThumbnailAt is isolating the Background/scene
 // track — see cloudBg.refreshOpacity's opacityBoost param for why.
 let thumbGlowBoost=1;
+// True for the whole span of a thumbnail capture (settling + the final
+// restore replay) — see applyAnimFrame's fireflyFieldSyncUI guard.
+let thumbCapturing=false;
 // A frame's aspect is the live camera's, CLAMPED. The camera follows the
 // canvas, which the timeline resize can squeeze to a letterbox — dragging the
 // panel tall took it to 7.9, which made every frame a 37px-high sliver and
@@ -4815,6 +4825,10 @@ function thumbSettle(toAnimTime,ticks=15){
 // seek. So a lane frame asks for (time, one layer), the summary strip for
 // (time, whole scene), and the gallery card for (now, whole scene).
 function captureThumbnailAt(sec,trackIndex){
+  // Spans this whole function, not just thumbSettle's own ticks — the final
+  // restore replay below also calls updateInnerLayers, and would leak into
+  // the visible Parameters sliders the same way if left unguarded there too.
+  thumbCapturing=true;
   const wholeScene=(trackIndex==null);
   const liveW=Math.max(1,renderer.domElement.width);
   const liveH=Math.max(1,renderer.domElement.height);
@@ -5003,6 +5017,7 @@ function captureThumbnailAt(sec,trackIndex){
   animTime=savedTime; animScrubbing=true;
   updateInnerLayers(clock.getElapsedTime(),0);
   animScrubbing=false;
+  thumbCapturing=false;
   animLoop=savedLoop;
   fireflyLayers.forEach((F,i)=>F.setParams(savedParams[i]));
   Object.assign(CLASSIC,savedClassic);
