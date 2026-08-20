@@ -884,7 +884,14 @@ document.addEventListener('keydown',(e)=>{
 
 // ---- Glow user tint state (colour + opacity, tracked here so snapshots and save/load can read them) ----
 let glowUserColor='#ffffff';
-let glowUserOpacity=1.0;
+let glowUserOpacity=0; // off by default
+// cloud-background.js's own internal userOpacity defaults to 1.0 and nothing
+// else applies glowUserOpacity to it until a preset/phase/slider explicitly
+// does — without this, the RENDERED glow would stay full-opacity at first
+// paint regardless of what glowUserOpacity itself defaults to above. (Can't
+// live next to cloudBg's own creation, far earlier in the file — these two
+// let bindings don't exist yet there.)
+cloudBg.setUserTint(glowUserColor,glowUserOpacity);
 let bgColor='#000000';
 let bgColor2='#c9d0d6';
 let bgGradientAmount=0; // 0 = solid bgColor, 1 = full gradient to bgColor2 (continuous, animatable)
