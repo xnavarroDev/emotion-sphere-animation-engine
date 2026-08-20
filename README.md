@@ -10,6 +10,10 @@ to help children explore and reflect their emotional state.
 
 Live: https://lost-in-space-light.vercel.app
 
+**Design reference:** [Figma — Emotion Sphere Particle Engine redesign](https://www.figma.com/design/FCQj42AClQLDXKuxpvuuHb/emotion-sphere-particle-engine-redesign?node-id=0-1&t=rJTidOnDuIgeaBHB-1)
+— the panel UI in `index.html` follows this for layout/visual direction; not
+every screen is built yet, and implementation may diverge in small ways.
+
 **Docs:**
 - [User guide](docs/USER_GUIDE.md) — UI controls, every parameter, easing curves
 - [Preset format reference](GEMINI_PRESET_CONTEXT.md) — the `.txt` grammar, for hand-editing or generating presets
