@@ -761,6 +761,13 @@ const FIREFLY_EMOTION_COLORS={ red:0xff3b30, purple:0xa070ff, yellow:0xffc24a, b
 // field with its own params and per-emotion colour overrides (default:
 // follow the official emotion palette).
 let fireflyLayers=[];
+// The firefly field and sphere-core are initialized by independent dynamic
+// imports. Preset URLs/API calls must wait for the firefly layers and their UI
+// to exist, otherwise Anim Layer sections are parsed while fireflyLayers is
+// still empty and silently lose their phases (the Scene track can survive
+// because sceneTimeline already exists).
+let fireflyLayersReadyResolve=null;
+const fireflyLayersReady=new Promise(resolve=>{ fireflyLayersReadyResolve=resolve; });
 let fireflyFieldSyncUI=null; // re-sync the active layer's sliders after animation lerps
 let fireflyFieldSelect=null; // switch the FIREFLY FIELD sliders to a given layer index
 // Each layer also gets its own signed `spin` (rad/s) so, combined with the
@@ -3557,6 +3564,7 @@ Promise.all([import('./field.js?v=8'),import('./particle-controls.js?v=7'),impor
   maybeSeedDefaultTimeline(); // see its comment: whichever chain lands last seeds
   rpSyncParams();
   tryInitUndoBaseline();
+  fireflyLayersReadyResolve?.();
 }).catch(err=>console.error('inner layers failed',err));
 
 // Inner core + glow halo
@@ -3716,7 +3724,7 @@ function switchPrototype(name){
 }
 
 let sphereCore=null;
-import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
+import('./sphere-core.js?v=proto3').then(async ({attachSphereCore})=>{
   sphereCore=attachSphereCore({
     THREE,
     group,
@@ -4081,6 +4089,14 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     });
     animPlaying=true;
   }
+  // Keep all preset entry points on the same readiness gate. This is
+  // especially important for a shared ?preset= URL, which can be processed
+  // by this import before the independent firefly-field import has created
+  // its layers.
+  const applyPresetWhenReady=(text)=>fireflyLayersReady.then(()=>{
+    applyParamsText(text);
+    startPlayback();
+  });
   window.emotionSphere = {
     emotions: Object.keys(PRESET_FILES),
     // play('sad') -> loads that preset and starts its animation from the top.
@@ -4089,7 +4105,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       const file = PRESET_FILES[String(name||'').toLowerCase()];
       if(!file) return Promise.reject(new Error('unknown emotion: '+name));
       return fetch(file).then(r=>{ if(!r.ok) throw new Error('preset fetch failed: '+file); return r.text(); })
-        .then(txt=>{ applyParamsText(txt); startPlayback(); });
+        .then(applyPresetWhenReady);
     },
     // applyPreset(text) -> apply a preset in the same plain-text format the
     // save/share-link buttons already produce (see any file in /presets for
@@ -4097,7 +4113,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     // Gemini "describe a feeling" integration) calls instead of reaching
     // into the panel's internals directly.
     applyPreset(text){
-      applyParamsText(text); startPlayback();
+      return applyPresetWhenReady(text);
     },
   };
 
@@ -4134,7 +4150,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
       let b64=_presetParam.replace(/-/g,'+').replace(/_/g,'/');
       b64+='='.repeat((4-b64.length%4)%4); // restore stripped padding (atob needs it)
       const txt=decodeURIComponent(escape(atob(b64)));
-      applyParamsText(txt); startPlayback();
+      await applyPresetWhenReady(txt);
     }catch(err){ console.warn('bad preset param',err); }
     if(_kiosk) document.body.classList.add('watch'); // fixed shared look: hide the dots
   }
