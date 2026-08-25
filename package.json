@@ -1,0 +1,14 @@
+{
+  "name": "emotion-sphere-animation-engine",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:install-browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "three": "^0.128.0"
+  }
+}
