@@ -16,6 +16,12 @@ body.kiosk #params-panel { display:none !important; }
 body.kiosk #d-cycle { display:none; }
 /* watch link (a shared ?preset in kiosk): one fixed look, so hide the emotion
    selector too — nothing to pick */
+
+body.kiosk #redesign-panel,
+body.kiosk #anim-canvas-controls {
+  display: none !important;
+}
+
 body.watch #dots { display:none !important; }
 /* Emotion switcher — sits over the canvas, top-right, styled to match the
    redesigned panel (larger targets, a ring on the active one) rather than
