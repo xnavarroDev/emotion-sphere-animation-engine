@@ -56,6 +56,39 @@ python3 -m http.server 8080
 (Opening `index.html` via `file://` will not work — the ES modules and the
 preset `fetch` require an HTTP server.)
 
+## Run the test suite
+
+The Playwright regression suite covers the editor, all built-in presets,
+shared links, kiosk mode, timeline editing, save/load, undo, layer controls,
+and the public runtime APIs in Chrome.
+
+```bash
+npm install
+npx playwright install chromium
+npm test
+```
+
+On Windows PowerShell installations that block npm's `.ps1` launchers, use
+the equivalent commands `npm.cmd install`, `npx.cmd playwright install
+chromium`, and `npm.cmd test`.
+
+Useful focused commands:
+
+```bash
+npm run test:chromium
+npm run test:headed
+```
+
+To run the suite against an already-running local deployment, set `BASE_URL`.
+For example, with the site served at `http://localhost:8080/`:
+
+```powershell
+$env:BASE_URL = "http://localhost:8080"
+npm.cmd test
+```
+
+When `BASE_URL` is set, Playwright does not start its own test server.
+
 ---
 
 ## Runtime / embedding (the handoff)
