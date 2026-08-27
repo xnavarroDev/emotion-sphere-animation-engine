@@ -14,14 +14,16 @@ body.kiosk #params-panel { display:none !important; }
 /* keep the emotion dots in kiosk mode — they're the emotion selector;
    hide the cycle dot (auto-cycle isn't used) */
 body.kiosk #d-cycle { display:none; }
-/* watch link (a shared ?preset in kiosk): one fixed look, so hide the emotion
-   selector too — nothing to pick */
 
+/* Ensures that the kisosk mode hides the authoring UI, leaving only
+   the sphere and the emotion dots. */
 body.kiosk #redesign-panel,
 body.kiosk #anim-canvas-controls {
   display: none !important;
 }
 
+/* watch link (a shared ?preset in kiosk): one fixed look, so hide the emotion
+   selector too — nothing to pick */
 body.watch #dots { display:none !important; }
 /* Emotion switcher — sits over the canvas, top-right, styled to match the
    redesigned panel (larger targets, a ring on the active one) rather than
