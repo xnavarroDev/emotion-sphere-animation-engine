@@ -240,4 +240,5 @@ docs/
   GEMINI_INTEGRATION.md   Spec: wiring "Describe a feeling" to Gemini (unbuilt)
 GEMINI_PRESET_CONTEXT.md  Preset .txt format grammar + parameter reference
 PRESET_DB_CONTEXT.md      Spec: saved-presets database (unbuilt)
+legacy/                   Archived prototype pages and their supporting scripts
 ```

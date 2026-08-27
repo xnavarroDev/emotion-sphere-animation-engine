@@ -81,22 +81,20 @@ glsl.js                Imported by field.js (SIMPLEX_NOISE_3D) — looks
 presets/*.txt           The 4 shipped emotion presets — source of truth
 ```
 
-**Dead — six-week-old prototypes, referenced nowhere except one code
-comment (`index.html:758`), not linked from the README or the app:**
+**Archived in `legacy/` — six-week-old prototypes, referenced nowhere except
+one code comment (`index.html:758`), not linked from the README or the app:**
 ```
-official warm.html, official_anger.html, official_calm.html, official_sad.html
-fireflies-demo.html    (uses fireflies.js)
-quickstart.html        (uses app.js)
-prototype1.txt
-fireflies.js, app.js   (only consumed by the dead HTML files above)
+legacy/official warm.html, legacy/official_anger.html,
+legacy/official_calm.html, legacy/official_sad.html
+legacy/fireflies-demo.html (uses legacy/fireflies.js)
+legacy/quickstart.html     (uses legacy/app.js)
+legacy/prototype1.txt
+legacy/fireflies.js, legacy/app.js
 ```
 
-**Recommendation:** don't silently delete these — move them into a
-`legacy/` or `prototypes/` folder in one commit with a message explaining
-why, so the history stays honest and anyone who remembers "wasn't there a
-warm.html demo" can still find it. If nobody objects after a couple weeks,
-delete for real. This is low-risk cleanup — do it first, it costs nothing
-and immediately makes the repo root legible.
+**Status:** these files are now in `legacy/`, preserving the history and
+keeping the active repo root legible. They can be deleted later if nobody
+needs the old demos.
 
 ---
 
@@ -106,8 +104,7 @@ and immediately makes the repo root legible.
    add a line to the README (or better, directly in the tool's UI near the
    link button) saying "no code needed — tune it, click the link icon,
    share the URL." This alone lets Min Lee participate today.
-2. **Move the dead files** into `legacy/` (§3). One commit, low risk,
-   immediately improves repo legibility for the next person.
+2. **Move the dead files** into `legacy/` (§3). **Completed.**
 3. **Build the Gemini integration** per `GEMINI_INTEGRATION.md`. This is
    the accessibility unlock — prioritize it over code refactoring.
 4. **Build the saved-presets DB + browse UI** per `PRESET_DB_CONTEXT.md`,
