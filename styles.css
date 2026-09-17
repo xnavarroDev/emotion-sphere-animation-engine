@@ -10,7 +10,19 @@ body.kiosk #hint,
 body.kiosk #proto-switch,
 body.kiosk #view-toggles,
 body.kiosk #params-toggle,
-body.kiosk #params-panel { display:none !important; }
+body.kiosk #params-panel,
+body.kiosk #redesign-panel,
+body.kiosk #rp-collapse-rail,
+body.kiosk #err { display:none !important; }
+/* let an embedder's own background show through the transparent WebGL
+   canvas (the renderer already clears to alpha 0) instead of the scene's
+   background gradient, which JS sets as an inline style */
+body.kiosk { background:transparent !important; }
+/* Opt-in for embedders whose backdrop already has its own imagery behind the
+   sphere (e.g. a robot photo whose glass sphere has something baked into it)
+   — an opaque canvas fully occludes that backdrop instead of letting it show
+   through the transparent gaps between particles. ?solid=1 alongside kiosk. */
+body.kiosk.solid-bg { background:radial-gradient(circle, #1a0f08 0%, #000 75%) !important; }
 /* keep the emotion dots in kiosk mode — they're the emotion selector;
    hide the cycle dot (auto-cycle isn't used) */
 body.kiosk #d-cycle { display:none; }

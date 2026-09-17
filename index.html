@@ -9,6 +9,20 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<script>
+// Applied synchronously, before the THREE.js script tag / any module import
+// below: if that CDN script is slow or fails (flaky network, ad-blocker, a
+// refresh racing the browser cache), the async kiosk boot further down never
+// runs, and an embed is left showing the raw authoring UI on its opaque
+// black background instead of failing gracefully transparent.
+(function(){
+  const q=new URLSearchParams(location.search);
+  const kiosk=q.get('mode')==='kiosk'||q.get('embed')==='1';
+  if(kiosk) document.body.classList.add('kiosk');
+  if(kiosk&&q.get('dots')==='0') document.body.classList.add('watch');
+  if(kiosk&&q.get('solid')==='1') document.body.classList.add('solid-bg');
+})();
+</script>
 <div id="label">RED · DANGER · AGGRESSION · ALERT</div>
 <div id="dots">
   <div class="dot" style="background:#22b8e8;box-shadow:0 0 8px #5ce4ff" onclick="switchEmotion('blue')" id="d-blue"></div>
@@ -606,6 +620,12 @@ let spawnEnabled=true;
 let innerSpawnCursor=0;
 let innerSpawnAcc=0;
 let lastAnimT=0;
+// Global playback-speed multiplier for the emotion animation itself (not the
+// UI/camera). 1 = normal. Only scales what feeds updateInnerLayers, so the
+// auto-cycle timer, thumbnail capture, etc. (driven by the real clock
+// elsewhere) are unaffected.
+let animSpeed=1;
+let scaledElapsed=0;
 
 function swirlInward(t, phase, ox, oy, oz, len, tangAmt, inAmt){
   const inv=1/(len||1);
@@ -4099,6 +4119,11 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
     applyPreset(text){
       applyParamsText(text); startPlayback();
     },
+    // setSpeed(mult) -> playback-rate multiplier for the animation itself
+    // (1 = normal, 2 = double speed, 0.5 = half). Clamped to a sane range.
+    setSpeed(mult){
+      animSpeed=Math.min(4,Math.max(0.1,Number(mult)||1));
+    },
   };
 
   // Kiosk boot: ?mode=kiosk (or ?embed=1) hides the UI; ?emotion=sad picks the
@@ -4106,6 +4131,14 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   const _q = new URLSearchParams(location.search);
   const _kiosk = _q.get('mode')==='kiosk' || _q.get('embed')==='1';
   if(_kiosk) document.body.classList.add('kiosk');
+  // layoutViewport() already ran once, synchronously, before this async boot
+  // added body.kiosk — measuring #redesign-panel at its full (visible) width
+  // and sizing the canvas around it. Re-run it now that the panel is hidden,
+  // or an embed narrower than that panel gets a near-zero-width canvas.
+  if(_kiosk && window.rpLayoutViewport) window.rpLayoutViewport();
+  // Opt-in: ?dots=0 hides the colour-dot selector too, for an embedder that
+  // brings its own emotion picker and drives playback purely via postMessage.
+  if(_kiosk && _q.get('dots')==='0') document.body.classList.add('watch');
   // The colour dots map to presets by emotion colour; in kiosk mode a click
   // plays that preset (not just recolour). d-blue=sad, d-yellow=warm,
   // d-red=anger, d-purple=calm.
@@ -4149,6 +4182,7 @@ import('./sphere-core.js?v=proto3').then(({attachSphereCore})=>{
   window.addEventListener('message',(ev)=>{
     const d=ev.data;
     if(d && d.type==='emotion' && d.value) playAndMark(d.value);
+    if(d && d.type==='speed' && d.value!=null) window.emotionSphere.setSpeed(d.value);
   });
 }).catch(err=>console.error('sphere-core failed',err));
 
@@ -5537,7 +5571,9 @@ function animate(){
     });
   }
 
-  updateInnerLayers(t,dt);
+  const scaledDt=dt*animSpeed;
+  scaledElapsed+=scaledDt;
+  updateInnerLayers(scaledElapsed,scaledDt);
   renderer.render(scene,camera);
 }
 animate();
