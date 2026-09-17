@@ -22,6 +22,8 @@ export function parseKioskRuntimeQuery(search = '') {
     // A shared look is authoritative; an emotion must not overwrite it after
     // the asynchronous preset restore completes.
     emotion: preset ? null : query.get('emotion'),
+    hideDots: query.get('dots') === '0',
+    solidBackground: query.get('solid') === '1',
   };
 }
 
@@ -58,6 +60,8 @@ export function createKioskRuntimeController({
     if (!options.kiosk) return options;
 
     body.classList.add('kiosk');
+    if (options.hideDots) body.classList.add('watch');
+    if (options.solidBackground) body.classList.add('solid-bg');
     for (const [dotId, emotion] of Object.entries(KIOSK_EMOTION_BY_DOT)) {
       emotionControls.setEmotionAction(dotId, () => playEmotion(emotion));
     }
@@ -86,6 +90,9 @@ export function createKioskRuntimeController({
       const message = event.data;
       if (message && message.type === 'emotion' && message.value) {
         playEmotion(message.value);
+      }
+      if (message && message.type === 'speed' && message.value != null) {
+        emotionApi.setSpeed(message.value);
       }
     });
   }

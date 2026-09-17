@@ -45,6 +45,16 @@ test('kiosk mode hides the redesigned authoring panel and timeline', async ({ pa
   await expectNoRuntimeErrors(page, runtimeErrors);
 });
 
+test('kiosk query flags support host-owned controls and solid backgrounds', async ({ page }) => {
+  const runtimeErrors = await preparePage(page);
+  await gotoApp(page, '?embed=1&emotion=calm&dots=0&solid=1');
+
+  await expect(page.locator('body')).toHaveClass(/\bwatch\b/);
+  await expect(page.locator('body')).toHaveClass(/\bsolid-bg\b/);
+  await expect(page.locator('#dots')).toBeHidden();
+  await expectNoRuntimeErrors(page, runtimeErrors);
+});
+
 test('runtime API and postMessage switch complete emotion presets', async ({ page }) => {
   const runtimeErrors = await preparePage(page);
   const warm = readPreset('warm');
@@ -63,6 +73,8 @@ test('runtime API and postMessage switch complete emotion presets', async ({ pag
   await page.evaluate(() => window.postMessage({ type: 'emotion', value: 'warm' }, '*'));
   await expect(page.locator(emotionDots.warm)).toHaveClass(/\bactive\b/);
   await expectTimelineCounts(page, timelineCounts(warm));
+  expect(await page.evaluate(() => window.emotionSphere.setSpeed(99))).toBe(4);
+  await page.evaluate(() => window.postMessage({ type: 'speed', value: 0.5 }, '*'));
   await expectNoRuntimeErrors(page, runtimeErrors);
 });
 

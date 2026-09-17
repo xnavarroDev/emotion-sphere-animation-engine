@@ -9,6 +9,9 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- Runs synchronously so embeds hide authoring chrome before larger runtime
+     dependencies load. The module runtime later applies the same URL policy. -->
+<script src="app/runtime/kiosk-shell.js?v=1"></script>
 <div id="label">RED · DANGER · AGGRESSION · ALERT</div>
 <div id="dots" role="group" aria-label="Emotion selection">
   <button class="dot dot-blue" type="button" data-emotion="blue" id="d-blue" aria-label="Blue emotion" aria-pressed="false"></button>

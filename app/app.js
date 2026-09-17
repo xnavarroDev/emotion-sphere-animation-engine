@@ -522,6 +522,7 @@ initializeCoreRuntime({
     },
     clearThumbnails:()=>thumbnailCaptures?.clear(),
     emotionControls,setDotActive,setPressed,
+    setAnimationSpeed:sceneRenderRuntime.setAnimationSpeed,
   },
 }).catch(err=>console.error('sphere-core failed',err));
 

@@ -26,6 +26,7 @@ export async function initializePresetRuntime({
   emotionControls,
   setDotActive,
   setPressed,
+  setAnimationSpeed,
 }) {
   const {
     documentLike, windowLike, navigatorLike, locationLike, fetchLike,
@@ -83,7 +84,11 @@ export async function initializePresetRuntime({
     restore(text);
     startPlayback();
   });
-  const emotionApi = createEmotionSphereApi({ fetchLike, applyPresetWhenReady });
+  const emotionApi = createEmotionSphereApi({
+    fetchLike,
+    applyPresetWhenReady,
+    setAnimationSpeed,
+  });
   windowLike.emotionSphere = emotionApi;
 
   const kioskRuntime = createKioskRuntimeController({

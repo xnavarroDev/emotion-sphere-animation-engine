@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EchoSphere Emotion Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #000; color: rgba(255,255,255,0.85); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace; }
+body { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+
+/*
+ * The robot photo (echosphere-front.png) is 1024x1344. The glass sphere in
+ * that photo is centered at (535, 800) with a radius of 178px, measured by
+ * hand against the source pixels (see PR description for the measurement).
+ * Expressed as percentages of the image so the overlay stays locked to the
+ * glass sphere at any container size:
+ *   left   = (535 - 178) / 1024 = 34.86%
+ *   top    = (800 - 178) / 1344 = 46.28%
+ *   width  = 178 * 2 / 1024     = 34.77%
+ *   height = 178 * 2 / 1344     = 26.49%
+ */
+#stage {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1024 / 1344;
+}
+#stage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+#sphere-overlay {
+  position: absolute;
+  left: 34.86%;
+  top: 46.28%;
+  width: 34.77%;
+  height: 26.49%;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+#sphere-overlay iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+#controls {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+#controls button {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(8,8,12,0.75);
+  color: rgba(255,255,255,0.85);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#controls button:hover { background: rgba(255,255,255,0.12); }
+#controls button.active { border-color: rgba(160,202,239,0.9); color: #a0caef; }
+
+#speed {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+  background: rgba(8,8,12,0.75);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 6px 12px;
+}
+#speed input[type="range"] {
+  width: 140px;
+  accent-color: #a0caef;
+}
+#speed em {
+  font-style: normal;
+  width: 30px;
+  text-align: right;
+  color: rgba(160,202,239,0.9);
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <img id="robotImg" src="echosphere-calm.png" alt="EchoSphere robot, front view">
+  <div id="sphere-overlay">
+    <iframe id="sphereFrame" src="index.html?mode=kiosk&dots=0&emotion=calm" allow="autoplay" title="Emotion Sphere"></iframe>
+  </div>
+  <div id="controls">
+    <button type="button" data-emotion="calm" class="active">Calm</button>
+    <button type="button" data-emotion="sad">Sad</button>
+    <button type="button" data-emotion="warm">Warm</button>
+    <button type="button" data-emotion="anger">Anger</button>
+  </div>
+  <div id="speed">
+    <span>Speed</span>
+    <input type="range" id="speedRange" min="0.25" max="3" step="0.25" value="1">
+    <em id="speedValue">1x</em>
+  </div>
+</div>
+<script>
+  const frame = document.getElementById('sphereFrame');
+  const robotImg = document.getElementById('robotImg');
+  const buttons = document.querySelectorAll('#controls button');
+  // Each emotion has its own re-lit hero photo (glass sphere + rim glow
+  // recolored to match that emotion's particle animation) so the two never
+  // clash. Anger also runs on a separate, newer particle build (anger-v5.html)
+  // with its own updated look; the other three share one engine (index.html).
+  const ENGINE_SRC = 'index.html?mode=kiosk&dots=0&emotion=';
+  const ANGER_SRC = 'anger-v5.html?v=3&mode=kiosk&dots=0&emotion=anger';
+  const PHOTO_SRC = { calm: 'echosphere-calm.png', sad: 'echosphere-sad.png', warm: 'echosphere-warm.png', anger: 'echosphere-anger.png' };
+  let currentEngine = 'index';
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const emotion = btn.dataset.emotion;
+      robotImg.src = PHOTO_SRC[emotion];
+      if (emotion === 'anger') {
+        if (currentEngine !== 'anger') {
+          frame.src = ANGER_SRC;
+          currentEngine = 'anger';
+          // anger-v5.html sizes its WebGL canvas once, synchronously, right
+          // after load — inside this iframe that sometimes runs before the
+          // iframe's own layout has settled, reading innerWidth as 0 and
+          // leaving the canvas 1px wide (so the embers render but are
+          // invisible). Nudging it with a real resize event once loading
+          // finishes forces it to recompute against the iframe's actual,
+          // settled size.
+          frame.addEventListener('load', () => {
+            setTimeout(() => {
+              try { frame.contentWindow.dispatchEvent(new Event('resize')); } catch (e) {}
+            }, 50);
+          }, { once: true });
+        }
+      } else {
+        if (currentEngine === 'anger') {
+          frame.src = ENGINE_SRC + emotion;
+          currentEngine = 'index';
+        } else {
+          frame.contentWindow.postMessage({ type: 'emotion', value: emotion }, '*');
+        }
+      }
+      buttons.forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  const speedRange = document.getElementById('speedRange');
+  const speedValue = document.getElementById('speedValue');
+  speedRange.addEventListener('input', () => {
+    const mult = Number(speedRange.value);
+    frame.contentWindow.postMessage({ type: 'speed', value: mult }, '*');
+    speedValue.textContent = mult + 'x';
+  });
+</script>
+</body>
+</html>

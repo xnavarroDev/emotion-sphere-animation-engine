@@ -216,8 +216,18 @@ test('scene frame runner keeps particle, trail, presentation, and render stages 
   expect(calls).toEqual([
     ['spawn', 0.05, 2], 'transition', 'derive', 'materials', 'shell', 'inner',
     ['trail-reset', 0], 'colors', 'visibility', ['trails', 0.05],
-    ['rotation', 0.05], ['presentation', 'core'], ['layers', 2, 0.05], 'render',
+    ['rotation', 0.05], ['presentation', 'core'], ['layers', 0.05, 0.05], 'render',
   ]);
+
+  expect(runner.setAnimationSpeed(2)).toBe(2);
+  calls.length = 0;
+  runner.run(2.03);
+  const layerCall = calls.find(call => Array.isArray(call) && call[0] === 'layers');
+  expect(layerCall[1]).toBeCloseTo(0.11);
+  expect(layerCall[2]).toBeCloseTo(0.06);
+  expect(runner.setAnimationSpeed(0)).toBe(1);
+  expect(runner.setAnimationSpeed(-5)).toBe(0.1);
+  expect(runner.setAnimationSpeed(99)).toBe(4);
 });
 
 test('particle frame state normalizes selected and cycling emotion inputs', async () => {

@@ -16,6 +16,7 @@ export function createEmotionSphereApi({
   presetFiles = DEFAULT_PRESET_FILES,
   fetchLike,
   applyPresetWhenReady,
+  setAnimationSpeed = () => 1,
 }) {
   return {
     emotions: Object.keys(presetFiles),
@@ -36,6 +37,11 @@ export function createEmotionSphereApi({
       // Normalize synchronous test/host adapters to the same promise contract
       // as fetched presets, including conversion of thrown errors to rejection.
       return Promise.resolve().then(() => applyPresetWhenReady(text));
+    },
+    // Hosts can change particle-layer playback without reaching into renderer
+    // state. The renderer owns normalization and returns the applied value.
+    setSpeed(multiplier) {
+      return setAnimationSpeed(multiplier);
     },
   };
 }

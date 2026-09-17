@@ -285,6 +285,7 @@ test('emotion runtime API validates aliases and routes every preset through read
       return Promise.resolve({ ok: true, text: () => Promise.resolve(`preset:${file}`) });
     },
     applyPresetWhenReady: text => { calls.push(['apply', text]); return `applied:${text}`; },
+    setAnimationSpeed: value => { calls.push(['speed', value]); return Number(value); },
   });
   expect(api.emotions).toEqual(Object.keys(DEFAULT_PRESET_FILES));
   await expect(api.play('HAPPY')).resolves.toBe('applied:preset:presets/firefly-warm.txt');
@@ -293,6 +294,8 @@ test('emotion runtime API validates aliases and routes every preset through read
     ['apply', 'preset:presets/firefly-warm.txt'],
   ]);
   await expect(api.applyPreset('custom')).resolves.toBe('applied:custom');
+  expect(api.setSpeed('2')).toBe(2);
+  expect(calls.at(-1)).toEqual(['speed', '2']);
   await expect(api.play('unknown')).rejects.toThrow('unknown emotion: unknown');
 
   const failing = createEmotionSphereApi({
@@ -422,7 +425,10 @@ test('scene render bootstrap composes runtime services and starts one ordered fr
     createSphereRotationController: () => 'rotation',
     createSceneFrameRunner: options => {
       calls.push(['frame-runner', options.particleTrails === trails]);
-      return { run: time => calls.push(['frame', time]) };
+      return {
+        run: time => calls.push(['frame', time]),
+        setAnimationSpeed: value => { calls.push(['speed', value]); return value; },
+      };
     },
     createEditorViewport: () => viewport,
   };
@@ -455,11 +461,13 @@ test('scene render bootstrap composes runtime services and starts one ordered fr
     particleTrails: trails,
     trailPoints: 'trail-points',
     viewport,
+    setAnimationSpeed: expect.any(Function),
   });
+  expect(runtime.setAnimationSpeed(2)).toBe(2);
   expect(calls).toEqual([
     ['trails', 2], ['spawner', 2], ['spawn', 1, 3], ['trail-reset', 1],
     ['color', 0], 'drag-connect', ['frame-runner', true], 'raf', 'cycle',
-    ['frame', 2], 'viewport-connect',
+    ['frame', 2], 'viewport-connect', ['speed', 2],
   ]);
 });
 
@@ -531,11 +539,15 @@ test('kiosk runtime keeps query precedence, dot actions, and host messages toget
     kiosk: true,
     preset: 'shared',
     emotion: null,
+    hideDots: false,
+    solidBackground: false,
   });
-  expect(parseKioskRuntimeQuery('?emotion=warm')).toEqual({
+  expect(parseKioskRuntimeQuery('?emotion=warm&dots=0&solid=1')).toEqual({
     kiosk: false,
     preset: null,
     emotion: 'warm',
+    hideDots: true,
+    solidBackground: true,
   });
 
   const calls = [];
@@ -549,7 +561,10 @@ test('kiosk runtime keeps query precedence, dot actions, and host messages toget
     },
     body: { classList: { add: value => classes.add(value) } },
     emotionControls: { setEmotionAction: (id, action) => actions.set(id, action) },
-    emotionApi: { play: emotion => { calls.push(['play', emotion]); return Promise.resolve(); } },
+    emotionApi: {
+      play: emotion => { calls.push(['play', emotion]); return Promise.resolve(); },
+      setSpeed: value => calls.push(['speed', value]),
+    },
     applyPresetWhenReady: text => calls.push(['preset', text]),
     decodePreset: value => `decoded:${value}`,
     setDotActive: id => calls.push(['dot', id]),
@@ -565,9 +580,9 @@ test('kiosk runtime keeps query precedence, dot actions, and host messages toget
   controller.connectMessages();
   controller.connectMessages(); // connecting twice must not duplicate listeners
   listeners.get('message')({ data: { type: 'emotion', value: 'anger' } });
+  listeners.get('message')({ data: { type: 'speed', value: 2 } });
   expect(calls.slice(-4)).toEqual([
-    ['dot', 'd-yellow'], ['play', 'warm'],
-    ['dot', 'd-red'], ['play', 'anger'],
+    ['play', 'warm'], ['dot', 'd-red'], ['play', 'anger'], ['speed', 2],
   ]);
 
   const shared = controller.configure('?mode=kiosk&emotion=sad&preset=payload');

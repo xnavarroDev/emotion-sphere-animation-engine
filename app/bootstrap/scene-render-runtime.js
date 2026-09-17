@@ -145,6 +145,7 @@ export function initializeSceneRenderRuntime({
     clock,
     particleSpawner,
     particleTrails,
+    setAnimationSpeed: multiplier => frameRunner.setAnimationSpeed(multiplier),
     trailPoints: particleTrails.points,
     viewport,
   };

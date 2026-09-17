@@ -43,6 +43,15 @@ export function createSceneFrameRunner({
   maxDeltaTime = 0.05,
 }) {
   let previousTime = 0;
+  let animationTime = 0;
+  let animationSpeed = 1;
+
+  function setAnimationSpeed(multiplier) {
+    // Match the public embed contract while preventing reversed or runaway
+    // layer timelines. Zero and non-numeric values restore normal speed.
+    animationSpeed = Math.min(4, Math.max(0.1, Number(multiplier) || 1));
+    return animationSpeed;
+  }
 
   function run(time) {
     const deltaTime = Math.min(Math.max(time - previousTime, 0), maxDeltaTime);
@@ -167,10 +176,14 @@ export function createSceneFrameRunner({
       animScrubbing: state.scrubbing,
     });
 
-    updateInnerLayers(time, deltaTime);
+    // Playback speed applies only to authored particle layers. Camera motion,
+    // emotion cycling, thumbnail timing, and the renderer keep real time.
+    const animationDeltaTime = deltaTime * animationSpeed;
+    animationTime += animationDeltaTime;
+    updateInnerLayers(animationTime, animationDeltaTime);
     render();
     return { deltaTime, frameState: frame };
   }
 
-  return { run };
+  return { run, setAnimationSpeed };
 }
