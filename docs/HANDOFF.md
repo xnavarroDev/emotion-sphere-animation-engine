@@ -1,11 +1,14 @@
 # Handoff — repo structure, cleanup, and where to take this next
 
 Written for whoever picks this project up next. The short version: the app
-works and the core renderer is solid, but it was built fast and iteratively
-("vibe coded") — one 5,600-line `index.html` carrying the entire UI, panel
-logic, timeline editor, and playback engine. Nothing here is broken in a way
-that blocks using the tool today; the debt is in *navigability*, not
-correctness.
+works and the core renderer is solid, but it was built fast and iteratively.
+For a code-oriented map, start with [`ARCHITECTURE.md`](ARCHITECTURE.md) and
+[`AGENTS.md`](../AGENTS.md).
+The original 5,600-line `index.html` is now a document shell. `app/app.js` is
+the composition root, while focused bootstrap, animation, scene, preset,
+thumbnail, and UI modules own subsystem behavior. The remaining complexity is
+mostly at the intentional boundary between retained compatibility controls and
+the modern editor, not in one monolithic entry file.
 
 **The north star for whatever you build next:** anyone on the team —
 including non-engineers, e.g. Min Lee — should be able to open this tool and
@@ -23,8 +26,8 @@ Before building anything new, know what's already true:
   [`USER_GUIDE.md`](USER_GUIDE.md), which was written specifically to make
   the parameter names (`coreBias`, `blinkDepth`, etc.) legible in plain
   English for exactly this reason — point non-engineers there first.
-- **The link/share button already works** (`#rp-share-link`, index.html
-  ~3474) — tune a look, click it, get a URL that plays that exact preset.
+- **The link/share button already works** (`#rp-share-link`, wired in
+  `app/app.js`) — tune a look, click it, get a URL that plays that exact preset.
   This is, right now, the zero-code way for someone like Min Lee to make and
   hand over a preset. It's just not documented or surfaced as "hey, this is
   how you do it" anywhere obvious — that's a 20-minute fix (see §4).
@@ -68,7 +71,15 @@ sits unreferenced in the root:
 
 **Live — don't touch without understanding the whole chain:**
 ```
-index.html            UI + panel + timeline editor + playback + kiosk API (5,587 lines)
+index.html            Document shell and UI markup
+app/app.js             App entry: panel, timeline, playback, and subsystem wiring
+app/animation/         Pure easing, timeline calculations, layout, and shared-column edits
+app/presets/           Preset parser, serializer, and share-link codec
+app/runtime/           Boot readiness, public API, and kiosk/query/message coordination
+app/state/             Canonical scene settings plus document undo policy
+app/scene/             Color helpers and renderer/camera lifecycle adapter
+app/thumbnails/        Restorable capture sessions, cache/surfaces, and filmstrip plans
+app/ui/                Shared UI primitives, grouped into controls, shell, timeline, and legacy
 styles.css            All styling (already separate — good)
 firefly-field.js      Current particle renderer (createFireflyField)
 cloud-background.js   Background glow, self-contained
@@ -81,8 +92,8 @@ glsl.js                Imported by field.js (SIMPLEX_NOISE_3D) — looks
 presets/*.txt           The 4 shipped emotion presets — source of truth
 ```
 
-**Archived in `legacy/` — six-week-old prototypes, referenced nowhere except
-one code comment (`index.html:758`), not linked from the README or the app:**
+**Archived in `legacy/` — historical prototypes that are not imported by the
+active application:**
 ```
 legacy/official warm.html, legacy/official_anger.html,
 legacy/official_calm.html, legacy/official_sad.html
@@ -109,27 +120,35 @@ needs the old demos.
    the accessibility unlock — prioritize it over code refactoring.
 4. **Build the saved-presets DB + browse UI** per `PRESET_DB_CONTEXT.md`,
    sharing the serverless groundwork from step 3.
-5. **Only after 3–4, if there's still appetite:** split `index.html`'s
-   JS out of the markup file into modules. A reasonable seam (based on
-   reading the file, not a rewrite) would roughly follow the sections that
-   are already visually distinct inside it: panel/collapsible UI wiring,
-   the timeline/track editor (phases, playhead, drag-resize), preset
-   text parsing (`paramsToText`/`applyPreset`), and the kiosk/embed API
-   (`window.emotionSphere`). This is real work and real risk (the phase/
-   duration semantics are subtle — see the commit history around "each
-   phase's duration now governs arriving at it, not leaving it" for how
-   easy this is to get backwards) — don't start it until 1–4 are done,
-   since it doesn't move the accessibility goal at all on its own.
+5. **Extend module boundaries only when feature work needs them.** The active
+   architecture is already split by responsibility:
+
+   - `app/app.js` is the composition root and frame-facing adapter.
+   - `app/bootstrap/` owns subsystem construction and initialization order.
+   - `app/animation/`, `app/scene/`, `app/presets/`, and
+     `app/thumbnails/` contain domain behavior without panel ownership.
+   - `app/ui/controls/`, `app/ui/shell/`, and `app/ui/timeline/` contain
+     current DOM presenters.
+   - `app/ui/legacy/` contains compatibility adapters for the retained original
+     controls. They intentionally share canonical playback, scene, and timeline
+     state with the modern editor.
+
+   A deeper legacy extraction should introduce one compatibility facade rather
+   than duplicate state. Preserve `window.emotionSphere`, shared-link behavior,
+   and the preset text grammar. Run `npm run verify` after structural changes;
+   phase columns, asynchronous readiness, and thumbnail restoration are the most
+   sensitive integration boundaries.
 
 ---
 
-## 5. Testing — there's no automated test suite
+## 5. Testing
 
-There isn't one, and I'm not recommending you build one before anything
-else — but *do* manually re-check these flows after any change, since
-they're the ones most likely to silently regress (the preset loader fails
-silently on bad input, so breakage often looks like "the sphere is just
-wrong," not an error):
+Run `npm run verify` after each refactor slice. The fast static gate checks the
+module boundaries and source shape before the Playwright suite covers editor
+boot, preset and share-link round trips, kiosk behavior, timeline interaction,
+undo, and core UI flows. Also manually inspect the visual character of each
+emotion after renderer changes; behavioral assertions cannot judge whether a
+motion still feels right.
 
 - [ ] Load each of the 4 built-in presets via the color dots — colors and
       motion still match their description in the README
@@ -150,6 +169,5 @@ wrong," not an error):
 It's not a bug list — nothing in the current build is confirmed broken
 beyond the two features that were always meant to be stubs (Gemini
 generation, saved presets). If you find an actual bug while working through
-§4, file it as you go rather than trying to hunt for bugs up front; a
-5,600-line file you didn't write is much faster to debug by touching real
-flows than by reading it end to end.
+§4, file it as you go and add a regression test before continuing the module
+split.

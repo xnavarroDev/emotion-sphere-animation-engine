@@ -1,3 +1,8 @@
+/**
+ * Compatibility slider definitions and DOM wiring used by the dynamically
+ * loaded particle-field prototype. The modern editor reuses the definitions
+ * while its own control adapters provide the current presentation.
+ */
 export const SLIDER_DEFS = [
   ["count", 0, 1000, 1],
   ["scale", 0.2, 0.95, 0.01],

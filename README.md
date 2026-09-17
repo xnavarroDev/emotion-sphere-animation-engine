@@ -16,6 +16,8 @@ every screen is built yet, and implementation may diverge in small ways.
 
 **Docs:**
 - [User guide](docs/USER_GUIDE.md) — UI controls, every parameter, easing curves
+- [Architecture](docs/ARCHITECTURE.md) — startup flow, state ownership, and feature boundaries
+- [Coding-agent guide](AGENTS.md) — task routing, invariants, debugging, and completion checks
 - [Preset format reference](GEMINI_PRESET_CONTEXT.md) — the `.txt` grammar, for hand-editing or generating presets
 
 **Not built yet — implementation specs for whoever picks these up:**
@@ -62,8 +64,10 @@ The Playwright regression suite covers the editor, all built-in presets,
 shared links, kiosk mode, timeline editing, save/load, undo, layer controls,
 and the public runtime APIs in Chrome.
 
+Use Node.js 20 or newer (required by the pinned Playwright version).
+
 ```bash
-npm install
+npm ci
 npx playwright install chromium
 npm test
 ```
@@ -75,9 +79,17 @@ chromium`, and `npm.cmd test`.
 Useful focused commands:
 
 ```bash
+npm run check
 npm run test:chromium
 npm run test:headed
+npm run verify
 ```
+
+`npm run check` is the fast, dependency-free architecture gate. It validates
+JavaScript syntax and local imports, rejects inline scripts and event handlers,
+protects the public API boundary, and prevents the HTML shell or application
+entry module from growing back past their current size ceilings. `npm run
+verify` runs that gate followed by the complete Chromium regression suite.
 
 To run the suite against an already-running local deployment, set `BASE_URL`.
 For example, with the site served at `http://localhost:8080/`:
@@ -143,7 +155,7 @@ change), then redeploying.
 | **warm** | `firefly-warm.txt` | Gold/amber; a 40s arc that blooms, glows, and breathes at the climax with a warm background wash |
 | **anger** | `firefly-anger.txt` | Red; erupts from calm into a fast, churning, tightly-packed storm |
 
-The runtime maps an emotion name → preset file in `index.html` (the
+The runtime maps an emotion name → preset file in `app/runtime/emotion-api.js` (the
 `PRESET_FILES` object). Other files in `presets/`
 (`firefly-bloom-reference.txt`, `firefly-anger-calm.txt`) are earlier drafts /
 references, not wired into the runtime.
@@ -194,9 +206,10 @@ interpolates between phases and loops. A separate **Scene** track animates the
 background color and glow. Cycle length is the sum of a preset's phase durations
 (calm 40s, sad 30s, warm 40s, anger 30s).
 
-The renderer lives in **`firefly-field.js`** (`createFireflyField`); the
-background glow in **`cloud-background.js`**; the UI, animation playback, and
-save/load glue in **`index.html`**.
+The particle renderer lives in **`firefly-field.js`** (`createFireflyField`)
+and the background glow in **`cloud-background.js`**. **`app/app.js`** composes
+the focused modules under `app/`; **`index.html`** contains only the document
+shell and UI markup.
 
 ---
 
@@ -226,7 +239,17 @@ preset files at that path).
 ## Project structure
 
 ```
-index.html               App: tuning UI + playback engine + kiosk runtime
+index.html               Document shell and UI markup
+app/
+  app.js                 Composition root and frame-facing adapters
+  bootstrap/             Subsystem construction and initialization order
+  animation/             Timeline model, editing, playback, and transitions
+  presets/               Preset format, restoration, state, and share links
+  runtime/               Readiness, kiosk behavior, and the public API
+  scene/                 Renderer lifecycle, particles, palette, and input
+  state/                 Canonical scene settings and undo history
+  thumbnails/            Capture transactions, caching, and sampling plans
+  ui/                    Shared primitives plus controls/shell/timeline/legacy
 firefly-field.js         The particle renderer (createFireflyField)
 cloud-background.js      Background glow (procedural, self-contained)
 sphere-core.js           Core sphere helpers

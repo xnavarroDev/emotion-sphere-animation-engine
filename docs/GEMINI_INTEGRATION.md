@@ -24,7 +24,7 @@ Everything is stubbed, nothing is wired:
 | The textarea | `index.html:52` (`#rp-describe-textarea`) | `disabled` |
 | The ✦ sparkle button | `index.html:53` (`.rp-sparkle`) | No click handler, `title="AI generation not built yet"` |
 | The section wrapper | `index.html:48` (`#rp-describe-section`) | Collapsible, works fine |
-| The apply seam | `index.html:4099` (`window.emotionSphere.applyPreset(text)`) | **Works.** This is your target — generate text, pass it here |
+| The apply seam | `app/app.js` (`window.emotionSphere.applyPreset(text)`) | **Works.** This is your target — generate text, pass it here |
 | Preset name field | `index.html:101` (`#rp-preset-name`) | Works; good place to put a generated name |
 
 There is **no** Gemini code anywhere in the repo, and **no** API key in
@@ -250,9 +250,9 @@ if (!ok) return res.status(502).json({ error: 'could not generate a valid preset
 
 ## 5. Client wiring
 
-Keep `index.html`'s footprint small. New module `describe-feeling.js`,
-dynamically imported the way `field.js` / `sphere-core.js` already are
-(see `index.html:1194` and `index.html:3719`):
+Keep `index.html` as the document shell. Put new client behavior under `app/`;
+`app/app.js` already imports and dynamically loads focused modules such as
+`app/ui/emotion-controls.js`, `field.js`, and `sphere-core.js`:
 
 ```js
 export async function generateFromDescription(description) {
@@ -266,8 +266,8 @@ export async function generateFromDescription(description) {
 }
 ```
 
-Then in `index.html`, near the other panel wiring (~line 2044, where
-`rp-describe-head` is already toggled):
+Then in a focused module under `app/ui/`, initialized by `app/app.js` near the
+other panel wiring:
 
 ```js
 const describeBox   = document.getElementById('rp-describe-textarea');
@@ -309,10 +309,10 @@ describeBox.addEventListener('keydown', e => {
 ```
 
 **Also remember to:**
-- Remove the `disabled` attribute from `index.html:52` in the markup itself.
+- Remove the `disabled` attribute from `#rp-describe-textarea` in `index.html`.
 - Guard against losing unsaved work — generation replaces the current look
-  entirely. Reuse the existing `rpDirty` flag (`index.html:2051`) and the
-  same confirm pattern as `rpStartNewPreset` (`index.html:2001`).
+  entirely. Reuse the existing dirty-state handling and the same confirmation
+  pattern as `rpStartNewPreset` in `app/app.js`.
 
 ---
 

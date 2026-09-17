@@ -2,6 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { expect } = require('@playwright/test');
 
+// Shared browser fixtures keep network stubs, runtime-error collection, preset
+// codecs, and common editor actions consistent across end-to-end suites.
 const repoRoot = path.resolve(__dirname, '../..');
 const threePath = require.resolve('three/build/three.min.js');
 

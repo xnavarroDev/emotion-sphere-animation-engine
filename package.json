@@ -2,6 +2,8 @@
   "name": "emotion-sphere-animation-engine",
   "private": true,
   "scripts": {
+    "check": "node scripts/quality-check.mjs",
+    "verify": "npm run check && npm run test:chromium",
     "test": "playwright test",
     "test:chromium": "playwright test --project=chromium",
     "test:headed": "playwright test --headed",

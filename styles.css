@@ -34,11 +34,17 @@ body.watch #dots { display:none !important; }
   background:rgba(226,232,240,0.10); backdrop-filter:blur(6px);
 }
 .dot {
+  appearance:none; border:0; padding:0; flex:0 0 auto;
   width:16px; height:16px; border-radius:50%; cursor:pointer;
   opacity:0.55; transition:opacity .18s, box-shadow .18s, transform .18s;
 }
 .dot:hover { opacity:1; transform:scale(1.1); }
+.dot:focus-visible { outline:2px solid #fff; outline-offset:3px; opacity:1; }
 .dot.active { opacity:1; box-shadow:0 0 0 2px rgba(255,255,255,0.9); }
+.dot.dot-blue { background:#22b8e8; box-shadow:0 0 8px #5ce4ff; }
+.dot.dot-yellow { background:#FFE066; box-shadow:0 0 8px #FFE880; }
+.dot.dot-red { background:#E83040; box-shadow:0 0 8px #FF5560; }
+.dot.dot-purple { background:#c890b0; box-shadow:0 0 8px #e8b0c8; }
 .dot-cycle {
   width:16px; height:16px; border-radius:50%;
   background:conic-gradient(from 90deg,#22b8e8,#c890b0,#E83040,#FFE066,#22b8e8);
@@ -203,6 +209,7 @@ body.watch #dots { display:none !important; }
   border-top:1px solid rgba(255,255,255,0.08);
 }
 #anim-heading {
+  appearance:none; width:100%; padding:0; border:0; background:none; text-align:left;
   font-size:10px; letter-spacing:3px; font-weight:400;
   color:rgba(160,202,239,0.9); text-transform:uppercase;
   margin-bottom:14px; cursor:pointer; user-select:none;
@@ -471,6 +478,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 
 /* ---- collapsible sections (Describe a feeling / Parameters) ---- */
 .rp-section-head {
+  appearance: none; width: 100%; border: none; background: none; color: inherit; text-align: left;
   display: flex; align-items: center; justify-content: space-between;
   cursor: pointer; user-select: none; font-size: 20px; font-weight: 600;
   padding: 0;
@@ -504,6 +512,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
 .rp-groups { margin-left: 12px; border-left: 1px solid var(--rp-border); padding-left: 12px; }
 .rp-group { margin-bottom: 4px; }
 .rp-group-head {
+  appearance: none; width: 100%; border: none; background: none; text-align: left;
   display: flex; align-items: center; gap: 8px; cursor: pointer;
   user-select: none; padding: 11px 2px; font-size: 16px; font-weight: 600; color: var(--rp-ink);
 }
@@ -535,6 +544,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   border-top: 1px solid var(--rp-border);
 }
 .rp-pinned-row {
+  appearance: none; width: 100%; border: none; background: none; color: inherit; text-align: left;
   display: flex; align-items: center; justify-content: space-between; cursor: pointer;
   user-select: none; font-size: 20px; font-weight: 600; padding: 6px 0;
 }
@@ -567,6 +577,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   margin: 0 13px 6px;
 }
 .rp-gradientbar .stop {
+  appearance: none; padding: 0;
   position: absolute; top: -3px; width: 24px; height: 24px; border-radius: 50%;
   border: 2px solid var(--rp-white); box-shadow: 0 0 0 1px var(--rp-border); cursor: pointer;
 }
@@ -578,6 +589,12 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   transform: translateX(-50%);
 }
 .rp-gradientbar .thumb:active { cursor: grabbing; }
+.rp-section-head:focus-visible, .rp-group-head:focus-visible,
+.rp-pinned-row:focus-visible, #anim-heading:focus-visible,
+.rp-gradientbar .stop:focus-visible, .rp-gradientbar .thumb:focus-visible,
+#rp-anim-resize:focus-visible {
+  outline: 2px solid var(--rp-accent); outline-offset: 3px;
+}
 .rp-gradient-toggle { border: none; background: none; cursor: pointer; font-size: 11px; color: var(--rp-accent); font-weight: 600; }
 
 /* ---- Animate timeline ---- */
@@ -615,6 +632,7 @@ body.rp-collapsed #rp-collapse-rail { display: flex; }
   border-radius: 999px; background: var(--rp-ink-3); transition: background 0.15s;
 }
 #rp-anim-resize:hover::after, body.rp-anim-resizing #rp-anim-resize::after { background: var(--rp-ink); }
+#rp-anim-resize:focus-visible::after { background: var(--rp-ink); }
 /* while dragging, don't let the pointer land on anything else */
 body.rp-anim-resizing, body.rp-anim-resizing * { cursor: ns-resize !important; user-select: none; }
 .rp-transport {

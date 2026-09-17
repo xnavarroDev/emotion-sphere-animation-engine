@@ -58,6 +58,25 @@ test('timeline add-phase placement, scrubbing, phase resizing, and panel resizin
   await expectNoRuntimeErrors(page, runtimeErrors);
 });
 
+test('phase placement accepts an exact typed duration', async ({ page }) => {
+  const runtimeErrors = await preparePage(page);
+  await gotoApp(page);
+  await openTimeline(page);
+
+  await page.locator('#rp-anim-add-phase').click();
+  const lane = page.locator('#rp-tracks .rp-lane-vp').first();
+  const laneBox = await lane.boundingBox();
+  expect(laneBox).not.toBeNull();
+  await page.mouse.click(laneBox.x + laneBox.width * 0.2, laneBox.y + laneBox.height / 2);
+  await page.keyboard.type('2.5');
+  await page.keyboard.press('Enter');
+
+  await expect(page.locator('body')).not.toHaveClass(/\brp-placing\b/);
+  await expectTimelineCounts(page, [5, 5, 5, 5]);
+  await expect(page.locator('.rp-dur-edit').filter({ hasText: '2.5s' })).toHaveCount(4);
+  await expectNoRuntimeErrors(page, runtimeErrors);
+});
+
 test('legacy playback controls and view toggles remain compatible with the redesigned state', async ({ page }) => {
   const runtimeErrors = await preparePage(page);
   await gotoApp(page);

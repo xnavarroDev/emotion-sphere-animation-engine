@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Minimal no-cache static server for deterministic ES-module browser tests.
 const root = path.resolve(__dirname, '..');
 const port = Number(process.env.TEST_PORT || 4173);
 const host = '127.0.0.1';
@@ -18,29 +19,30 @@ const contentTypes = {
 
 function createServer() {
   return http.createServer((request, response) => {
-  try {
-    const url = new URL(request.url, `http://${host}:${port}`);
-    const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
-    const filePath = path.resolve(root, `.${pathname}`);
-    const withinRoot = filePath === root || filePath.startsWith(`${root}${path.sep}`);
+    try {
+      const url = new URL(request.url, `http://${host}:${port}`);
+      const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+      const filePath = path.resolve(root, `.${pathname}`);
+      const withinRoot = filePath === root || filePath.startsWith(`${root}${path.sep}`);
 
-    if (!withinRoot) {
-      response.writeHead(403).end('Forbidden');
-      return;
+      if (!withinRoot) {
+        response.writeHead(403).end('Forbidden');
+        return;
+      }
+
+      const stat = fs.statSync(filePath);
+      const resolvedPath = stat.isDirectory() ? path.join(filePath, 'index.html') : filePath;
+      response.writeHead(200, {
+        'Content-Type': contentTypes[path.extname(resolvedPath).toLowerCase()] || 'application/octet-stream',
+        'Cache-Control': 'no-store',
+      });
+
+      if (request.method === 'HEAD') response.end();
+      else fs.createReadStream(resolvedPath).pipe(response);
+    } catch (error) {
+      const missing = error.code === 'ENOENT';
+      response.writeHead(missing ? 404 : 500).end(missing ? 'Not found' : 'Server error');
     }
-
-    const stat = fs.statSync(filePath);
-    const resolvedPath = stat.isDirectory() ? path.join(filePath, 'index.html') : filePath;
-    response.writeHead(200, {
-      'Content-Type': contentTypes[path.extname(resolvedPath).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
-    });
-
-    if (request.method === 'HEAD') response.end();
-    else fs.createReadStream(resolvedPath).pipe(response);
-  } catch (error) {
-    response.writeHead(error.code === 'ENOENT' ? 404 : 500).end(error.code === 'ENOENT' ? 'Not found' : 'Server error');
-  }
   });
 }
 

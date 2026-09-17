@@ -3,6 +3,7 @@ const {
   expectNoRuntimeErrors,
   expectTimelineCounts,
   gotoApp,
+  openTimeline,
   preparePage,
 } = require('./helpers/app');
 
@@ -19,6 +20,9 @@ test('editor boots with its public API, canvas, controls, and seeded timeline', 
   await expect.poll(() => page.evaluate(() => window.emotionSphere.emotions.slice().sort()))
     .toEqual(['anger', 'angry', 'calm', 'happy', 'sad', 'warm']);
   await expectTimelineCounts(page, [3, 3, 3, 3]);
+  await openTimeline(page);
+  await expect(page.locator('#rp-tracks > .rp-summary-track')).toHaveCount(1);
+  await expect(page.locator('#rp-tracks .rp-segment .rp-thumb-slots')).not.toHaveCount(0);
   await expectNoRuntimeErrors(page, runtimeErrors);
 });
 
@@ -28,8 +32,12 @@ test('panel collapse and layer add/remove controls preserve the editor state', a
 
   await page.locator('#rp-collapse-btn').click();
   await expect(page.locator('body')).toHaveClass(/\brp-collapsed\b/);
-  await page.locator('#rp-collapse-rail').click();
+  await expect(page.locator('#rp-collapse-btn')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#rp-collapse-rail')).toHaveAttribute('aria-expanded', 'false');
+  await page.locator('#rp-collapse-rail').focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('body')).not.toHaveClass(/\brp-collapsed\b/);
+  await expect(page.locator('#rp-collapse-btn')).toHaveAttribute('aria-expanded', 'true');
 
   await page.locator('#rp-layer-add').click();
   await expect(page.locator('#rp-layer-eyebrow')).toHaveText('Layer 4/4');

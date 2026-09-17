@@ -44,16 +44,19 @@ test('the share button creates a self-contained URL that round-trips', async ({ 
   const expectedCounts = timelineCounts(preset);
   await gotoApp(page, '?emotion=anger');
   await expectTimelineCounts(page, expectedCounts);
+  await page.locator('#rp-preset-name').fill('Café – 感情 🌊');
 
   const sharedUrl = await copyFromButton(page, '#rp-share-link');
   expect(sharedUrl).toContain('?mode=kiosk&preset=');
   expect(decodePresetUrl(sharedUrl)).toContain('Anim Layer 1');
   expect(decodePresetUrl(sharedUrl)).toContain('Anim Scene');
+  expect(decodePresetUrl(sharedUrl)).toContain('presetname Café – 感情 🌊');
 
   const parsed = new URL(sharedUrl);
   await gotoApp(page, `${parsed.search}`);
   await expect(page.locator('body')).toHaveClass(/\bkiosk\b/);
   await expect(page.locator('body')).toHaveClass(/\bwatch\b/);
+  await expect(page.locator('#rp-preset-name')).toHaveValue('Café – 感情 🌊');
   await expectTimelineCounts(page, expectedCounts);
   await expectNoRuntimeErrors(page, runtimeErrors);
 });
